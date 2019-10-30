@@ -1,0 +1,11 @@
+*.log
+*.sqlite
+**/__pycache__/*
+__pycache__/*
+.idea/*
+doc/*.pdf
+doc/*.synctex*
+doc/*.out
+doc/*.toc
+doc/old/*
+buchschloss/config.py

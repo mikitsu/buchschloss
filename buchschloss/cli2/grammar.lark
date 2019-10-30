@@ -1,0 +1,85 @@
+// grammar for cli2
+
+start: code
+code: ((stmt|expr)? limit)* (stmt|expr)?
+func_code: ((return_stmt|stmt|expr)? limit)* (return_stmt|stmt|expr)?
+?stmt: (assign_stmt | if_stmt | while_stmt | for_stmt)
+limit: /(#.*?)?[;\n]/
+
+block: block_begin code "}"
+block_begin: "{"
+func_block: func_begin func_code "}"
+func_begin: "{"
+//func_end: "}"
+
+// statements
+
+assign_stmt: NAME "=" expr -> set_var_stmt
+           | attr_elem_call "." NAME "=" expr -> set_attr_stmt
+
+
+if_stmt: if_begin expr block ["else" (block | if_stmt)]
+if_begin: "if" -> dont_cut
+while_stmt: while_begin expr block
+while_begin: "while" -> dont_cut
+for_stmt: for_begin NAME "in" expr block
+for_begin: "for" -> dont_cut
+
+// expressions
+
+// function definitions
+func_expr: arg_def func_block
+arg_def: "(" (NAME ",")* [NAME] ")"
+//?single_arg: NAME
+return_stmt: "return" expr
+
+// literals and names
+?atom: name | number | string | "(" expr ")" | func_expr | list | map
+name: NAME
+NAME: /[a-zA-Z_]\w*/
+?number: INTEGER -> integer
+       | FLOAT -> float
+INTEGER: ("0" | /[1-9]\d*/)
+FLOAT: FLOAT_EXPONENT
+     | FLOAT_POINT
+FLOAT_EXPONENT: (INTEGER | FLOAT_POINT) /[eE][+-]?\d+/
+FLOAT_POINT: INTEGER? "." /\d+/
+           | INTEGER "."
+string:  /(".*?"|'.*?')/
+list: "[" (expr ",")* expr? "]" frozen? "L"
+map: "[" (expr ":" expr ",")* (expr ":" expr)? "]" frozen? "M"
+frozen: "F"
+
+// operations
+?expr: lnot
+      | expr "and" lnot -> log_and
+      | expr "or" lnot -> log_or
+?lnot: cmp
+     | "not" lnot -> log_not
+?cmp: sum
+    | cmp "<" sum -> less_than
+    | cmp "<=" sum -> less_equal
+    | cmp ">" sum -> greater_than
+    | cmp ">=" sum -> greater_equal
+    | cmp "==" sum -> equal
+    | cmp "!=" sum -> not_equal
+    | cmp "in" sum -> contains
+?sum: prod
+    | sum "+" prod -> add
+    | sum "-" prod -> sub
+?prod: sign
+     | prod "*" sign -> mul
+     | prod "/" sign -> div
+?sign: attr_elem_call
+      | "-" attr_elem_call -> minus
+      | "+" attr_elem_call -> plus
+attr_elem_call: atom
+              | attr_elem_call "." NAME -> attr_lookup
+              | attr_elem_call elem_enter expr "]" -> elem_lookup
+              | attr_elem_call "(" (expr ",")* expr? ")" -> call
+
+elem_enter: "["
+
+%ignore /[ \t\f]/
+%ignore /#.*?#/
+%ignore /#.*$/
