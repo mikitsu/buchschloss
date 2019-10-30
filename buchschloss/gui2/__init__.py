@@ -358,7 +358,7 @@ class ShowInfoNS:
                     # workaround because mtk.ScrollableWidget doesn't handle .destroy() yet
                     ShowInfoNS.to_destroy.container.destroy()
                 except AttributeError:
-                    # don't crash everythong if I stop using ScrollableWidget
+                    # don't crash everything if I stop using ScrollableWidget
                     sys.stderr.write('WARN -- in show_results.<locals>.search_show\n')
                     ShowInfoNS.to_destroy.destroy()
             if id_ is None:
@@ -481,9 +481,9 @@ actions = ActionTree.from_map({
         }.items()
     },
     'search': {k: search_action(FORMS[k], *v) for k, v in {
-        'book': (core.Book, ShowInfoNS.book),
-        'person': (core.Person, ShowInfoNS.person),
-        'borrow_search': (core.Borrow, ShowInfoNS.borrow)
+        'book': (core.models.Book, ShowInfoNS.book),
+        'person': (core.models.Person, ShowInfoNS.person),
+        'borrow_search': (core.models.Borrow, ShowInfoNS.borrow)
         }.items()
     },
     'borrow': borrow_restitute(forms.BorrowForm, core.borrow),

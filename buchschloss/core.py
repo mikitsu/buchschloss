@@ -25,6 +25,7 @@ import operator
 import typing as T
 import numbers
 import re
+import enum
 import builtins
 import traceback
 import logging
@@ -217,6 +218,12 @@ class DummyErrorFile:
                 pass
             else:
                 break
+                
+                
+class LibraryGroupAction(enum.Enum):
+    ADD = 'add'
+    REMOVE = 'remove'
+    DELETE = 'delete'
 
 
 def pbkdf(pw, salt, iterations=config.HASH_ITERATIONS[0]):
@@ -576,13 +583,76 @@ class Library:
         """Create a new Library with the specified name and add it to the specified
                 people and books.
 
-            ``people`` and ``books`` are iterables of the IDs of the poeple and books
+            ``people`` and ``books`` are iterables of the IDs of the people and books
                 to gain access / be transferred to the new library
-            if a Library with the given name already exists, add it to the given
-                people and books
-            return a set of strings describing any encountered errors
+            
+            raise a BuchSchlossBaseError if the Library exists
         """
-        return new_library_group('library', name, books, people, pay_required, True)
+        with models.db:
+            try:
+                lib = models.Library.create(name=name, pay_required=pay_required)
+            except peewee.IntegrityError as e:
+                if str(e).startswith('UNIQUE'):
+                    raise BuchSchlossError('Library_exists', 'Library_{}_exists', name)
+            else:
+                lib.people = people
+                lib.books = books
+
+    @staticmethod
+    def edit(action: LibraryGroupAction, name: str, people: T.Iterable[int] = (),
+             books: T.Iterable[int] = (), pay_required: bool = None):
+        """Perform the given action on the Library with the given name
+
+            'delete' will remove the reference to the library from all given people
+                and books (setting their library to 'main'),
+                but not actually delete the Library itself
+                ``people`` and ``books`` are ignored in this case
+            'add' will add the Library to all given people and set the library
+                of all the given books to the specified one
+            'remove' will remove the reference to the given Library in the given people
+                and set the library of the given books to 'main'
+
+            ``name`` is the name of the Library to modify
+            ``people`` is an iterable of the IDs of the people to modify
+            ``books`` is an iterable of IDs of the books to modify
+            ``pay_required`` will set the Library's payment requirement to itself if not None
+
+            raise a BuchSchlossBaseError if the Library doesn't exist
+        """
+        try:
+            lib = models.Library.get_by_id(name)
+        except models.Library.DoesNotExist:
+            raise BuchSchlossNotFoundError('Library', name)
+        with models.db:
+            if action is LibraryGroupAction.DELETE:
+                lib.books = ()
+                lib.people = ()
+            else:
+                for b in books:
+                    getattr(lib.books, action.value)(b)
+                for p in people:
+                    getattr(lib.people, action.value)(p)
+            if pay_required is not None:
+                lib.pay_required = pay_required
+                lib.save()
+
+    @staticmethod
+    @from_db(models.Library)
+    def view_str(lib):
+        """Return information on the Library
+
+            Return a dict with the following items as strings:
+            - __str__: a string representation of the Library
+            - name: the name of the Library
+            - people: the IDs of the people in the Library, separated by ';'
+            - books: hte IDs of the books in the Library, separated by ';'
+        """
+        return {
+            '__str__': str(lib),
+            'name': lib.name,
+            'people': ';'.join(p.id for p in lib.people),
+            'books': ';'.join(b.id for b in lib.books),
+        }
 
 
 def new_person(id: int, *args, **kwargs):
@@ -613,17 +683,14 @@ def new_library_group(what: T.Union[T.Type[models.Library], T.Type[models.Group]
                       _is_internal_call=False,
                       _skip_library=False,
                       ):
-    """deprecated"""
-    # these two allow legacy calls specifying 'library' or 'group' at
-    # first position or as ``what``. Can be removed once nobody uses them.
-    if isinstance(what, str):
-        what = {'library': models.Library, 'group': models.Group}[what]
-    if not _is_internal_call:
-        warnings.warn('use {}.new instead of new_library_group'.format(what.capitalize()),
-                      DeprecationWarning)
+    """unite common action for creation of libraries and groups"""
     # ``lib`` is a Library or a Group
     lib, new = what.get_or_create(name=name)
-    errors = set()
+    if new:
+        errors = {BuchSchlossError(
+            f'{what.__name__}_exists', '%s_{}_exists' % what.__name__).message}
+    else:
+        errors = set()
     with models.db:
         for b in books:
             try:
@@ -651,14 +718,15 @@ def new_library_group(what: T.Union[T.Type[models.Library], T.Type[models.Group]
                 p = models.Person.get_by_id(p)
             except models.Person.DoesNotExist:
                 errors.add(BuchSchlossNotFoundError('Person', p).message)
-            else:
-                if what == 'library':
-                    try:
-                        p.libraries.add(lib)
-                    except peewee.IntegrityError as e:
-                        if str(e).startswith('UNIQUE'):
-                            errors.add('Person_{}_in_Library_{}'.format(p, name))
-                p.save()
+                continue
+            if what == 'library':
+                try:
+                    p.libraries.add(lib)
+                except peewee.IntegrityError as e:
+                    if str(e).startswith('UNIQUE'):
+                        errors.add(utils.get_name('Person_{}_in_Library_{}')
+                                   .format(p, name))
+            p.save()
     lib.pay_required = pay_required
     lib.save()
     return errors

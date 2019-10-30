@@ -94,8 +94,8 @@ class Person(Model):
     class_: str = CharField()
     max_borrow: int = IntegerField()
     pay_date: datetime.date = FormatedDateField(null=True)
-    # libraries as backref
-    # borrows as backref
+    libraries: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # libraries as backref
+    borrows: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # borrows as backref
 
     repr_data = {
         'ein': 'eine',
@@ -114,12 +114,14 @@ class Library(Model):
     """Represent the libraries a Person has access to.
 
     Speichert die Bibliotheken, zu denen eine Person Zugang hat."""
-    person: T.Iterable[Person] = ManyToManyField(Person, 'libraries')
+    people: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]\
+        = ManyToManyField(Person, 'libraries')
+    books: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]
     name: str = CharField(primary_key=True)
     pay_required: bool = BooleanField(default=True)
 
     def __str__(self):
-        return self.name
+        return utils.get_name('Library[{}]').format(self.name)
 
     repr_data = {
         'ein': 'eine',
@@ -155,9 +157,9 @@ class Book(Model):
     medium: str = CharField()
     genres: str = CharField(null=True)
 
-    # groups as backref
+    groups: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # groups as backref
     id: int = AutoField(primary_key=True)
-    library: Library = ForeignKeyField(Library)
+    library: Library = ForeignKeyField(Library, backref='books')
     shelf: str = CharField()
     is_active: bool = BooleanField(default=True)
 
@@ -181,11 +183,12 @@ class Group(Model):
     """Represent a Group.
 
     Repräsentiert eine Gruppe"""
-    book: T.Iterable[Book] = ManyToManyField(Book, 'groups')
+    books: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]\
+        = ManyToManyField(Book, 'groups')
     name: str = CharField(primary_key=True)
 
     def __str__(self):
-        return self.name
+        return utils.get_name('Group[{}]').format(self.name)
 
     repr_data = {
         'ein': 'eine',
@@ -271,7 +274,7 @@ if __name__ == '__main__':
         sys.exit()
     db.create_tables(Model.__subclasses__())
     # noinspection PyUnresolvedReferences
-    db.create_tables([Library.person.through_model, Group.book.through_model])
+    db.create_tables([Library.people.through_model, Group.books.through_model])
     print('created tables...')
     Misc.create(pk='check_date', data=datetime.datetime.now())
     Misc.create(pk='latest_borrowers', data=[])
