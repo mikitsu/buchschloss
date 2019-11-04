@@ -211,9 +211,35 @@ def foreach(iterable):
             handle_user_input(ui)
 
 
-COMMANDS = {c: getattr(core, c) for c in core.__all__ if c not in
-            ['BuchSchlossBaseError', 'DummyErrorFile', 'misc_data', 'ComplexSearch']}
-COMMANDS.update({
+def search_wrapper(obj, condition):
+    return obj.search(condition)
+search_wrapper.__doc__ = core.search.__doc__
+
+COMMANDS = {
+    'login': core.login,
+    'logout': core.logout,
+    'new_person': core.Person.new,
+    'edit_person': core.Person.edit,
+    'view_person': core.Person.view_str,
+    'new_book': core.Book.new,
+    'edit_book': core.Book.edit,
+    'view_book': core.Book.view_str,
+    'new_library': core.Library.new,
+    'edit_library': core.Library.edit,
+    'new_group': core.Group.new,
+    'edit_group': core.Group.edit,
+    'activate_group': core.Group.activate,
+    'new_member': core.Member.new,
+    'edit_member': core.Member.edit,
+    'change_password': core.Member.change_password,
+    'view_member': core.Member.view_str,
+    'borrow': core.Borrow.new,
+    'restitute': core.Borrow.restitute,
+    'view_borrow': core.Borrow.view_str,
+    'search': search_wrapper,
+    'Book': core.Book,
+    'Person': core.Person,
+    'Borrow': core.Borrow,
     'help': help,
     'list': lambda x: tuple(x),
     'print': pprint.pprint,
@@ -223,7 +249,7 @@ COMMANDS.update({
     'set': setvar,
     'vars': lsvars,
     'foreach': foreach,
-})
+}
 variables = {m.__name__: m for m in models.Model.__subclasses__()}
 
 
