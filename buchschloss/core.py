@@ -401,7 +401,7 @@ class Book:
 
     @staticmethod
     @from_db(models.Book)
-    def view_str(book: models.Book):
+    def view_dict(book: models.Book):
         """Return data about a Book.
 
         Return a dictionary consisting of the following items as strings:
@@ -544,7 +544,7 @@ class Person:
     @staticmethod
     @level_required(1)
     @from_db(models.Person)
-    def view_str(person: models.Person):
+    def view_dict(person: models.Person):
         """Return data about a Person.
 
         Return a dict consisting of the following items as strings:
@@ -678,7 +678,7 @@ class Library:
 
     @staticmethod
     @from_db(models.Library)
-    def view_str(lib):
+    def view_dict(lib):
         """Return information on the Library
 
             Return a dict with the following items as strings:
@@ -806,7 +806,7 @@ class Group:
 
     @staticmethod
     @from_db(models.Group)
-    def view_str(group):
+    def view_dict(group):
         """Return data on a Group
 
             Return a ict with the following items as strings:
@@ -932,6 +932,8 @@ class Borrow:
             and raise a BuchSchlossBaseError if that is not the case
             Also raise a BuchSchlossBaseError if the book hasn't been borrowed,
             even if ``person`` is None
+
+            return the returned Book's shelf
         """
         borrow = book.borrow
         if borrow is None:
@@ -942,6 +944,7 @@ class Borrow:
         borrow.is_back = True
         borrow.save()
         logging.info('{} confirmed {} was returned'.format(current_login, borrow))
+        return book.shelf
 
     @staticmethod
     @level_required(1)
@@ -1089,7 +1092,7 @@ class Member:
     @staticmethod
     @level_required(1)
     @from_db(models.Member)
-    def view_str(member):
+    def view_dict(member):
         """Retrun information about a Member
 
             Return a dictionatry with the following string items:
