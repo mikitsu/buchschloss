@@ -25,17 +25,20 @@ from buchschloss import core, config
 
 
 class FormattedDate(date):
+    """print a datetime.date as specified in config.DATE_FORMAT"""
     def __str__(self):
         return self.strftime(config.DATE_FORMAT)
 
     @classmethod
     def fromdate(cls, date_: date):
+        """Create a FormattedDate from a datetime.date"""
         if date_ is None:
             return None
         else:
             return cls(date_.year, date_.month, date_.day)
 
     def todate(self):
+        """transform self to a datetime.date"""
         return date(self.year, self.month, self.day)
 
 
@@ -57,7 +60,7 @@ def late_books():
     late = []
     warn = []
     today = date.today()
-    for b in core.models.Borrow.select():
+    for b in core.models.Borrow.select():  # TODO: make this much more efficient
         if not b.is_back:
             if b.return_date < today:
                 late.append(b)
@@ -164,11 +167,14 @@ def break_string(text, size, break_char=string.punctuation, cut_char=string.whit
 
 
 def get_book_data(isbn: int):
-    """Attempt to get book data via the ISBN from the DB, if that fails, try the DNB (https://portal.dnb.de)"""
-
-    result = core.search(core.models.Book, _eq_={'isbn': isbn})
-    if result:
-        data = core.view_book(next(iter(result)).id)
+    """Attempt to get book data via the ISBN from the DB, if that fails,
+        try the DNB (https://portal.dnb.de)"""
+    try:
+        book = next(iter(core.Book.search(('isbn', 'eq', isbn))))
+    except StopIteration:
+        pass  # actually, I could put the whole rest of the function here
+    else:
+        data = core.Book.view_str(book.id)
         del data['id'], data['status'], data['return_date'], data['borrowed_by']
         del data['borrowed_by_id'], data['__str__']
         return data
@@ -177,8 +183,8 @@ def get_book_data(isbn: int):
         r = requests.get('https://portal.dnb.de/opac.htm?query=isbn%3D'
                          + str(isbn) + '&method=simpleSearch&cqlMode=true')
         r.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        raise core.BuchSchlossBaseError('keine Verbindung', 'Die Verbindung zur DNB konnte nicht hergestellt werden.') from e
+    except requests.exceptions.RequestException:
+        raise core.BuchSchlossError('no_connection', 'no_connection')
 
     person_re = re.compile(r'(\w*, \w*) \((\w*)\)')
     results = {'concerned_people': []}

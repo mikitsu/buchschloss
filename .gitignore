@@ -1,7 +1,10 @@
 *.log
+*.txt
 *.sqlite
 **/__pycache__/*
 __pycache__/*
+*-ignore/*
+test/*
 .idea/*
 doc/*.pdf
 doc/*.synctex*

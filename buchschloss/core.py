@@ -36,19 +36,9 @@ from . import utils
 from . import models
 
 __all__ = [
-    'BuchSchlossBaseError', 'DummyErrorFile', 'misc_data',
-
-    # 'Person', 'Book', 'Member', 'Misc',
-
+    'BuchSchlossBaseError', 'DummyErrorFile', 'misc_data', 'ComplexSearch',
+    'Person', 'Book', 'Member', 'Borrow', 'Library', 'Group',
     'login', 'logout',
-
-    'new_person', 'new_book', 'new_library', 'new_group', 'new_member',
-    'edit_person', 'edit_book', 'edit_library', 'edit_group', 'edit_member',
-    'change_password', 'activate_group',
-    'view_book', 'view_person', 'view_member', 'view_borrow',
-
-    'borrow', 'restitute',
-    'search', 'ComplexSearch',
 ]
 
 logging.basicConfig(level=logging.INFO,
@@ -57,16 +47,6 @@ logging.basicConfig(level=logging.INFO,
                     style='{',
                     filename='buchschloss.log'
                     )
-
-
-def _moved_to(name, dest):
-    def deprecated_func(*args, **kwargs):
-        warnings.warn('{} has been moved to {}'.format(name, dest.__qualname__),
-                      PendingDeprecationWarning)
-        return dest(*args, **kwargs)
-
-    deprecated_func.__doc__ = 'moved to {}'.format(dest.__qualname__)
-    return deprecated_func
 
 
 class MiscData:
@@ -149,7 +129,7 @@ BuchSchlossDataMissingError = partial(BuchSchlossError, message='data_missing')
 
 class BuchSchlossNotFoundError(BuchSchlossError.template_title('%s_not_found')
                                .template_message('no_%s_with_id_{}')):
-    def __init__(self, model, pk):
+    def __init__(self, model: str, pk):
         super().__init__(model, model, pk)
 
 
@@ -303,15 +283,6 @@ def _try_set_lib(b: models.Book, lib: str, e: set = Dummy(add=lambda x: 0)):
         e.add(BuchSchlossNotFoundError('Library', lib).message)
 
 
-def _get_query_arg(e: peewee.DoesNotExist, throw=True):
-    try:
-        return re.search(r'\[(.*), 1, 0\]$', str(e)).group(1)
-    except AttributeError:
-        traceback.print_exc()
-        if throw:
-            raise BuchSchlossError('error', 'error_while_getting_error_msg')
-
-
 def authenticate(m, password):
     """Check if the given password corresponds to the hashed one.
     Update the hash if newer iteration number present"""
@@ -355,7 +326,21 @@ def logout():
     current_login = dummy_member
 
 
-get_level = _moved_to('get_level', utils.get_level)
+def _update_library_group(lg_model: T.Type[models.Model],
+                          libgr: peewee.ManyToManyQuery,
+                          new: T.Set[str]):
+    errors = set()
+    old = set(lg.name for lg in libgr)
+    for add in new.difference(old):
+        try:
+            libgr.add(lg_model.get(name=add))
+        except lg_model.DoesNotExist:
+            errors.add(BuchSchlossNotFoundError(lg_model.__name__, add).message)
+    for rem in old.difference(new):
+        # these are the ones we just read from the database,
+        # if we get an error here it's bad, so let it crash
+        libgr.remove(lg_model.get(name=rem))
+    return errors
 
 
 class Book:
@@ -404,8 +389,7 @@ class Book:
             raise TypeError('unexpected kwarg')
         errors = set()
         groups = set(kwargs.pop('groups', ()))
-        if all(groups):
-            errors.update(_update_library_group(book, 'groups', groups))
+        errors.update(_update_library_group(models.Group, book.groups, groups))
         lib = kwargs.pop('library', None)
         if lib is not None:
             _try_set_lib(book, lib, errors)
@@ -466,6 +450,32 @@ class Book:
         """
         return book
 
+    @staticmethod
+    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
+               complex_action: str = None):
+        """Search for books.
+
+            `condition` is a tuple of the form (<a>, <op>, <b>)
+                with <op> being a logical operation ("and" or "or") and <a>
+                    and <b> in that case being condition tuples
+                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
+                    "lt" or "le")
+                    in which case <a> is a (possibly dotted) string corresponding
+                    to the attribute name and <b> is the model to compare to.
+            `complex_params` is a sequence of ComplexSearch instances to apply after
+                executing the SQL SELECT
+            `complex_action` is "and" or "or" and specifies how to handle multiple
+                complex cases. If finer granularity is needed, it can be achieved with
+                bitwise operators, providing bools are used.
+
+            Note: for `condition`, there is no "not" available.
+                Use the inverse comparision operator instead
+
+            Return an iterable of objects like those returned by Book.view_ns
+        """
+        return search(models.Book, condition, *complex_params,
+                      complex_action=complex_action)
+
 
 class Person:
     """Namespace for Person-related functions"""
@@ -478,6 +488,7 @@ class Person:
         """Attempt to create a new Person with the given arguments.
 
         raise a BuchSchlossBaseError on failure.
+        Silently ignore nonexistent libraries
 
         See Person for details on arguments
         If ``pay`` is True and ``pay_date`` is None,
@@ -489,13 +500,9 @@ class Person:
             raise BuchSchlossPermError(utils.get_level(4))
         p = models.Person(id=id_, first_name=first_name, last_name=last_name,
                           class_=class_, max_borrow=max_borrow, pay_date=pay_date)
+        p.libraries = libraries
         try:
-            with models.db:
-                for lib in libraries:
-                    p.libraries.add(models.Library.get(models.Library.name == lib))
-                p.save(force_insert=True)
-        except models.Library.DoesNotExist as e:
-            raise BuchSchlossNotFoundError('Library', _get_query_arg(e))
+            p.save(force_insert=True)
         except peewee.IntegrityError as e:
             traceback.print_exc()
             if str(e).startswith('UNIQUE'):
@@ -528,8 +535,7 @@ class Person:
             kwargs['pay_date'] = date.today()
         errors = set()
         lib = set(kwargs.pop('libraries', ()))
-        if all(lib):
-            errors.update(_update_library_group(person, 'libraries', lib))
+        errors.update(_update_library_group(models.Library, person.libraries, lib))
         for k, v in kwargs.items():
             setattr(person, k, v)
         person.save()
@@ -581,6 +587,33 @@ class Person:
         data storage
         """
         return person
+
+    @staticmethod
+    @level_required(1)
+    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
+               complex_action: str = None):
+        """Search for people.
+
+            `condition` is a tuple of the form (<a>, <op>, <b>)
+                with <op> being a logical operation ("and" or "or") and <a>
+                    and <b> in that case being condition tuples
+                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
+                    "lt" or "le")
+                    in which case <a> is a (possibly dotted) string corresponding
+                    to the attribute name and <b> is the model to compare to.
+            `complex_params` is a sequence of ComplexSearch instances to apply after
+                executing the SQL SELECT
+            `complex_action` is "and" or "or" and specifies how to handle multiple
+                complex cases. If finer granularity is needed, it can be achieved with
+                bitwise operators, providing bools are used.
+
+            Note: for `condition`, there is no "not" available.
+                Use the inverse comparision operator instead
+
+            Return an iterable of objects like those returned by Person.view_ns
+        """
+        return search(models.Person, condition, *complex_params,
+                      complex_action=complex_action)
 
 
 class Library:
@@ -681,6 +714,33 @@ class Library:
         """
         return lib
 
+    @staticmethod
+    @level_required(1)
+    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
+               complex_action: str = None):
+        """Search for libraries.
+
+            `condition` is a tuple of the form (<a>, <op>, <b>)
+                with <op> being a logical operation ("and" or "or") and <a>
+                    and <b> in that case being condition tuples
+                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
+                    "lt" or "le")
+                    in which case <a> is a (possibly dotted) string corresponding
+                    to the attribute name and <b> is the model to compare to.
+            `complex_params` is a sequence of ComplexSearch instances to apply after
+                executing the SQL SELECT
+            `complex_action` is "and" or "or" and specifies how to handle multiple
+                complex cases. If finer granularity is needed, it can be achieved with
+                bitwise operators, providing bools are used.
+
+            Note: for `condition`, there is no "not" available.
+                Use the inverse comparision operator instead
+
+            Return an iterable of objects like those returned by Library.view_ns
+        """
+        return search(models.Library, condition, *complex_params,
+                      complex_action=complex_action)
+
 
 class Group:
     """Namespace for Group-related functions"""
@@ -728,6 +788,26 @@ class Group:
                         getattr(group, action.value)(book)
 
     @staticmethod
+    @level_required(3)
+    @from_db(models.Group)
+    def activate(group, src: T.Iterable[str] = (), dest: str = 'main'):
+        """Activate a Group
+
+            ``src`` is an iterable of the names of origin libraries
+                if it is falsey (empty), books are taken from all libraries
+            ``dest`` is the name of the target Library
+
+            return a set of strings describing encountered errors such as
+                missing source libraries
+            raise a BuchSchlossBaseError it the target Library does not exist
+        """
+        errors = set()
+        for book in group.books:
+            # it would probably be better to somehow do this selection at SQL level...
+            if (not src) or book.library.name in src:
+                _try_set_lib(book, dest, errors)
+
+    @staticmethod
     @from_db(models.Group)
     def view_str(group):
         """Return data on a Group
@@ -758,6 +838,33 @@ class Group:
             This will probably change if I decide to store data in any other way
         """
         return group
+
+    @staticmethod
+    @level_required(1)
+    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
+               complex_action: str = None):
+        """Search for groups.
+
+            `condition` is a tuple of the form (<a>, <op>, <b>)
+                with <op> being a logical operation ("and" or "or") and <a>
+                    and <b> in that case being condition tuples
+                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
+                    "lt" or "le")
+                    in which case <a> is a (possibly dotted) string corresponding
+                    to the attribute name and <b> is the model to compare to.
+            `complex_params` is a sequence of ComplexSearch instances to apply after
+                executing the SQL SELECT
+            `complex_action` is "and" or "or" and specifies how to handle multiple
+                complex cases. If finer granularity is needed, it can be achieved with
+                bitwise operators, providing bools are used.
+
+            Note: for `condition`, there is no "not" available.
+                Use the inverse comparision operator instead
+
+            Return an iterable of objects like those returned by Book.view_ns
+        """
+        return search(models.Group, condition, *complex_params,
+                      complex_action=complex_action)
 
 
 class Borrow:
@@ -885,6 +992,33 @@ class Borrow:
         """
         return borrow
 
+    @staticmethod
+    @level_required(1)
+    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
+               complex_action: str = None):
+        """Search for borrows.
+
+            `condition` is a tuple of the form (<a>, <op>, <b>)
+                with <op> being a logical operation ("and" or "or") and <a>
+                    and <b> in that case being condition tuples
+                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
+                    "lt" or "le")
+                    in which case <a> is a (possibly dotted) string corresponding
+                    to the attribute name and <b> is the model to compare to.
+            `complex_params` is a sequence of ComplexSearch instances to apply after
+                executing the SQL SELECT
+            `complex_action` is "and" or "or" and specifies how to handle multiple
+                complex cases. If finer granularity is needed, it can be achieved with
+                bitwise operators, providing bools are used.
+
+            Note: for `condition`, there is no "not" available.
+                Use the inverse comparision operator instead
+
+            Return an iterable of objects like those returned by Book.view_ns
+        """
+        return search(models.Borrow, condition, *complex_params,
+                      complex_action=complex_action)
+
 
 class Member:
     """namespace for Member-related functions"""
@@ -987,432 +1121,40 @@ class Member:
         """
         return member
 
+    @staticmethod
+    @level_required(3)
+    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
+               complex_action: str = None):
+        """Search for members.
 
-def new_person(id: int, *args, **kwargs):
-    """moved to Person.new"""
-    warnings.warn('new_person has been moved to Person.new', PendingDeprecationWarning)
-    return Person.new(id, *args, **kwargs)
+            `condition` is a tuple of the form (<a>, <op>, <b>)
+                with <op> being a logical operation ("and" or "or") and <a>
+                    and <b> in that case being condition tuples
+                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
+                    "lt" or "le")
+                    in which case <a> is a (possibly dotted) string corresponding
+                    to the attribute name and <b> is the model to compare to.
+            `complex_params` is a sequence of ComplexSearch instances to apply after
+                executing the SQL SELECT
+            `complex_action` is "and" or "or" and specifies how to handle multiple
+                complex cases. If finer granularity is needed, it can be achieved with
+                bitwise operators, providing bools are used.
 
+            Note: for `condition`, there is no "not" available.
+                Use the inverse comparision operator instead
 
-new_book = _moved_to('new_book', Book.new)
-new_library = _moved_to('new_library', Library.new)
-
-
-def new_group(name: str, books: T.Iterable[int]):
-    """Create a new Group with the specified name and add the given books to it
-
-        ``books`` is an iterable of the IDs of the books to be added
-        return a set of strings describing encountered errors
-    """
-    return new_library_group(name, books, _is_internal_call=True)
-
-
-@level_required(3)
-def new_library_group(what: T.Union[T.Type[models.Library], T.Type[models.Group]],
-                      name: str,
-                      books: T.Iterable[int],
-                      people: T.Iterable[int] = (),
-                      pay_required: bool = True,
-                      _is_internal_call=False,
-                      _skip_library=False,
-                      ):
-    """unite common action for creation of libraries and groups"""
-    # ``lib`` is a Library or a Group
-    lib, new = what.get_or_create(name=name)
-    if new:
-        errors = {BuchSchlossError(
-            f'{what.__name__}_exists', '%s_{}_exists' % what.__name__).message}
-    else:
-        errors = set()
-    with models.db:
-        for b in books:
-            try:
-                b = models.Book.get_by_id(b)
-            except models.Book.DoesNotExist:
-                errors.add(BuchSchlossNotFoundError('Book', b).message)
-            else:
-                if what == 'library':
-                    _try_set_lib(b, name, errors)
-                elif what == 'group':
-                    try:
-                        b.groups.add(lib)
-                    except peewee.IntegrityError as e:
-                        if str(e).startswith('UNIQUE'):
-                            errors.add(utils.get_name('Book_{}_in_Group_{}').format(b.id, name))
-                        else:
-                            raise
-                    b.save()
-    logging.info('{} created {}'.format(current_login, lib))
-    if _skip_library or what == 'group':
-        return errors  # only libraries for people
-    with models.db:
-        for p in people:
-            try:
-                p = models.Person.get_by_id(p)
-            except models.Person.DoesNotExist:
-                errors.add(BuchSchlossNotFoundError('Person', p).message)
-                continue
-            if what == 'library':
-                try:
-                    p.libraries.add(lib)
-                except peewee.IntegrityError as e:
-                    if str(e).startswith('UNIQUE'):
-                        errors.add(utils.get_name('Person_{}_in_Library_{}')
-                                   .format(p, name))
-            p.save()
-    lib.pay_required = pay_required
-    lib.save()
-    return errors
-
-
-@auth_required
-@level_required(4)
-def new_member(name: str, password: str, level: int):
-    """Create a new Member with the specified properties.
-
-    A salt of the length specified in config.HASH_SALT_LENGTH
-        is randomly generated and used to hash the password.
-    See the wrapping pbkdf function in this module for hashing details
-    """
-    salt = urandom(config.HASH_SALT_LENGTH)
-    pass_hash = pbkdf(password.encode('UTF-8'), salt)
-    try:
-        with models.db:
-            m = models.Member.create(name=name, password=pass_hash, salt=salt, level=level)
-    except peewee.IntegrityError as e:
-        if str(e).startswith('UNIQUE'):
-            raise BuchSchlossError('Member', 'id_{}_for_Member_already_used', name)
-        else:
-            raise
-    logging.info('{} created {}'.format(current_login, m))
-
-
-edit_person = _moved_to('edit_person', Person.edit)
-edit_book = _moved_to('edit_book', Book.edit)
-
-
-def _update_library_group(o: models.Model, what: str, new: T.Set[str]):
-    libgr = getattr(o, what)
-    errors = set()
-    old = set(lg.name for lg in libgr)
-    lg_model = libgr.rel_model
-    for add in new.difference(old):
-        try:
-            libgr.add(lg_model.get(name=add))
-        except lg_model.DoesNotExist:
-            errors.add(BuchSchlossNotFoundError(lg_model, add).message)
-    for rem in old.difference(new):
-        # these are the ones we just read from the database,
-        # if we get an error here it's bad, so let it crash
-        libgr.remove(lg_model.get(name=rem))
-    return errors
-
-
-def edit_library(action: str, name: str, people: T.Iterable[int] = (),
-                 books: T.Iterable[int] = (), pay_required: bool = None) -> set:
-    """Perform the given action on the Library with the given name
-
-        'delete' will remove the reference to the library from all given people
-            and books (setting their library to 'main'),
-            but not actually delete the Library itself
-            ``people`` and ``books`` are ignored in this case
-        'add' will add the Library to all given people and set the library
-            of all the given books to the specified one
-        'remove' will remove the reference to the given Library in the given people
-            and set the library of the given books to 'main'
-
-        ``name`` is the name of the Library to modify
-        ``people`` is an iterable of the IDs of the people to modify
-        ``books`` is an iterable of IDs of the books to modify
-        ``pay_required`` will set the Library's payment requirement to itself if not None
-
-        return a set of strings describing encountered errors
-    """
-    return edit_library_group('library', action, name, people, books,
-                              pay_required, True)
-
-
-def edit_group(action: str, name: str, books: T.Iterable[int]) -> set:
-    """Perform the given action on the specified Group
-
-        'delete' will remove the reference to the grou from all given books,
-            but not actually delete the Group itself
-            ``books`` is ignored in this case
-        'add' will add the Group to all given books
-        'remove' will remove the reference to the given Group in the given books
-
-        ``name`` is the name of the Group to modify
-        ``books`` is an iterable of the IDs of the books to modify
-
-        return a set of strings describing encountered errors
-    """
-    return edit_library_group('group', action, name, books, _is_internal_call=True)
-
-
-@level_required(3)
-def edit_library_group(what: str, action: str, name: str,
-                       people: T.Iterable[int] = (),
-                       books: T.Iterable[int] = (),
-                       pay_required: bool = None,
-                       _is_internal_call=False) -> set:
-    """Perform action on the group or library `name`.
-
-    `what` is either 'library' or 'group'.
-    if action is 'delete', remove name from all references in books (and people)
-        but don't actually delete the library/group
-    if action is 'add', add name to references to what in given books (and people)
-        remain silent when requested to add books/people to a library/group they already belong to
-    if action is 'remove', remove name from references in given books (and people)
-    return a list of error messages if any errors were encountered
-
-    detail: if `what` is neither 'library' nor 'group', a KeyError is raised"""
-    if not _is_internal_call:
-        logging.warning('edit_library_group called directly')
-    # attention -- lib is a Group of Library object, depending on context
-    try:
-        lib = {'library': models.Library, 'group': models.Group}[what].get_by_id(name)
-    except models.Library.DoesNotExist:
-        raise BuchSchlossNotFoundError('Library', name)
-    except models.Group.DoesNotExist:
-        raise BuchSchlossNotFoundError('Group', name)
-
-    errors = set()
-    if action == 'delete':
-        with models.db:
-            if what == 'library':
-                for p in models.Person.select().join(models.Person.libraries.through_model).join(
-                        models.Library).where(models.Library.name == name):
-                    p.libraries.remove(lib)
-                    p.save()
-                for b in models.Book.filter(models.Book.library == lib):
-                    _try_set_lib(b, 'main', errors)
-                    b.save()
-            elif what == 'group':
-                for b in (models.Book.select().join(models.Book.groups.through_model).join(models.Group)
-                          .where(models.Group.name == name)):
-                    b.groups.remove(lib)
-                    # b.save()
-        return errors
-
-    if what == 'library':
-        for s_nr in people:
-            with models.db:
-                try:
-                    p = models.Person.get_by_id(s_nr)
-                except models.Person.DoesNotExist:
-                    errors.add(BuchSchlossNotFoundError('Person', s_nr).message)
-                else:
-                    if action == 'add' and lib not in p.libraries:
-                        p.libraries.add(lib)
-                    elif action == 'remove':
-                        p.libraries.remove(lib)
-                    p.save()
-    for b_id in books:
-        with models.db:
-            try:
-                b = models.Book.get_by_id(b_id)
-            except models.Book.DoesNotExist:
-                errors.add(BuchSchlossNotFoundError('Book', b_id))
-            else:
-                if action == 'add':
-                    if what == 'library':
-                        _try_set_lib(b, name, errors)
-                    elif what == 'group' and lib not in b.groups:
-                        b.groups.add(lib)
-                elif action == 'remove':
-                    if what == 'library':
-                        if b.library.name != name:
-                            errors.add(utils.get_name('Book_not_in_Library_{}')
-                                       .format(name))
-                        else:
-                            _try_set_lib(b, 'main', errors)
-                    elif what == 'group':
-                        b.groups.remove(lib)
-                b.save()
-    if pay_required is not None and what == 'library':
-        lib.pay_required = pay_required
-        lib.save()
-    logging.info('{} edited {}, involving People: {} and Books: {}'
-                 .format(current_login, lib, people, books))
-    return errors
-
-
-@auth_required
-@level_required(4)
-@from_db(models.Member)
-def edit_member(m: models.Member, **kwargs):
-    """Edit a member.
-
-    Set the attributes of the Member object retrieved to the arguments passed.
-    wrapper raises BuchSchlossBaseError on failure"""
-    old = str(m)
-    for k, v in kwargs.items():
-        setattr(m, k, v)
-    logging.info('{} edited {} to {}'.format(current_login, old, m))
-    m.save()
-
-
-@auth_required
-@from_db(models.Member)
-def change_password(m: models.Member, new_password: str):
-    """Change a Member's password and use a new salt
-
-    new_password is the new password of the Member being edited
-    Editing requires being level 4 or the editee
-    If the editee is currently logged in, update"""
-    global current_login
-    if current_login.level < 4 and current_login.name != m.name:
-        raise BuchSchlossError('no_permission', 'no_edit_password_permission')
-    m.salt = urandom(config.HASH_SALT_LENGTH)
-    m.password = pbkdf(new_password.encode('UTF-8'), m.salt)
-    m.save()
-    if current_login.name == m.name:
-        current_login = m
-    logging.info("{} changed {}'s password".format(current_login, m))
-
-
-@level_required(3)
-def activate_group(name: str, src: T.Iterable[str] = (), dest: str = ''):
-    """Activate a group.
-
-    name is the group name
-    src is an iterable of origin libraries
-    dest is the target library
-    if src is a falsely model (empty), the origin is all libraries
-    if dest is a falsely model, the destination is 'main'
-
-    return a set of strings describing encountered errors or the number of moved books"""
-    errors = set()
-    with models.db:
-        if not tuple(models.Group.select(models.Group.name).where(models.Group.name == name)):
-            return {utils.get_name('no_group_{}').format(name)}
-        for b in models.Book.select().join(
-                models.Book.groups.through_model).join(
-                models.Group).where(models.Group.name == name):
-            if not src or b.library.name in src:
-                _try_set_lib(b, dest or 'main', errors)
-                b.save()
-    logging.info('{} activated {!r}'.format(current_login, name))
-    return errors
-
-
-view_person = _moved_to('new_person', Person.view_str)
-view_book = _moved_to('new_book', Book.view_str)
-
-
-@level_required(1)
-@from_db(models.Member)
-def view_member(member: models.Member):
-    """Return information about a member
-
-    Return a dictionary with the member's name and level"""
-    return {'name': member.name, 'level': member.level}
-
-
-@level_required(1)
-@from_db(models.Borrow)
-def view_borrow(borrow: models.Borrow):
-    """Return information about a borrow action
-
-    Return a dictionary with the following items as strings:
-        - 'person': a string representation of the borrowing Person
-        - 'person_id': the ID (id) of the borrowing Person
-        - 'book': a string representation of the borrowed Book
-        - 'book_id': the ID of the borrowed Book
-        - 'return_date': a string representation of the date
-            by which the book has to be returned
-        - 'is_back': a boolean indicating if the book has been returned
-        - '__str__': a string representation of the Borrow
-    """
-    r = {k: str(getattr(borrow, k)) for k in ['person', 'book', 'return_date']}
-    r.update({
-        'person_id': borrow.person.id,
-        'book_id': borrow.book.id,
-        'is_back': borrow.is_back,
-        '__str__': str(borrow),
-    })
-    return r
-
-
-# @level_required(1) -- enforced by borrowing times
-@from_db(models.Book, models.Person, None)
-def borrow(b: models.Book, p: models.Person, weeks: numbers.Real):
-    """Borrow a book.
-
-    ``weeks`` is the time to borrow in weeks.
-
-    raise an error if
-        a) the Person or Book does not exist
-        b) the Person has reached their limit set in max_borrow
-        c) the Person is not allowed to access the library the book is in
-        d) the Book is not available
-        e) the Person has not paid for over 52 weeks and the book's
-            Library requires payment
-        f) ``weeks`` exceeds the one allowed to the executing member
-        g) ``weeks`` is <= 0
-
-    level | max weeks borrowing allowed  TODO: put this somewhere into config
-    1     | 5
-    2     | 7
-    3     | 10
-    4     | 20
-    """
-    if weeks > (0, 5, 7, 10, 20)[current_login.level]:
-        raise BuchSchlossError('borrow', 'no_permission_borrow_{}_weeks', weeks)
-    if weeks <= 0:
-        raise BuchSchlossError('borrow_time', 'borrow_time_negative')
-    if b.borrow or not b.is_active:
-        raise BuchSchlossBaseError('borrow', '{}_not_available', b.id)
-    if b.library not in p.libraries:
-        raise BuchSchlossBaseError(
-            'no_permission', '{}_may_not_borrow_from_{}', p, b.library)
-    if (b.library.pay_required
-            and (p.pay_date or date.min) + timedelta(weeks=52) < date.today()):
-        raise BuchSchlossBaseError('no_payment', 'no_payment_for_{}', p)
-    if models.Borrow.select().where(models.Borrow.person == p, models.Borrow.is_back == False
-                                    ).count() >= p.max_borrow:
-        raise BuchSchlossBaseError('borrow', '{}_reached_max_borrow', p)
-    rdate = datetime.today()+timedelta(weeks=float(weeks))
-    models.Borrow.create(return_date=rdate, person=p, book=b)
-    logging.info('{} borrowed {} to {} until {}'
-                 .format(current_login, b, p, rdate))
-    latest = misc_data.latest_borrowers
-    # avoid writing intermediary stuff to the DB
-    # I'm pretty sure it only does on explicit assignment, but BSTS
-    # plus, it saves a bit of typing
-    if p.id in latest:
-        latest.remove(p.id)
-    else:
-        latest = latest[:config.no_latest_borrowers_save - 1]
-    latest.insert(0, p.id)
-    misc_data.latest_borrowers = latest
-
-
-@level_required(1)
-@from_db(models.Book, models.Person)
-def restitute(book: models.Book, person: models.Person = None, person_match: bool = True):  # return is keyword
-    """Restitute a book.
-
-    raise a BuchSchlossBaseError if:
-        a) the book or person doesn't exist OR
-        b) the book is not borrowed OR
-        c) the person has not borrowed the book and `person_match` is True"""
-    borrow = book.borrow
-    if borrow is None:
-        raise BuchSchlossBaseError('Book_not_borrowed', '{}_not_borrowed', book)
-    elif person_match and borrow.person != person:
-        raise BuchSchlossBaseError(
-            'Book_not_borrowed', '{}_not_borrowed_by_{}', book, person)
-    borrow.is_back = True
-    borrow.save()
-    logging.info('{} confirmed {} returned {}'
-                 .format(current_login, person, book))
+            Return an iterable of objects like those returned by Book.view_ns
+        """
+        return search(models.Member, condition, *complex_params,
+                      complex_action=complex_action)
 
 
 def search(o: T.Type[models.Model], condition: T.Tuple = None,
            *complex_params: 'ComplexSearch', complex_action: str = 'or',
            _in_=None, _eq_=None):
-    """Search for objects.
+    """THIS IS AN INTERNAL FUNCTION -- for user searches, use *.search
+
+        Search for objects.
 
         `condition` is a tuple of the form (<a>, <op>, <b>)
             with <op> being a logical operation ("and" or "or") and <a>
@@ -1484,7 +1226,7 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
     query = o.select(*o.str_fields)
     result = handle_condition(*condition, query)
     if complex_params:
-        return do_complex_search(complex_action, result, complex_params)
+        return _do_complex_search(complex_action, result, complex_params)
     else:
         return result
 
@@ -1503,14 +1245,13 @@ def _search_old(o: T.Type[models.Model], kind: str = 'or', *complex_params, _in_
     The objects returned have enough data to be representable as strings.
     If more data is needed, the appropriate view_* function may be called
     """
-    warnings.warn('use the new condition specification in search',
-                  DeprecationWarning, stacklevel=2)
+    warnings.warn('use the new *.search functions', DeprecationWarning, stacklevel=2)
     req_level = next(i for i, mods in enumerate(
         ((models.Book,), (models.Person, models.Borrow), (), models.Model.__subclasses__())) if o in mods)
     if req_level > current_login.level:
         raise BuchSchlossBaseError(utils.get_name('no_permission'),
                                    utils.get_name('must_be_{}').format(
-                                   get_level(req_level)))
+                                   utils.get_level(req_level)))
 
     def add_to_query(q):
         nonlocal query
@@ -1562,12 +1303,14 @@ def _search_old(o: T.Type[models.Model], kind: str = 'or', *complex_params, _in_
         query = query.where(reduce(
             {'and': operator.and_, 'or': operator.or_}[kind], conditions))
     if complex_params:
-        return do_complex_search(kind, query, complex_params)
+        return _do_complex_search(kind, query, complex_params)
     logging.info('{} performed a search for {}'.format(current_login, o))
     return query
 
 
-def do_complex_search(kind: str, objects: T.Iterable[models.Model], complex_params):
+def _do_complex_search(kind: str, objects: T.Iterable[models.Model], complex_params):
+    """Perform the ComplexSearch operations.
+        Once __search_old is removed, this can be merged into search"""
     results = set()
     for o in objects:
         for c in complex_params:
