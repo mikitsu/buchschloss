@@ -432,7 +432,7 @@ class Book:
     def view_ns(book):
         """Return data about a Book.
 
-        Return a Python object with the following attributes:
+            Return a Python object with the following attributes:
             - isbn: int
             - author, title language, publisher, medium, shelf: str
             - series, concerned_peoplem genres: str or None
@@ -441,9 +441,11 @@ class Book:
             - is_active: bool
             - borrow: object as returned by Borrow.view_ns or None
 
-        Actually, the returned object is instance of models.Book,
-        but this may change if I ever decide to use something else for
-        data storage
+            The object supports str()
+
+            Actually, the returned object is instance of models.Book,
+            but this may change if I ever decide to use something else for
+            data storage
         """
         return book
 
@@ -570,7 +572,7 @@ class Person:
     def view_ns(person):
         """Return data about a Person.
 
-        Return a Python object with the following attributes:
+            Return a Python object with the following attributes:
             - id, max_borrow: int
             - first_name, last_name, class_: str
             - pay_date: datetime.date or None
@@ -579,9 +581,11 @@ class Person:
             - borrows: iterable of objects as returned by Borrow.view_ns
                 representing the Person's borrows
 
-        Actually, the returned object is instance of models.Person,
-        but this may change if I ever decide to use something else for
-        data storage
+            The object supports str()
+
+            Actually, the returned object is instance of models.Person,
+            but this may change if I ever decide to use something else for
+            data storage
         """
         return person
 
@@ -705,6 +709,8 @@ class Library:
                 representing the people with access to the Library
             - books: an iterable of objects as returned by Book.view_ns
                 representing the books in the Library
+
+            The object supports str()
 
             Actually, the object returned is a models.Library instance.
             This will probably change if I decide to store data in any other way
@@ -830,6 +836,8 @@ class Group:
             - name: the name of the Group as string
             - books: an iterable of objects as returned by Book.view_ns
                 representing the books in the Group
+
+            The object supports str()
 
             Actually, the object returned is a models.Group instance.
             This will probably change if I decide to store data in any other way
@@ -987,6 +995,8 @@ class Borrow:
                 by which the book has the be returned
             - a boolean indicating whether the book has been returned yet
 
+            The object supports str()
+
             Actually, this function returns an instance of models.Borrow.
             If I ever decide to change the way data is stored, this may change.
         """
@@ -1115,6 +1125,8 @@ class Member:
             Return a Python object with the following attributes:
             - name: str
             - level: int
+
+            The object supports str()
 
             Actually, a models.Member instance is returned.
             This may change if I ever decide to store date in a different way
