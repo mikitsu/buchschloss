@@ -398,6 +398,10 @@ class Book:
         See Book.__doc__ for more information on the arguments
         raise a BuchSchlossBaseError if the Book isn't found.
         """
+        if ((not set(kwargs.keys()) <= {k for k, v in vars(models.Person).items()
+                                        if isinstance(v, peewee.Field)})
+                or 'id' in kwargs):
+            raise TypeError('unexpected kwarg')
         errors = set()
         groups = set(kwargs.pop('groups', ()))
         if all(groups):
@@ -465,6 +469,7 @@ class Book:
 
 class Person:
     """Namespace for Person-related functions"""
+
     @staticmethod
     @level_required(3)
     def new(id_: int, first_name: str, last_name: str, class_: str,
@@ -494,7 +499,7 @@ class Person:
         except peewee.IntegrityError as e:
             traceback.print_exc()
             if str(e).startswith('UNIQUE'):
-                raise BuchSchlossError('Person', 'id_{}_for_Person_already_used', id_)
+                raise BuchSchlossError('Person_exists', 'Person_{}_exists', id_)
             elif str(e).startswith('NOT NULL'):
                 raise BuchSchlossDataMissingError('new_person')
             else:
@@ -515,6 +520,10 @@ class Person:
         raise a BuchSchlossBaseError if the Person isn't found.
         Return a set of errors found during updating the person's libraries
         """
+        if ((not set(kwargs.keys()) <= {k for k, v in vars(models.Person).items()
+                                        if isinstance(v, peewee.Field)})
+                or 'id' in kwargs):
+            raise TypeError('unexpected kwarg')
         if kwargs.pop('pay', False):
             kwargs['pay_date'] = date.today()
         errors = set()
@@ -578,8 +587,8 @@ class Library:
     """Namespace for Library-related functions"""
     @staticmethod
     @level_required(3)
-    def new(name: str, books: T.Iterable[int],
-            people: T.Iterable[int], pay_required: bool = True):
+    def new(name: str, books: T.Sequence[int],
+            people: T.Sequence[int], pay_required: bool = True):
         """Create a new Library with the specified name and add it to the specified
                 people and books.
 
@@ -599,17 +608,18 @@ class Library:
                 lib.books = books
 
     @staticmethod
+    @level_required(3)
     def edit(action: LibraryGroupAction, name: str, people: T.Iterable[int] = (),
              books: T.Iterable[int] = (), pay_required: bool = None):
         """Perform the given action on the Library with the given name
 
-            'delete' will remove the reference to the library from all given people
+            DELETE will remove the reference to the library from all given people
                 and books (setting their library to 'main'),
                 but not actually delete the Library itself
                 ``people`` and ``books`` are ignored in this case
-            'add' will add the Library to all given people and set the library
+            ADD will add the Library to all given people and set the library
                 of all the given books to the specified one
-            'remove' will remove the reference to the given Library in the given people
+            REMOVE will remove the reference to the given Library in the given people
                 and set the library of the given books to 'main'
 
             ``name`` is the name of the Library to modify
@@ -645,7 +655,7 @@ class Library:
             - __str__: a string representation of the Library
             - name: the name of the Library
             - people: the IDs of the people in the Library, separated by ';'
-            - books: hte IDs of the books in the Library, separated by ';'
+            - books: the IDs of the books in the Library, separated by ';'
         """
         return {
             '__str__': str(lib),
@@ -653,6 +663,329 @@ class Library:
             'people': ';'.join(p.id for p in lib.people),
             'books': ';'.join(b.id for b in lib.books),
         }
+
+    @staticmethod
+    @from_db(models.Library)
+    def view_ns(lib):
+        """Return information on a Library
+
+            Return a Python object with the following attributes:
+            - name: the name of the Library
+            - people: an iterable objects as returned by Person.view_ns
+                representing the people with access to the Library
+            - books: an iterable of objects as returned by Book.view_ns
+                representing the books in the Library
+
+            Actually, the object returned is a models.Library instance.
+            This will probably change if I decide to store data in any other way
+        """
+        return lib
+
+
+class Group:
+    """Namespace for Group-related functions"""
+
+    @staticmethod
+    @level_required(3)
+    def new(name: str, books: T.Sequence[int]):
+        """Create a new Group with the given name and books
+
+            raise a BuchSchlossBaseError if the Group exists
+        """
+        with models.db:
+            try:
+                group = models.Group.create(name=name)
+            except peewee.IntegrityError as e:
+                if str(e).startswith('UNIQUE'):
+                    raise BuchSchlossError('Group_exists', 'Group_{}_exists', name)
+                else:
+                    raise
+            else:
+                group.books = books
+
+    @staticmethod
+    @level_required(3)
+    def edit(action: LibraryGroupAction, name: str, books: T.Iterable[int]):
+        """Perform the given action on the Group with the given name
+
+            DELETE will remove all references to the Group,
+                but not delete the Group itself. ``books`` is ignored in this case
+            ADD will add the given Group to the given books
+                ignore IDs of non-existing books
+            REMOVE will remove the reference to the Group in all of the given books
+                ignore books not in the Group and IDs of nonexistent books
+        """
+        with models.db:
+            try:
+                group = models.Group.get_by_id(name)
+            except models.Group.DoesNotExist:
+                raise BuchSchlossNotFoundError('Group', name)
+            else:
+                if action is LibraryGroupAction.DELETE:
+                    group.books = ()
+                else:
+                    for book in books:
+                        getattr(group, action.value)(book)
+
+    @staticmethod
+    @from_db(models.Group)
+    def view_str(group):
+        """Return data on a Group
+
+            Return a ict with the following items as strings:
+            - __str__: a string representation of the Group
+            - name: the name of the Group
+            - books: the IDs of the books in the Group
+                separated by ';'
+        """
+        return {
+            '__str__': str(group),
+            'name': group.name,
+            'books': ';'.join(str(b.id) for b in group.books),
+        }
+
+    @staticmethod
+    @from_db(models.Group)
+    def view_ns(group):
+        """Return data on a Group
+
+            Return a Python object with the following attributes
+            - name: the name of the Group as string
+            - books: an iterable of objects as returned by Book.view_ns
+                representing the books in the Group
+
+            Actually, the object returned is a models.Group instance.
+            This will probably change if I decide to store data in any other way
+        """
+        return group
+
+
+class Borrow:
+    """Namespace for Borrow-related functions"""
+
+    @staticmethod
+    @from_db(models.Book, models.Person)
+    def new(book, person, weeks):
+        """Borrow a book.
+
+            ``book`` is the ID of the Book begin borrowed
+            ``person`` is the ID of the Person borrowing the book
+            ``weeks`` is the time to borrow in weeks.
+
+            raise an error if
+                a) the Person or Book does not exist
+                b) the Person has reached their limit set in max_borrow
+                c) the Person is not allowed to access the library the book is in
+                d) the Book is not available
+                e) the Person has not paid for over 52 weeks and the book's
+                    Library requires payment
+                f) ``weeks`` exceeds the one allowed to the executing member
+                g) ``weeks`` is <= 0
+
+            the maximum amount of time a book may be borrowed for is defined
+            in the configuration settings
+        """
+        if weeks > config.borrow_time_limit[current_login.level]:
+            raise BuchSchlossPermError(1)
+        if weeks <= 0:
+            raise BuchSchlossError('Borrow', 'borrow_length_not_positive')
+        if not book.is_active or book.borrow:
+            raise BuchSchlossError('Borrow', 'Book_{}_not_available', book.id)
+        if book.library not in person.libraries:
+            raise BuchSchlossError('Borrow', '{}_not_in_Library_{}',
+                                   person, book.library.name)
+        if (book.library.pay_required and (person.pay_date or date.min)
+                + timedelta(weeks=52) < date.today()):
+            raise BuchSchlossError('Borrow', 'Library_{}_needs_payment')
+        if len(person.borrows) >= person.max_borrow:
+            raise BuchSchlossError('Borrow', '{}_has_reached_max_borrow', person)
+        rdate = date.today() + timedelta(weeks=weeks)
+        models.Borrow.create(person=person, book=book, return_date=rdate)
+        logging.info('{} borrowed {} to {} until {}'.format(
+            current_login, book, person, rdate))
+        latest = misc_data.latest_borrowers
+        # since the values are written to the DB on explicit assignment only
+        # and values aren't cached (yet, but I still don't want to rely on it)
+        # but read on each lookup, the temporary variable is important
+        if person.id in latest:
+            latest.remove(person.id)
+        else:
+            latest = latest[:config.no_latest_borrowers_save - 1]
+        latest.insert(0, person.id)
+        misc_data.latest_borrowers = latest
+
+    @staticmethod
+    @level_required(1)
+    @from_db(models.Book)
+    def restitute(book, person):
+        """return a book
+
+            ``book`` is the ID of the Book to be returned
+            ``person`` may be the ID of the returning Person or None
+
+            if ``person`` is not None, verify that the specified Person
+            actually has borrowed the Book before making modifications
+            and raise a BuchSchlossBaseError if that is not the case
+            Also raise a BuchSchlossBaseError if the book hasn't been borrowed,
+            even if ``person`` is None
+        """
+        borrow = book.borrow
+        if borrow is None:
+            raise BuchSchlossError('not_borrowed', '{}_not_borrowed', book.id)
+        if person is not None and borrow.person.id != person:
+            raise BuchSchlossError('not_borrowed', '{}_not_borrowed_by_{}',
+                                   book, person)
+        borrow.is_back = True
+        borrow.save()
+        logging.info('{} confirmed {} was returned'.format(current_login, borrow))
+
+    @staticmethod
+    @level_required(1)
+    @from_db(models.Borrow)
+    def view_str(borrow):
+        """Return information about a Borrow
+
+            Return a dictionary containing the following items:
+            - __str__: a string representation of the Borrow
+            - person: a string representation of the borrowing Person
+            - person_id: the ID of the borrowing Person
+            - book: a string representation of the borrowed Book
+            - book_id: the ID of the borrowed Book
+            - return_date: a string representation of the date
+                by which the book has to be returned
+            - is_back: a string indicating whether the Book has been returned
+        """
+        return {
+            '__str__': str(borrow),
+            'person': str(borrow.person),
+            'person_id': borrow.person.id,
+            'book': str(borrow.book),
+            'book_id': borrow.book.id,
+            'return_date': str(borrow.return_date),
+            'is_back': utils.get_name(str(borrow.is_back)),
+        }
+
+    @staticmethod
+    @level_required(1)
+    @from_db(models.Borrow)
+    def view_ns(borrow):
+        """Return information on a Borrow
+
+            Return a Python object with the following attributes:
+            - person: an object as returned by Person.view_ns
+                representing the borrowing Person
+            - book: an object as returned by Book.view_ns
+                representing the borrowed Book
+            - return_date: a datetime.date object representing the date
+                by which the book has the be returned
+            - a boolean indicating whether the book has been returned yet
+
+            Actually, this function returns an instance of models.Borrow.
+            If I ever decide to change the way data is stored, this may change.
+        """
+        return borrow
+
+
+class Member:
+    """namespace for Member-related functions"""
+
+    @staticmethod
+    @auth_required
+    @level_required(4)
+    def new(name: str, password: str, level: int):
+        """Create a new Member
+
+            ``name`` must be unique among members and is case-sensitive
+            ``level`` must be between 0 and 4, inclusive
+        """
+        salt = urandom(config.HASH_SALT_LENGTH)
+        pass_hash = pbkdf(password.encode(), salt)
+        with models.db:
+            try:
+                m = models.Member.create(name=name, password=pass_hash,
+                                         salt=salt, level=level)
+            except peewee.IntegrityError as e:
+                if str(e).startswith('UNIQUE'):
+                    raise BuchSchlossError('Member_exists', 'Member_{}_exists')
+                else:
+                    raise
+        logging.info('{} created {}'.format(current_login, m))
+
+    @staticmethod
+    @auth_required
+    @level_required(4)
+    @from_db(models.Member)
+    def edit(member, **kwargs):
+        """Edit the given member.
+
+            Set the given attributes on the given Member.
+            As of now, only the level can be set.
+
+            If the editee is currently logged in, a new level
+            applies to all future actions immediately
+
+            ATTENTION: DO NOT change password with this function
+            use Member.change_password instead
+        """
+        old_str = str(member)
+        if (not set(kwargs.keys()) <= {'level'}) or 'name' in kwargs:
+            raise TypeError('unexpected kwarg')
+        for k, v in kwargs.items():
+            setattr(member, k, v)
+        member.save()
+        logging.info('{} edited {} to {}'.format(current_login, old_str, member))
+
+    @staticmethod
+    @auth_required
+    @from_db(models.Member)
+    def change_password(member, new_password):
+        """Change a Member's password
+
+            editing a password requires being level 4 or the editee
+            If the editee is currently logged in, the new password
+            needs to be used for authentication immediately
+        """
+        global current_login
+        if current_login.level < 4 and current_login.name != member.name:
+            raise BuchSchlossPermError('4_or_editee')
+        member.salt = urandom(config.HASH_SALT_LENGTH)
+        member.password = pbkdf(new_password, member.salt)
+        member.save()
+        if current_login.name == member.name:
+            current_login = member
+        logging.info("{} changed {}'s password".format(current_login, member))
+
+    @staticmethod
+    @level_required(1)
+    @from_db(models.Member)
+    def view_str(member):
+        """Retrun information about a Member
+
+            Return a dictionatry with the following string items:
+            - __str__: a representation of the Member
+            - name: the Member's name
+            - level: the Member's level
+        """
+        return {
+            '__str__': str(member),
+            'name': member.name,
+            'level': utils.get_name(member.level),
+        }
+
+    @staticmethod
+    @level_required(1)
+    @from_db(models.Member)
+    def view_ns(member):
+        """Return information about a Member
+
+            Return a Python object with the following attributes:
+            - name: str
+            - level: int
+
+            Actually, a models.Member instance is returned.
+            This may change if I ever decide to store date in a different way
+        """
+        return member
 
 
 def new_person(id: int, *args, **kwargs):

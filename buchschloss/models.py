@@ -64,12 +64,12 @@ class Model(peewee.Model):
                 break
 
 
-class FormatedDateField(DateField):
+class FormattedDateField(DateField):
     def python_value(self, value):
-        return utils.FormatedDate.fromdate(super().python_value(value))
+        return utils.FormattedDate.fromdate(super().python_value(value))
 
     def db_value(self, value):
-        if isinstance(value, utils.FormatedDate):
+        if isinstance(value, utils.FormattedDate):
             return value.todate()
         return value
 
@@ -93,7 +93,7 @@ class Person(Model):
     last_name: str = CharField()
     class_: str = CharField()
     max_borrow: int = IntegerField()
-    pay_date: datetime.date = FormatedDateField(null=True)
+    pay_date: datetime.date = FormattedDateField(null=True)
     libraries: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # libraries as backref
     borrows: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # borrows as backref
 
@@ -214,7 +214,7 @@ class Borrow(Model):
     person: Person = ForeignKeyField(Person, backref='borrows')
     book: Book = ForeignKeyField(Book)
     is_back: bool = BooleanField(default=False)
-    return_date: datetime.date = FormatedDateField()
+    return_date: datetime.date = FormattedDateField()
 
     repr_data = {
         'ein': 'ein',

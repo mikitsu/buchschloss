@@ -24,7 +24,7 @@ import string
 from buchschloss import core, config
 
 
-class FormatedDate(date):
+class FormattedDate(date):
     def __str__(self):
         return self.strftime(config.DATE_FORMAT)
 
