@@ -2,17 +2,15 @@
 
 Handles access to the database and provides high-level interfaces for all operations.
 __all__ exports:
-    - BuchSchlossBaseError: the error raised in this module. Comes with a nice description of what exactly failed.
+    - BuchSchlossBaseError: the error raised in this module.
+        Instances come with a nice description of what exactly failed.
     - DummyErrorFile: a dummy error file (for sys.stderr) that writes errors to log
         and provides access to them e.g. for display or ending
     - misc_data: provide easy access to data stored in Misc by attribute lookup
-    - (as of now not, decision pending) Person, Book, Member, Misc: DB model classes for direct usage
     - login, logout: to log  user in or out
-    - new_*, edit_*, view_*: interfaces for creating, editing or viewing data
-    - activate_group: group activation
-    - change_password: Member password change by lvl 4 or member themselves
-    - borrow, restitute: "return" is keyword
-    - search, ComplexSearch: for searching models
+    - Book, Person, Borrow, Member, Library, Group: namespaces for functions
+        dealing with the respective objects
+    - ComplexSearch: for very complex search queries
 """
 
 from hashlib import pbkdf2_hmac
