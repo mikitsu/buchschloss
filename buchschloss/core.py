@@ -470,7 +470,8 @@ class Book:
             Note: for `condition`, there is no "not" available.
                 Use the inverse comparision operator instead
 
-            Return an iterable of objects like those returned by Book.view_ns
+            Return an iterable of objects like those returned by Book.view_ns,
+            differing in that they only have the attributes ``id`` and ``title``
         """
         return search(models.Book, condition, *complex_params,
                       complex_action=complex_action)
@@ -611,7 +612,9 @@ class Person:
             Note: for `condition`, there is no "not" available.
                 Use the inverse comparision operator instead
 
-            Return an iterable of objects like those returned by Person.view_ns
+            Return an iterable of objects like those returned by Person.view_ns,
+            differing in that they only have the attributes ``id``,
+            11first_name``, and ``last_name``
         """
         return search(models.Person, condition, *complex_params,
                       complex_action=complex_action)
@@ -739,7 +742,8 @@ class Library:
             Note: for `condition`, there is no "not" available.
                 Use the inverse comparision operator instead
 
-            Return an iterable of objects like those returned by Library.view_ns
+            Return an iterable of objects like those returned by Library.view_ns,
+            differing in that they only have the attribute ``name``
         """
         return search(models.Library, condition, *complex_params,
                       complex_action=complex_action)
@@ -866,7 +870,8 @@ class Group:
             Note: for `condition`, there is no "not" available.
                 Use the inverse comparision operator instead
 
-            Return an iterable of objects like those returned by Book.view_ns
+            Return an iterable of objects like those returned by Group.view_ns,
+            differing in that they only have the attribute ``name``
         """
         return search(models.Group, condition, *complex_params,
                       complex_action=complex_action)
@@ -1024,7 +1029,7 @@ class Borrow:
             Note: for `condition`, there is no "not" available.
                 Use the inverse comparision operator instead
 
-            Return an iterable of objects like those returned by Book.view_ns
+            Return an iterable of objects like those returned by Borrow.view_ns
         """
         return search(models.Borrow, condition, *complex_params,
                       complex_action=complex_action)
@@ -1155,7 +1160,7 @@ class Member:
             Note: for `condition`, there is no "not" available.
                 Use the inverse comparision operator instead
 
-            Return an iterable of objects like those returned by Book.view_ns
+            Return an iterable of objects like those returned by Member.view_ns
         """
         return search(models.Member, condition, *complex_params,
                       complex_action=complex_action)
