@@ -21,7 +21,6 @@ import warnings
 import operator
 # noinspection PyPep8Naming
 import typing as T
-import numbers
 import re
 import enum
 import builtins
