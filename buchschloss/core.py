@@ -2,17 +2,13 @@
 
 Handles access to the database and provides high-level interfaces for all operations.
 __all__ exports:
-    - BuchSchlossBaseError: the error raised in this module. Comes with a nice description of what exactly failed.
+    - BuchSchlossBaseError: the error raised in this module.
+        Comes with a nice description of what exactly failed.
     - DummyErrorFile: a dummy error file (for sys.stderr) that writes errors to log
         and provides access to them e.g. for display or ending
     - misc_data: provide easy access to data stored in Misc by attribute lookup
-    - (as of now not, decision pending) Person, Book, Member, Misc: DB model classes for direct usage
-    - login, logout: to log  user in or out
-    - new_*, edit_*, view_*: interfaces for creating, editing or viewing data
-    - activate_group: group activation
-    - change_password: Member password change by lvl 4 or member themselves
-    - borrow, restitute: "return" is keyword
-    - search, ComplexSearch: for searching models
+    - Person, Book, Member, Borrow, Library, Group: namespaces for related functions
+    - login, logout: to log a user in or out
 """
 
 from hashlib import pbkdf2_hmac
@@ -23,7 +19,6 @@ import warnings
 import operator
 # noinspection PyPep8Naming
 import typing as T
-import numbers
 import re
 import enum
 import builtins
@@ -216,7 +211,7 @@ def from_db(*arguments: T.Type[models.Model]):
 
     convert all arguments at their given position to wrapper_arg.get_by_id(func_arg)
     ignore wrapper arguments of None
-    raise a BuchSchlossBaseError with an explainaition if the object does not exist"""
+    raise a BuchSchlossBaseError with an explanation if the object does not exist"""
     def wrapper_maker(f):
         @wraps(f)
         def wrapper(*args: T.Any, **kwargs):
@@ -451,6 +446,11 @@ class Book:
         return book
 
     @staticmethod
+    def view_repr(book):
+        """return a string representing the Book"""
+        return str(models.Book.select_str_fields().where(models.Book.id == book))
+
+    @staticmethod
     def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
                complex_action: str = None):
         """Search for books.
@@ -590,6 +590,13 @@ class Person:
 
     @staticmethod
     @level_required(1)
+    def view_repr(person):
+        """Return an informational string about the Person"""
+        person = models.Person.select_str_fields().where(models.Person.id == person)
+        return str(person)
+
+    @staticmethod
+    @level_required(1)
     def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
                complex_action: str = None):
         """Search for people.
@@ -713,6 +720,11 @@ class Library:
             This will probably change if I decide to store data in any other way
         """
         return lib
+
+    @staticmethod
+    def view_repr(library):
+        """return a representational string"""
+        return str(models.Library.select_str_fields().where(models.Library.name == library))
 
     @staticmethod
     @level_required(1)
@@ -840,7 +852,11 @@ class Group:
         return group
 
     @staticmethod
-    @level_required(1)
+    def view_repr(group):
+        """return a string representing the Group"""
+        return str(models.Group.select_str_fields().where(models.Group.id == group))
+
+    @staticmethod
     def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
                complex_action: str = None):
         """Search for groups.
@@ -994,6 +1010,12 @@ class Borrow:
 
     @staticmethod
     @level_required(1)
+    def view_repr(borrow):
+        """return a representational string"""
+        return str(models.Borrow.select_str_fields().where(models.Borrow.id == borrow))
+
+    @staticmethod
+    @level_required(1)
     def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
                complex_action: str = None):
         """Search for borrows.
@@ -1090,7 +1112,6 @@ class Member:
         logging.info("{} changed {}'s password".format(current_login, member))
 
     @staticmethod
-    @level_required(1)
     @from_db(models.Member)
     def view_str(member):
         """Retrun information about a Member
@@ -1107,7 +1128,6 @@ class Member:
         }
 
     @staticmethod
-    @level_required(1)
     @from_db(models.Member)
     def view_ns(member):
         """Return information about a Member
@@ -1120,6 +1140,11 @@ class Member:
             This may change if I ever decide to store date in a different way
         """
         return member
+
+    @staticmethod
+    def view_repr(member):
+        """return a string representing the Member"""
+        return str(models.Member.select_str_fields().where(models.Member.name == member))
 
     @staticmethod
     @level_required(3)
@@ -1420,4 +1445,3 @@ current_login = dummy_member
 misc_data = MiscData()
 
 logging.info('core operational')
-

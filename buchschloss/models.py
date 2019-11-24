@@ -63,6 +63,11 @@ class Model(peewee.Model):
                 cls.pk_type = typing.get_type_hints(cls)[k]
                 break
 
+    @classmethod
+    def select_str_fields(cls):
+        """return cls.select(*cls.str_fields)"""
+        return cls.select(*cls.str_fields)
+
 
 class FormattedDateField(DateField):
     def python_value(self, value):
