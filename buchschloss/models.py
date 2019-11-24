@@ -106,8 +106,9 @@ class Person(Model):
     pk_type = int
 
     def __str__(self):
-        return '%s[%i]"%s, %s"' % (utils.get_name(type(self).__name__.lower()),
-                                   self.id, self.last_name, self.first_name)
+        return utils.get_name('Person[{}]"{}, {}"').format(
+            self.id, self.last_name, self.first_name
+        )
 
 
 class Library(Model):
@@ -175,8 +176,7 @@ class Book(Model):
     str_fields = (id, title)
 
     def __str__(self):
-        return '%s[%i]"%s"' % (utils.get_name(type(self).__name__.lower()),
-                               self.id, self.title)
+        return utils.get_name('Book[{}]"{}"').format(self.id, self.title)
 
 
 class Group(Model):
@@ -248,7 +248,8 @@ class Member(Model):
     pk_name = 'name'
 
     def __str__(self):
-        return "Mitglied[{}]({})".format(self.name, config.MEMBER_LEVELS[self.level])
+        return utils.get_name("Member[{}]({})").format(
+            self.name, config.MEMBER_LEVELS[self.level])
 
 
 class Misc(Model):
@@ -278,10 +279,12 @@ if __name__ == '__main__':
     print('created tables...')
     Misc.create(pk='check_date', data=datetime.datetime.now())
     Misc.create(pk='latest_borrowers', data=[])
-    Member.create(name='SAdmin', password=b'\xd2Kf\xef#o\xba\xe2\x84i\x896\x13\x99\x80\x94P\xd4\xab\x10n\xeaB\xda'
-                                          b'\x8c\xbf\xf9\x7f\xd4\xe7\x80\x87',
-                  salt=b'{\x7f\xa5\xe7\x07\x1e>\xdf$\xc6\x8cX\xe6\x15J\x8ds\x88\x9d2}9\x98\x9b)x]\x8cc\x8a\xcb'
-                       b'\xc8\x8aO\xb3y%g\x9d\x94\xd8\x03m\xec$V\xfa\xcdW3',
+    Member.create(name='SAdmin',
+                  password=b'\xd2Kf\xef#o\xba\xe2\x84i\x896\x13\x99\x80\x94P\xd4'
+                           b'\xab\x10n\xeaB\xda\x8c\xbf\xf9\x7f\xd4\xe7\x80\x87',
+                  salt=b'{\x7f\xa5\xe7\x07\x1e>\xdf$\xc6\x8cX\xe6\x15J\x8ds\x88'
+                       b'\x9d2}9\x98\x9b)x]\x8cc\x8a\xcb\xc8\x8aO\xb3y%g\x9d'
+                       b'\x94\xd8\x03m\xec$V\xfa\xcdW3',
                   level=4)
     Library.create(name='main')
     print('Finished. Press return to exit')

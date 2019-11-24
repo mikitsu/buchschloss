@@ -136,13 +136,12 @@ class App:
 
     def my_event_handler(self):
         # in theory, I shouldn't need this, but misc.ScrollableWidget
-        # doesn't work wothout calling .set_scrollregion(),
+        # doesn't work without calling .set_scrollregion(),
         # which in turn can't be done from inside a tkinter callback
         while True:
             event = self.queue.get()
             time.sleep(0.35)
             event()
-app = App()
 
 
 def action_login():
@@ -168,7 +167,7 @@ def action_login():
 # noinspection PyDefaultArgument
 def generic_formbased_action(form_type, form_cls, callback,
                              form_options={}, fill_data=None,
-                             post_init=lambda f:None,
+                             post_init=lambda f: None,
                              do_reset=True):
     form_options_ = {
         k: {'groups': v} for k, v in {
@@ -490,5 +489,6 @@ actions = ActionTree.from_map({
     'restitute': borrow_restitute(forms.RestituteForm, core.restitute),
 })
 
+app = App()
 start = app.launch
 utils.late_handlers.append(view_late)
