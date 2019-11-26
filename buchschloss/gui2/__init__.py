@@ -6,8 +6,10 @@ import tkinter as tk
 from functools import partial
 import queue
 import threading
+import logging
 import time
 import sys
+import typing as T
 
 import misc.validation as mval
 import misc.tkstuff as mtk
@@ -77,6 +79,14 @@ class ActionTree:
 
 
 class App:
+    """The main application
+
+        Attributes:
+        .header: the top bar including login, reset and exit
+        .center: the main part
+        .queue: actions to be executed separately from the tk event loop
+        .root: the tk.Tk instance
+    """
     def __init__(self):
         self.root = tk.Tk()
         self.root.protocol('WM_CLOSE_WINDOW', self.onexit)
@@ -92,37 +102,44 @@ class App:
         self.greeter = tk.Label(self.root, **config.intro)
         self.greeter.pack(fill=tk.BOTH)
         self.center = tk.Frame(self.root)
-
-    def launch(self):
-        self.root.after(3000, self.start)
-        self.root.mainloop()
-
-    def start(self):
-        self.greeter.destroy()
         self.header = widgets.Header(
             self.root,
             {'text': utils.get_name('login'), 'command': action_login},
             utils.get_name('not_logged_in'),
             {'text': utils.get_name('abort'), 'command': self.reset},
-            {'text': utils.get_name('exit_app'), 'command': self.onexit})
+            {'text': utils.get_name('exit_app'), 'command': self.onexit}
+        )
+
+    def launch(self):
+        """remove greeting screen in 3 seconds and start the min loop"""
+        self.root.after(3000, self.start)
+        self.root.mainloop()
+
+    def start(self):
+        """remove the greeting screen and show default screen"""
+        self.greeter.destroy()
         self.header.pack()
         self.center.pack()
         self.display_start()
         threading.Thread(target=self.my_event_handler, daemon=True).start()
 
     def reset(self):
+        """reset to initial view"""
         self.clear_center()
         self.display_start()
 
     @staticmethod
     def display_start():
+        """initial view"""
         actions()
 
     def clear_center(self):
+        """clear the center frame"""
         for w in self.center.children.copy().values():
             w.destroy()
 
     def onexit(self):
+        """execute when the user exits the application"""
         if tk_msg.askokcancel(utils.get_name('exit_app'),
                               utils.get_name('really_exit_app')):
             if sys.stderr.error_happened and tk_msg.askokcancel(
@@ -135,8 +152,9 @@ class App:
             sys.exit()
 
     def my_event_handler(self):
+        """execute events outside of the tkinter event loop TODO: move this to a proper scheduler"""
         # in theory, I shouldn't need this, but misc.ScrollableWidget
-        # doesn't work wothout calling .set_scrollregion(),
+        # doesn't work without calling .set_scrollregion(),
         # which in turn can't be done from inside a tkinter callback
         while True:
             event = self.queue.get()
@@ -145,31 +163,22 @@ class App:
 app = App()
 
 
-def action_login():
-    if isinstance(core.current_login, core.Dummy):
-        try:
-            data = mtkd.FormDialog.ask(app.root, forms.LoginForm)
-        except mtkd.UserExitedDialog:
-            return
-        try:
-            core.login(**data)
-        except core.BuchSchlossBaseError as e:
-            tk_msg.showerror(e.title, e.message)
-            return
-        app.header.set_info_text(utils.get_name('logged_in_as_{}'
-                                                ).format(core.current_login))
-        app.header.set_login_text(utils.get_name('logout'))
-    else:
-        core.logout()
-        app.header.set_info_text(utils.get_name('logged_out'))
-        app.header.set_login_text(utils.get_name('login'))
-
-
 # noinspection PyDefaultArgument
 def generic_formbased_action(form_type, form_cls, callback,
                              form_options={}, fill_data=None,
-                             post_init=lambda f:None,
+                             post_init=lambda f: None,
                              do_reset=True):
+    """perform a generic action
+        Arguments:
+            form_type: 'new', 'edit' or 'search': used for the form group  TODO: make this an enum
+            form_cls: the form class (subclass of misc.tkstuff.forms.Form)
+            callback: the function to call on form submit with form data as keyword arguments
+            form_options: optional dict of additional options for the form
+            fill_data: optional callable taking the input of the first form field
+                and returning a dict of datat to fill into the form
+            post_init: called after creation and placement of the form
+                with the form instance as argument
+            do_reset: boolean indicating whether to call app.reset after form submission"""
     form_options_ = {
         k: {'groups': v} for k, v in {
             'new': [forms.ElementGroup.NEW],
@@ -238,6 +247,13 @@ def generic_formbased_action(form_type, form_cls, callback,
 
 
 def show_results(results, view_func, master=None):
+    """show search results as buttons taking the user to the appropriate view
+
+        Arguments:
+            - results: an iterable of objects as those returned by core.*.search
+            - view_func: the function to call for wiewing an object
+            - master: the master widget, app.center by default
+    """
     if master is None:
         master = app.center
 
@@ -271,42 +287,47 @@ def show_results(results, view_func, master=None):
     app.root.bind('<q>', lambda e: rw.set_scrollregion())
 
 
-def search_action(form_cls, model, view_func):
-    def search_callback(*, search_mode, exact_match, **kwargs):
-        if exact_match:
-            _in_ = {}
-            _eq_ = kwargs
-        else:
-            _in_ = {}
-            _eq_ = {}
-            for k, v in kwargs.items():
-                if isinstance(v, str):
-                    _in_[k] = v
-                else:
-                    _eq_[k] = v
+def search_action(form_cls, namespace: core.ActionNamespace):
+    """wrapper for generic_formbased_action for search actions
 
-        results = core.search(model, search_mode, _in_=_in_, _eq_=_eq_)
-        show_results(results, view_func)
+    Arguments:
+        - form_cls: the misc.tkstuff.forms.Form subclass
+        - namespace: the core namespace in which the search and view functions are
+    """
+    def search_callback(*, search_mode, exact_match, **kwargs):
+        q = ()
+        for k, v in kwargs.items():
+            if exact_match or isinstance(v, str):
+                q = ((k, 'eq', v), search_mode, q)
+            else:
+                q = ((k, 'contains', v), search_mode, q)
+
+        results = namespace.search(q)
+        show_results(results, namespace.view_str)
 
     return generic_formbased_action('search', form_cls, search_callback, do_reset=False)
 
 
-def view_late(late, warn, from_utils=True):
-    if from_utils:
-        actions.view_late = partial(view_late, late, warn, from_utils=False)
-    else:
-        show_results(warn+late, ShowInfoNS.borrow)
+def late_hook(late, warn):
+    """Add an action to view late books. This is a late handler for utils"""
+    actions.view_late = partial(view_late, late, warn)
+
+
+def view_late(late, warn):
+    """show late books"""
+    show_results(warn+late, ShowInfoNS.borrow)
 
 
 def borrow_restitute(form_cls, callback):
+    """function for borrow and restitute actions"""
     def add_btn(form):
-        pw = [(widgets.Button, {'text': core.view_person(p)['__str__'],
+        pw = [(widgets.Button, {'text': core.Person.view_repr(p),
                                 'command': partial(form.inject_submit, person=p)})
               for p in core.misc_data.latest_borrowers]
         widgets.mtk.ContainingWidget(app.center, *pw, horizontal=2).pack()
 
     def callback_wrapper(book=None, person=None, borrow_time=None):
-        if time is None:
+        if borrow_time is None:
             return callback(book, person)
         else:
             return callback(book, person, borrow_time)
@@ -315,6 +336,7 @@ def borrow_restitute(form_cls, callback):
 
 
 def new_book_autofill(form):
+    """automatically fill some information on a book"""
     def filler(event=None):
         if str(form) not in str(app.root.focus_get()):
             # going somewhere else
@@ -339,27 +361,44 @@ def new_book_autofill(form):
 
 
 def activate_group_wrapper(name, src, dest):
+    """allow activation of multiple groups"""
     e = set()
     for n in name.split(';'):
-        e |= core.activate_group(n, src, dest)
+        e |= core.Group.activate(n, src, dest)
     return e
 
 
 class ShowInfoNS:
+    """namespace for information viewing"""
     # noinspection PyDefaultArgument,PyNestedDecorators
     @func_from_static
     @staticmethod
-    def show_info_action(func, special_keys={}, id_get_title='ID',
+    def show_info_action(namespace: T.Type[core.ActionNamespace],
+                         special_keys={}, id_get_title='ID',
                          id_get_text='ID:', id_type=int):
+        """prepare a fcuntion displaying information
+
+        Arguments:
+            - namespace: the namespace with the viewing function
+            - special_keys: a mapping form keys in the returned data to a function
+                taking the value mapped by the key and returning a value to pass
+                to widgets.InfoWidget. Optionally, a different name for the field
+                may be returned as first element in a sequence, the display value
+                being second
+            TODO -- move to a form-based question
+            - id_get_title: the title of the popup window asking for the ID
+            - id_get_text: the text of the window askinf for the ID
+            - id_type: the type of the ID
+        """
 
         def show_info(id_=None):
             if ShowInfoNS.to_destroy is not None:
                 try:
                     # workaround because mtk.ScrollableWidget doesn't handle .destroy() yet
                     ShowInfoNS.to_destroy.container.destroy()
-                except AttributeError:
+                except AttributeError as e:
                     # don't crash everything if I stop using ScrollableWidget
-                    sys.stderr.write('WARN -- in show_results.<locals>.search_show\n')
+                    logging.error(e)
                     ShowInfoNS.to_destroy.destroy()
             if id_ is None:
                 try:
@@ -374,7 +413,7 @@ class ShowInfoNS:
                     return
 
             try:
-                data = func(id_)
+                data = namespace.view_str(id_)
             except core.BuchSchlossBaseError as e:
                 show_BSE(e)
                 app.reset()
@@ -399,7 +438,7 @@ class ShowInfoNS:
         return show_info
 
     book = show_info_action(
-        core.view_book,
+        core.Book,
         {'borrowed_by': lambda d: (
             utils.get_name('borrowed_by'), (widgets.Button, {
                 'text': utils.break_string(str(d['borrowed_by']), config.INFO_LENGTH),
@@ -411,7 +450,7 @@ class ShowInfoNS:
         utils.get_name('book_id')
     )
     person = show_info_action(
-        core.view_person,
+        core.Person,
         {'borrows': lambda d: (
             [(widgets.Button, {
                 'text': utils.break_string(t, config.INFO_LENGTH),
@@ -423,7 +462,7 @@ class ShowInfoNS:
         utils.get_name('id')
     )
     borrow = show_info_action(
-        core.view_borrow,
+        core.Borrow,
         {'person': lambda d: (
             (widgets.Button, {
                 'text': utils.break_string(d['person'], config.INFO_LENGTH),
@@ -491,4 +530,4 @@ actions = ActionTree.from_map({
 })
 
 start = app.launch
-utils.late_handlers.append(view_late)
+utils.late_handlers.append(late_hook)

@@ -14,7 +14,6 @@ import datetime
 
 from . import core
 from . import utils
-from . import models
 from . import config
 
 
@@ -136,7 +135,8 @@ def handle_user_input(ui):
 
 
 def start():
-    sys.stderr = core.DummyErrorFile()
+    if not getattr(config, 'DEBUG', False):
+        sys.stderr = core.DummyErrorFile()
     print(config.intro['text'], end='\n\n')
     try:
         while True:
@@ -237,9 +237,6 @@ COMMANDS = {
     'restitute': core.Borrow.restitute,
     'view_borrow': core.Borrow.view_str,
     'search': search_wrapper,
-    'Book': core.Book,
-    'Person': core.Person,
-    'Borrow': core.Borrow,
     'help': help,
     'list': lambda x: tuple(x),
     'print': pprint.pprint,
@@ -250,7 +247,11 @@ COMMANDS = {
     'vars': lsvars,
     'foreach': foreach,
 }
-variables = {m.__name__: m for m in models.Model.__subclasses__()}
+variables = {
+    'Book': core.Book,
+    'Person': core.Person,
+    'Borrow': core.Borrow,
+}
 
 
 parser = MyArgumentParser('', add_help=False)
