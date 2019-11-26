@@ -1,6 +1,6 @@
 """Specific actions"""
 
-from .__init__ import tk, tk_msg, app
+from .main import tk, tk_msg, app
 from .. import core
 from .. import utils
 
