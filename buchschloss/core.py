@@ -749,7 +749,7 @@ class Group(ActionNamespace):
     def view_str(group):
         """Return data on a Group
 
-            Return a ict with the following items as strings:
+            Return a dict with the following items as strings:
             - __str__: a string representation of the Group
             - name: the name of the Group
             - books: the IDs of the books in the Group

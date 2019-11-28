@@ -1,4 +1,4 @@
-"""Specific actions not directly mappable to core"""
+"""translate GUI actions to core-provided functions"""
 
 import tkinter as tk
 import tkinter.messagebox as tk_msg
