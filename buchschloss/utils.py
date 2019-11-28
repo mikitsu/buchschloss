@@ -20,7 +20,6 @@ import re
 import bs4
 import string
 
-# from .core import *
 from buchschloss import core, config
 
 
@@ -56,16 +55,18 @@ def late_books():
     """Check for late and nearly late books.
 
     Call the functions in late_handlers with arguments (late, warn).
-    late and warn are sequences of Borrow instances."""
+    late and warn are sequences of core.Borrow instances.
+    """
     late = []
     warn = []
     today = date.today()
-    for b in core.models.Borrow.select():  # TODO: make this much more efficient
-        if not b.is_back:
-            if b.return_date < today:
-                late.append(b)
-            elif b.return_date < today+ config.warn_time:
-                warn.append(b)
+    for b in core.Borrow.search((
+            ('is_back', 'eq', False),
+            'and', ('return_date', 'gt', today+config.warn_time))):
+        if b.return_date < today:
+            late.append(b)
+        else:
+            warn.append(b)
     for h in late_handlers:
         h(late, warn)
 
@@ -90,27 +91,31 @@ def backup():
 def web_backup():
     """Remote backups.
 
-    Run backup_shift and upload name.ext db as name1.ext"""
+    Run backup_shift and upload name.ext db as name1.ext
+    """
+    # noinspection PyDeprecation
     with ftputil.FTPHost(*config.ftp, session_factory=ftplib.FTP_TLS) as host:
         backup_shift(host)
         host.upload('.'.join(config.DATABASE_NAME), '1.'.join(config.DATABASE_NAME))
 
 
 def backup_shift(fs):
-    """shift all nameX.ext up one number to config.backup_depth in the given filesystem (os or remote FTP host)"""
+    """shift all nameX.ext up one number to config.backup_depth
+    in the given filesystem (os or remote FTP host)"""
     try:
         fs.remove(('%i.' % config.backup_depth).join(config.DATABASE_NAME))
     except FileNotFoundError:
         pass
     for f in range(config.backup_depth, 1, -1):
         try:
-            fs.rename(('%i.' % (f-1,)).join(config.DATABASE_NAME), ('%i.' % (f,)).join(config.DATABASE_NAME))
+            fs.rename(('%i.' % (f-1,)).join(config.DATABASE_NAME),
+                      ('%i.' % (f,)).join(config.DATABASE_NAME))
         except FileNotFoundError:
             pass
 
 
 def send_mailgun(subject, text, to=''):
-    """Send an Email from SGB-Schülerbücherei using mailgun"""
+    """Send an Email using mailgun"""
     recipients = config.implicit_recipients.copy()
     if to:
         recipients.append(to)
@@ -127,14 +132,15 @@ def get_name(internal: str):
     """Get the pretty name.
 
     Try lookup in config.NAMES, else capitalize and replace "_" with " "
-    "__" are replaced with ": " and components are converted individually"""
+    "__" are replaced with ": " and components are converted individually
+    """
     if '__' in internal:
         return ': '.join(get_name(s) for s in internal.split('__'))
     return config.NAMES.get(internal, internal.capitalize().replace('_', ' '))
 
 
 def get_level(n: int = None):
-    """Get the represetation of the given level. If None is given, use the logged in Member's one."""
+    """Get the representation of the given level. If None is given, use the logged in Member's one."""
     if n is None:
         return config.MEMBER_LEVELS[core.current_login.level]
     else:
@@ -144,9 +150,11 @@ def get_level(n: int = None):
 def break_string(text, size, break_char=string.punctuation, cut_char=string.whitespace):
     """Insert newlines every `size` characters.
 
-    if allow_before is True, break before the set amount of characters
-        if a character in `break_char+cut_char` is encountered
-        if the character is in `cut_char`, it is replace by the newline"""
+        Insert '\n' before the given amount of characters
+        if a character in `break_char` is encountered.
+        If the character is in `cut_char`, it is replaced by the newline.
+    """
+    # TODO: move to misc
     break_char += cut_char
     r = []
     while len(text) > size:
@@ -188,18 +196,19 @@ def get_book_data(isbn: int):
 
     person_re = re.compile(r'(\w*, \w*) \((\w*)\)')
     results = {'concerned_people': []}
+
     page = bs4.BeautifulSoup(r.text)
     table = page.select_one('#fullRecordTable')
     if table is None:
         # see if we got multiple results
         link_to_first = page.select_one('#recordLink_0')
         if link_to_first is None:
-            raise core.BuchSchlossBaseError(
-                'Buch nicht gefunden',
-                'Das Buch mit der ISBN %s wurde nicht in der DNB gefunden.' % (isbn,))
+            raise core.BuchSchlossError(
+                'Book_not_found', 'Book_with_ISBN_{}_not_in_DNB', isbn)
         r = requests.get('https://portal.dnb.de'+link_to_first['href'])
         page = bs4.BeautifulSoup(r.text)
         table = page.select_one('#fullRecordTable')
+
     for tr in table.select('tr'):
         td = [x.get_text('\n').strip() for x in tr.select('td')]
         if len(td) == 2:
@@ -221,11 +230,9 @@ def get_book_data(isbn: int):
                 results['year'] = td[1].split(':')[1].strip()
             elif td[0] == 'Sprache(n)':
                 results['language'] = td[1].split(',')[0].split()[0].strip()
+
     results['concerned_people'] = '; '.join(results['concerned_people'])
     return results
-
-
-stuff_to_do = [globals()[k] for k in config.tasks]
 
 
 def run():
@@ -237,12 +244,13 @@ def run():
 
 def _default_late_handler(late, warn):
     head = datetime.now().strftime(config.DATE_FORMAT).join(('\n\n',))
-    with open('late.txt', 'a') as f:
+    with open('late.txt', 'w') as f:
         f.write(head)
         f.write('\n'.join(str(L) for L in late))
-    with open('warn.txt',  'a') as f:
+    with open('warn.txt',  'w') as f:
         f.write(head)
         f.write('\n'.join(str(w) for w in warn))
 
 
 late_handlers = [_default_late_handler]
+stuff_to_do = [globals()[k] for k in config.tasks]
