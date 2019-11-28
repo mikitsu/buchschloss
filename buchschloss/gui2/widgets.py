@@ -43,7 +43,7 @@ class InfoWidget(mtk.ContainingWidget):
         super().__init__(master, *widgets, horizontal=2)
 
 
-class ListEntryMixin:
+class ListEntryMixin(tk.Entry):
     def __init__(self, master, cnf={}, sep=';', **kw):
         self.sep = sep
         super().__init__(master, cnf, **kw)

@@ -23,6 +23,8 @@ import operator
 import typing as T
 import re
 import enum
+import abc
+import contextlib
 import builtins
 import traceback
 import logging
@@ -213,7 +215,7 @@ def from_db(*arguments: T.Type[models.Model]):
 
     convert all arguments at their given position to wrapper_arg.get_by_id(func_arg)
     ignore wrapper arguments of None
-    raise a BuchSchlossBaseError with an explainaition if the object does not exist"""
+    raise a BuchSchlossBaseError with an explanation if the object does not exist"""
     def wrapper_maker(f):
         @wraps(f)
         def wrapper(*args: T.Any, **kwargs):
@@ -235,17 +237,34 @@ def from_db(*arguments: T.Type[models.Model]):
     return wrapper_maker
 
 
+@contextlib.contextmanager
+def catch_not_found(model, pk):
+    """catch model.DoesNotExist errors and raise a BuchSchlossNotFoundError instead"""
+    try:
+        yield
+    except model.DoesNotExist:
+        raise BuchSchlossNotFoundError(model.__name__, pk)
+
+
+def check_level(level, resource):
+    """check if the currently logged in member has the given level.
+        otherwise, raise a BuchSchlossBaseError and log"""
+    if current_login.level < level:
+        logging.info('access to {} denied to {}'
+                     .format(resource, current_login))
+        raise BuchSchlossPermError('must_be_level_{}', utils.get_level(level))
+
+
 def level_required(level):
     """require the given level for executing the wrapped function.
     raise a BuchSchlossBaseError when requirement not met."""
     def wrapper_maker(f):
+        checker = partial(check_level, level, f.__name__)
+
         @wraps(f)
         def level_required_wrapper(*args, **kwargs):
-            if current_login.level >= level:
-                return f(*args, **kwargs)
-            logging.info('access to {} denied to {}'
-                         .format(f.__name__, current_login))
-            raise BuchSchlossPermError('must_be_level_{}', utils.get_level(level))
+            checker()
+            return f(*args, **kwargs)
         return level_required_wrapper
     return wrapper_maker
 
@@ -340,8 +359,63 @@ def _update_library_group(lg_model: T.Type[models.Model],
     return errors
 
 
-class Book:
+class ActionNamespace(abc.ABC):
+    """Abstract base class for the Book, Person Member, Library, Group and Borrow namespaces"""
+    model: T.ClassVar[models.Model]
+    view_level: T.ClassVar[int] = 0
+
+    @classmethod
+    @abc.abstractmethod
+    def new(cls, **kwargs):
+        """Create a new record"""
+        raise NotImplementedError
+
+    @classmethod
+    @abc.abstractmethod
+    def view_str(cls, id_: T.Union[int, str]) -> dict:
+        """Return information in a dict"""
+        raise NotImplementedError
+
+    @classmethod
+    def view_ns(cls, id_: T.Union[int, str]):
+        """Return a namespace of information"""
+        check_level(cls.view_level, cls.__name__+'.view_ns')
+        with catch_not_found(cls.model, id_):
+            return cls.model.get_by_id(id_)
+
+    @classmethod
+    def view_repr(cls, id_: T.Union[str, int]) -> str:
+        """Return a string representation"""
+        check_level(cls.view_level, cls.__name__+'.view_repr')
+        with catch_not_found(cls.model, id_):
+            return str(cls.model.select_str_fields().where(
+                getattr(cls.model, cls.model.pk_name) == id_))
+
+    @classmethod
+    def view_attr(cls, id_: T.Union[str, int], name: str):
+        """Return the value of a specific attribute"""
+        # this is said to be faster...
+        check_level(cls.view_level, cls.__name__+'.view_attr')
+        with catch_not_found(cls.model, id_):
+            return cls.model.select(getattr(cls.model, name)).where(
+                getattr(cls.model, cls.model.pk_name) == id_
+            )
+
+    @classmethod
+    def search(cls,
+               condition: tuple,
+               complex_params: T.Iterable['ComplexSearch'] = (),
+               complex_action: str = None,
+               ):
+        """search for records. see search for details on arguments"""
+        check_level(cls.view_level, cls.__name__+'.search')
+        return search(cls.model, condition, *complex_params,
+                      complex_action=complex_action)
+
+
+class Book(ActionNamespace):
     """Namespace for Book-related functions"""
+    model = models.Book
 
     @staticmethod
     @level_required(2)
@@ -401,7 +475,7 @@ class Book:
 
     @staticmethod
     @from_db(models.Book)
-    def view_dict(book: models.Book):
+    def view_str(book: models.Book):
         """Return data about a Book.
 
         Return a dictionary consisting of the following items as strings:
@@ -427,58 +501,11 @@ class Book:
         logging.info('{} viewed {}'.format(current_login, book))
         return r
 
-    @staticmethod
-    @from_db(models.Book)
-    def view_ns(book):
-        """Return data about a Book.
 
-            Return a Python object with the following attributes:
-            - isbn: int
-            - author, title language, publisher, medium, shelf: str
-            - series, concerned_peoplem genres: str or None
-            - year: int
-            - library: models.Library
-            - is_active: bool
-            - borrow: object as returned by Borrow.view_ns or None
-
-            The object supports str()
-
-            Actually, the returned object is instance of models.Book,
-            but this may change if I ever decide to use something else for
-            data storage
-        """
-        return book
-
-    @staticmethod
-    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
-               complex_action: str = None):
-        """Search for books.
-
-            `condition` is a tuple of the form (<a>, <op>, <b>)
-                with <op> being a logical operation ("and" or "or") and <a>
-                    and <b> in that case being condition tuples
-                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
-                    "lt" or "le")
-                    in which case <a> is a (possibly dotted) string corresponding
-                    to the attribute name and <b> is the model to compare to.
-            `complex_params` is a sequence of ComplexSearch instances to apply after
-                executing the SQL SELECT
-            `complex_action` is "and" or "or" and specifies how to handle multiple
-                complex cases. If finer granularity is needed, it can be achieved with
-                bitwise operators, providing bools are used.
-
-            Note: for `condition`, there is no "not" available.
-                Use the inverse comparision operator instead
-
-            Return an iterable of objects like those returned by Book.view_ns,
-            differing in that they only have the attributes ``id`` and ``title``
-        """
-        return search(models.Book, condition, *complex_params,
-                      complex_action=complex_action)
-
-
-class Person:
+class Person(ActionNamespace):
     """Namespace for Person-related functions"""
+    model = models.Person
+    view_level = 1
 
     @staticmethod
     @level_required(3)
@@ -547,7 +574,7 @@ class Person:
     @staticmethod
     @level_required(1)
     @from_db(models.Person)
-    def view_dict(person: models.Person):
+    def view_str(person: models.Person):
         """Return data about a Person.
 
         Return a dict consisting of the following items as strings:
@@ -568,60 +595,12 @@ class Person:
         logging.info('{} viewed {}'.format(current_login, person))
         return r
 
-    @staticmethod
-    @from_db(models.Person)
-    def view_ns(person):
-        """Return data about a Person.
 
-            Return a Python object with the following attributes:
-            - id, max_borrow: int
-            - first_name, last_name, class_: str
-            - pay_date: datetime.date or None
-            - libraries: iterable of objects as returned by Library.view_ns
-                representing the Person's libraries
-            - borrows: iterable of objects as returned by Borrow.view_ns
-                representing the Person's borrows
+class Library(ActionNamespace):
 
-            The object supports str()
-
-            Actually, the returned object is instance of models.Person,
-            but this may change if I ever decide to use something else for
-            data storage
-        """
-        return person
-
-    @staticmethod
-    @level_required(1)
-    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
-               complex_action: str = None):
-        """Search for people.
-
-            `condition` is a tuple of the form (<a>, <op>, <b>)
-                with <op> being a logical operation ("and" or "or") and <a>
-                    and <b> in that case being condition tuples
-                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
-                    "lt" or "le")
-                    in which case <a> is a (possibly dotted) string corresponding
-                    to the attribute name and <b> is the model to compare to.
-            `complex_params` is a sequence of ComplexSearch instances to apply after
-                executing the SQL SELECT
-            `complex_action` is "and" or "or" and specifies how to handle multiple
-                complex cases. If finer granularity is needed, it can be achieved with
-                bitwise operators, providing bools are used.
-
-            Note: for `condition`, there is no "not" available.
-                Use the inverse comparision operator instead
-
-            Return an iterable of objects like those returned by Person.view_ns,
-            differing in that they only have the attributes ``id``,
-            11first_name``, and ``last_name``
-        """
-        return search(models.Person, condition, *complex_params,
-                      complex_action=complex_action)
-
-
-class Library:
     """Namespace for Library-related functions"""
+    model = models.Library
+
     @staticmethod
     @level_required(3)
     def new(name: str, books: T.Sequence[int],
@@ -685,7 +664,7 @@ class Library:
 
     @staticmethod
     @from_db(models.Library)
-    def view_dict(lib):
+    def view_str(lib):
         """Return information on the Library
 
             Return a dict with the following items as strings:
@@ -701,56 +680,11 @@ class Library:
             'books': ';'.join(b.id for b in lib.books),
         }
 
-    @staticmethod
-    @from_db(models.Library)
-    def view_ns(lib):
-        """Return information on a Library
 
-            Return a Python object with the following attributes:
-            - name: the name of the Library
-            - people: an iterable objects as returned by Person.view_ns
-                representing the people with access to the Library
-            - books: an iterable of objects as returned by Book.view_ns
-                representing the books in the Library
+class Group(ActionNamespace):
 
-            The object supports str()
-
-            Actually, the object returned is a models.Library instance.
-            This will probably change if I decide to store data in any other way
-        """
-        return lib
-
-    @staticmethod
-    @level_required(1)
-    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
-               complex_action: str = None):
-        """Search for libraries.
-
-            `condition` is a tuple of the form (<a>, <op>, <b>)
-                with <op> being a logical operation ("and" or "or") and <a>
-                    and <b> in that case being condition tuples
-                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
-                    "lt" or "le")
-                    in which case <a> is a (possibly dotted) string corresponding
-                    to the attribute name and <b> is the model to compare to.
-            `complex_params` is a sequence of ComplexSearch instances to apply after
-                executing the SQL SELECT
-            `complex_action` is "and" or "or" and specifies how to handle multiple
-                complex cases. If finer granularity is needed, it can be achieved with
-                bitwise operators, providing bools are used.
-
-            Note: for `condition`, there is no "not" available.
-                Use the inverse comparision operator instead
-
-            Return an iterable of objects like those returned by Library.view_ns,
-            differing in that they only have the attribute ``name``
-        """
-        return search(models.Library, condition, *complex_params,
-                      complex_action=complex_action)
-
-
-class Group:
     """Namespace for Group-related functions"""
+    model = models.Group
 
     @staticmethod
     @level_required(3)
@@ -816,10 +750,10 @@ class Group:
 
     @staticmethod
     @from_db(models.Group)
-    def view_dict(group):
+    def view_str(group):
         """Return data on a Group
 
-            Return a ict with the following items as strings:
+            Return a dict with the following items as strings:
             - __str__: a string representation of the Group
             - name: the name of the Group
             - books: the IDs of the books in the Group
@@ -831,54 +765,11 @@ class Group:
             'books': ';'.join(str(b.id) for b in group.books),
         }
 
-    @staticmethod
-    @from_db(models.Group)
-    def view_ns(group):
-        """Return data on a Group
 
-            Return a Python object with the following attributes
-            - name: the name of the Group as string
-            - books: an iterable of objects as returned by Book.view_ns
-                representing the books in the Group
-
-            The object supports str()
-
-            Actually, the object returned is a models.Group instance.
-            This will probably change if I decide to store data in any other way
-        """
-        return group
-
-    @staticmethod
-    @level_required(1)
-    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
-               complex_action: str = None):
-        """Search for groups.
-
-            `condition` is a tuple of the form (<a>, <op>, <b>)
-                with <op> being a logical operation ("and" or "or") and <a>
-                    and <b> in that case being condition tuples
-                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
-                    "lt" or "le")
-                    in which case <a> is a (possibly dotted) string corresponding
-                    to the attribute name and <b> is the model to compare to.
-            `complex_params` is a sequence of ComplexSearch instances to apply after
-                executing the SQL SELECT
-            `complex_action` is "and" or "or" and specifies how to handle multiple
-                complex cases. If finer granularity is needed, it can be achieved with
-                bitwise operators, providing bools are used.
-
-            Note: for `condition`, there is no "not" available.
-                Use the inverse comparision operator instead
-
-            Return an iterable of objects like those returned by Group.view_ns,
-            differing in that they only have the attribute ``name``
-        """
-        return search(models.Group, condition, *complex_params,
-                      complex_action=complex_action)
-
-
-class Borrow:
+class Borrow(ActionNamespace):
     """Namespace for Borrow-related functions"""
+    model = models.Borrow
+    view_level = 1
 
     @staticmethod
     @from_db(models.Book, models.Person)
@@ -985,58 +876,11 @@ class Borrow:
             'is_back': utils.get_name(str(borrow.is_back)),
         }
 
-    @staticmethod
-    @level_required(1)
-    @from_db(models.Borrow)
-    def view_ns(borrow):
-        """Return information on a Borrow
 
-            Return a Python object with the following attributes:
-            - person: an object as returned by Person.view_ns
-                representing the borrowing Person
-            - book: an object as returned by Book.view_ns
-                representing the borrowed Book
-            - return_date: a datetime.date object representing the date
-                by which the book has the be returned
-            - a boolean indicating whether the book has been returned yet
-
-            The object supports str()
-
-            Actually, this function returns an instance of models.Borrow.
-            If I ever decide to change the way data is stored, this may change.
-        """
-        return borrow
-
-    @staticmethod
-    @level_required(1)
-    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
-               complex_action: str = None):
-        """Search for borrows.
-
-            `condition` is a tuple of the form (<a>, <op>, <b>)
-                with <op> being a logical operation ("and" or "or") and <a>
-                    and <b> in that case being condition tuples
-                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
-                    "lt" or "le")
-                    in which case <a> is a (possibly dotted) string corresponding
-                    to the attribute name and <b> is the model to compare to.
-            `complex_params` is a sequence of ComplexSearch instances to apply after
-                executing the SQL SELECT
-            `complex_action` is "and" or "or" and specifies how to handle multiple
-                complex cases. If finer granularity is needed, it can be achieved with
-                bitwise operators, providing bools are used.
-
-            Note: for `condition`, there is no "not" available.
-                Use the inverse comparision operator instead
-
-            Return an iterable of objects like those returned by Borrow.view_ns
-        """
-        return search(models.Borrow, condition, *complex_params,
-                      complex_action=complex_action)
-
-
-class Member:
+class Member(ActionNamespace):
     """namespace for Member-related functions"""
+    model = models.Member
+    view_level = 2
 
     @staticmethod
     @auth_required
@@ -1105,9 +949,8 @@ class Member:
         logging.info("{} changed {}'s password".format(current_login, member))
 
     @staticmethod
-    @level_required(1)
     @from_db(models.Member)
-    def view_dict(member):
+    def view_str(member):
         """Retrun information about a Member
 
             Return a dictionatry with the following string items:
@@ -1120,50 +963,6 @@ class Member:
             'name': member.name,
             'level': utils.get_name(member.level),
         }
-
-    @staticmethod
-    @level_required(1)
-    @from_db(models.Member)
-    def view_ns(member):
-        """Return information about a Member
-
-            Return a Python object with the following attributes:
-            - name: str
-            - level: int
-
-            The object supports str()
-
-            Actually, a models.Member instance is returned.
-            This may change if I ever decide to store date in a different way
-        """
-        return member
-
-    @staticmethod
-    @level_required(3)
-    def search(condition, complex_params: T.Iterable['ComplexSearch'] = (),
-               complex_action: str = None):
-        """Search for members.
-
-            `condition` is a tuple of the form (<a>, <op>, <b>)
-                with <op> being a logical operation ("and" or "or") and <a>
-                    and <b> in that case being condition tuples
-                or a comparison operation ("contains", "eq", "ne", "gt", "ge",
-                    "lt" or "le")
-                    in which case <a> is a (possibly dotted) string corresponding
-                    to the attribute name and <b> is the model to compare to.
-            `complex_params` is a sequence of ComplexSearch instances to apply after
-                executing the SQL SELECT
-            `complex_action` is "and" or "or" and specifies how to handle multiple
-                complex cases. If finer granularity is needed, it can be achieved with
-                bitwise operators, providing bools are used.
-
-            Note: for `condition`, there is no "not" available.
-                Use the inverse comparision operator instead
-
-            Return an iterable of objects like those returned by Member.view_ns
-        """
-        return search(models.Member, condition, *complex_params,
-                      complex_action=complex_action)
 
 
 def search(o: T.Type[models.Model], condition: T.Tuple = None,
@@ -1180,6 +979,7 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
                 "lt" or "le")
                 in which case <a> is a (possibly dotted) string corresponding
                 to the attribute name and <b> is the model to compare to.
+            It may be empty, in which case it has no effect, i.e. always is True
         `complex_params` is a sequence of ComplexSearch instances to apply after
             executing the SQL SELECT
         `complex_action` is "and" or "or" and specifies how to handle multiple
@@ -1226,11 +1026,14 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
             fv = getattr(mod, mod.pk_name)
         return fv, q
 
-    def handle_condition(a, op, b, q):
+    def handle_condition(cond, q):
+        if not cond:
+            return q
+        a, op, b = cond
         if op == 'and':
-            return handle_condition(*b, handle_condition(*a, q).switch(o))
+            return handle_condition(b, handle_condition(a, q).switch(o))
         elif op == 'or':
-            return handle_condition(*a, q) + handle_condition(*b, q)
+            return handle_condition(a, q) + handle_condition(b, q)
         else:
             a, q = follow_path(a, q)
             if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
@@ -1241,7 +1044,7 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
                 raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
                                  '"ge", "le" or "contains"')
     query = o.select(*o.str_fields)
-    result = handle_condition(*condition, query)
+    result = handle_condition(condition, query)
     if complex_params:
         return _do_complex_search(complex_action, result, complex_params)
     else:
@@ -1285,7 +1088,7 @@ def _search_old(o: T.Type[models.Model], kind: str = 'or', *complex_params, _in_
         # to do this, but I feel there should be one...
         # there is: .rel_model
         model = next(v_ for k_, v_ in f.through_model._meta.fields.items()
-                     if k_ not in  ('id', k)).rel_field.model
+                     if k_ not in ('id', k)).rel_field.model
         q = q.join(f.through_model).join(model)
         q = q.where(op(model._meta.primary_key, v))
         add_to_query(q)
@@ -1437,4 +1240,3 @@ current_login = dummy_member
 misc_data = MiscData()
 
 logging.info('core operational')
-
