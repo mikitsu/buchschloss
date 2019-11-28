@@ -127,7 +127,7 @@ def show_results(results, view_func, master=None):
             # workaround because mtk.ScrollableWidget doesn't handle .destroy() yet
             ShowInfoNS.to_destroy.container.destroy()
         except AttributeError as e:
-            # don't crash everythng if I stop using ScrollableWidget
+            # don't crash everything if I stop using ScrollableWidget
             logging.error(e)
             ShowInfoNS.to_destroy.destroy()
         ShowInfoNS.to_destroy = None

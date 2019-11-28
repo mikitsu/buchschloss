@@ -1,6 +1,7 @@
 *.log
 *.txt
 *.sqlite
+*.json
 **/__pycache__/*
 __pycache__/*
 *-ignore/*

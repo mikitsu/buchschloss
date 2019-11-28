@@ -3,12 +3,14 @@
 Handles access to the database and provides high-level interfaces for all operations.
 __all__ exports:
     - BuchSchlossBaseError: the error raised in this module.
-        Comes with a nice description of what exactly failed.
+        Instances come with a nice description of what exactly failed.
     - DummyErrorFile: a dummy error file (for sys.stderr) that writes errors to log
         and provides access to them e.g. for display or ending
     - misc_data: provide easy access to data stored in Misc by attribute lookup
-    - Person, Book, Member, Borrow, Library, Group: namespaces for related functions
-    - login, logout: to log a user in or out
+    - login, logout: to log  user in or out
+    - Book, Person, Borrow, Member, Library, Group: namespaces for functions
+        dealing with the respective objects
+    - ComplexSearch: for very complex search queries
 """
 
 from hashlib import pbkdf2_hmac
@@ -595,6 +597,7 @@ class Person(ActionNamespace):
 
 
 class Library(ActionNamespace):
+
     """Namespace for Library-related functions"""
     model = models.Library
 
@@ -679,6 +682,7 @@ class Library(ActionNamespace):
 
 
 class Group(ActionNamespace):
+
     """Namespace for Group-related functions"""
     model = models.Group
 
@@ -832,6 +836,8 @@ class Borrow(ActionNamespace):
             and raise a BuchSchlossBaseError if that is not the case
             Also raise a BuchSchlossBaseError if the book hasn't been borrowed,
             even if ``person`` is None
+
+            return the returned Book's shelf
         """
         borrow = book.borrow
         if borrow is None:
@@ -842,6 +848,7 @@ class Borrow(ActionNamespace):
         borrow.is_back = True
         borrow.save()
         logging.info('{} confirmed {} was returned'.format(current_login, borrow))
+        return book.shelf
 
     @staticmethod
     @level_required(1)
