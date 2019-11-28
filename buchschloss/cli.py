@@ -18,33 +18,44 @@ from . import config
 
 
 class MyArgumentParser(argparse.ArgumentParser):
+    """Raise a ParsingError when parsing fails"""
     def error(self, message):
         raise ParsingError(message)
 
 
 class Level8Error(Exception):
+    """Error by user"""
     pass
 
 
 class ParsingError(Level8Error):
+    """Invalid command format"""
     pass
 
 
 class ExecutionError(Level8Error):
+    """Error while executing the given command"""
     pass
 
 
 class VariableNameError(Level8Error):
+    """Invalid variable name"""
     pass
 
 
 class ExitException(Exception):
+    """raised to exit"""
     @classmethod
     def throw(cls, *si, **nk):
         raise cls()
 
 
 def execute(command, args, kwargs):
+    """execute the given command with the given arguments
+
+        get passwords with getpass
+        display encountered errors
+    """
     func = COMMANDS[command]
     try:
         f_args = inspect.signature(func).parameters.keys()
@@ -61,14 +72,15 @@ def execute(command, args, kwargs):
         return func(*args, **kwargs)
     except core.BuchSchlossBaseError as e:
         raise ExecutionError('{0.title}: {0.message}'.format(e))
-    except ExitException as e:
+    except ExitException:
         raise
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         raise ExecutionError(utils.get_name('unexpected_error'))
 
 
 def parse_args(arg_list):
+    """filter out keyword-arguments"""
     args = []
     kwargs = {}
     for arg in arg_list:
@@ -84,6 +96,13 @@ def parse_args(arg_list):
 
 
 def eval_val(val):
+    """evaluate a given argument:
+
+        if enclosed in <>, get the variable
+        if a date in %Y-%m-%d format, use it
+        if a valid Python literal, use it
+        treat as a string
+    """
     if val == '<>':
         return eval_val.last_result
     elif val.startswith('<') and val.endswith('>'):
@@ -104,6 +123,7 @@ eval_val.last_result = None
 
 
 def read_input(prompt):
+    """get the user input. Split it with shlex.split"""
     try:
         return shlex.split(input(prompt))
     except ValueError as e:
@@ -113,14 +133,17 @@ def read_input(prompt):
 
 
 def do_execution(data, args, kwargs):
+    """perform the execution of a command with arguments"""
     r = execute(data.action, args, kwargs)
-    if data.cmd:
+    if data.cmd in COMMANDS:
         class NS:
             action = data.cmd
             store = data.store
             cmd = None
         do_execution(NS, (r,), {})
     else:
+        if data.cmd:
+            print('')
         if r is not None:
             pprint.pprint(r)
             eval_val.last_result = r
@@ -129,12 +152,14 @@ def do_execution(data, args, kwargs):
 
 
 def handle_user_input(ui):
+    """read input, parse arguments and execute the command"""
     ns = parser.parse_args(ui)
     args, kwargs = parse_args(ns.args)
     do_execution(ns, args, kwargs)
 
 
 def start():
+    """Entry point. Provide a REPL"""
     if not getattr(config, 'DEBUG', False):
         sys.stderr = core.DummyErrorFile()
     print(config.intro['text'], end='\n\n')
