@@ -5,7 +5,6 @@
 **/__pycache__/*
 __pycache__/*
 *-ignore/*
-test/*
 .idea/*
 doc/*.pdf
 doc/*.synctex*
