@@ -33,7 +33,7 @@ def generic_formbased_action(form_type, form_cls, callback,
             callback: the function to call on form submit with form data as keyword arguments
             form_options: optional dict of additional options for the form
             fill_data: optional callable taking the input of the first form field
-                and returning a dict of datat to fill into the form
+                and returning a dict of data to fill into the form
             post_init: called after creation and placement of the form
                 with the form instance as argument
             do_reset: boolean indicating whether to call app.reset after form submission"""
