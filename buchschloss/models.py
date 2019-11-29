@@ -273,14 +273,13 @@ class Misc(Model):
     pk_name = 'pk'
 
 
+models = Model.__subclasses__() + [Library.people.through_model, Group.books.through_model]
 if __name__ == '__main__':
     print('Running this as a script will create tables in the DB '
           'and initialize them with basic data. Proceed? (y/n)')
     if not input().lower().startswith('y'):
         sys.exit()
-    db.create_tables(Model.__subclasses__())
-    # noinspection PyUnresolvedReferences
-    db.create_tables([Library.people.through_model, Group.books.through_model])
+    db.create_tables(models)
     print('created tables...')
     Misc.create(pk='check_date', data=datetime.datetime.now())
     Misc.create(pk='latest_borrowers', data=[])
