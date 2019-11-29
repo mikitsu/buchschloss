@@ -557,7 +557,7 @@ class Person(ActionNamespace):
         """
         if ((not set(kwargs.keys()) <= {k for k in dir(models.Person)
                                         if isinstance(getattr(models.Person, k),
-                                                      peewee.Field)})
+                                                      peewee.Field)} | {'pay'})
                 or 'id' in kwargs):
             raise TypeError('unexpected kwarg')
         if kwargs.pop('pay', False):
