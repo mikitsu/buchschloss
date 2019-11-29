@@ -57,9 +57,10 @@ def test_person_new(db):
     assert p.pay_date is None
     core.current_login.level = 4
     old_today = datetime.date.today()  # in case this is run around midnight...
-    core.Person.new(124, 'first', 'last', 'cls', pay=True)
+    core.Person.new(124, 'first', 'last', 'cls', 5, pay=True)
     p = models.Person.get_by_id(124)
     assert p.id == 124
+    assert p.max_borrow == 5
     assert p.pay_date in (datetime.date.today(), old_today)
     core.Person.new(125, 'first', 'last', 'cls', pay_date=datetime.date(1956, 1, 31))
     p = models.Person.get_by_id(125)
@@ -70,3 +71,34 @@ def test_person_new(db):
     p = models.Person.get_by_id(126)
     assert p.id == 126
     assert list(p.libraries) == [models.Library.get_by_id('main')]
+
+
+def test_person_edit(db):
+    """test Person.edit"""
+    models.Person.create(id=123, first_name='first', last_name='last', class_='cls',
+                         max_borrow=3, pay_date=datetime.date(1956, 1, 31))
+    for level in range(3):
+        core.current_login.level = level
+        with pytest.raises(core.BuchSchlossBaseError):
+            core.Person.edit(123)
+    core.current_login.level = 4
+    core.Person.edit(123, first_name='other_value')
+    assert models.Person.get_by_id(123).first_name == 'other_value'
+    core.Person.edit(123, last_name='value_for_last', pay_date=None)
+    p = models.Person.get_by_id(123)
+    assert p.last_name == 'value_for_last'
+    assert p.pay_date is None
+    old_today = datetime.date.today()
+    core.Person.edit(123, pay=True)
+    assert models.Person.get_by_id(123).pay_date in (datetime.date.today(), old_today)
+    models.Library.create(name='lib_1')
+    models.Library.create(name='lib_2')
+    e = core.Person.edit(123, libraries=('lib_1', 'lib_does_not_exist'))
+    assert e
+    assert list(models.Person.get_by_id(123).libraries) == [models.Library.get_by_id('lib_1')]
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Person.edit(124)
+    with pytest.raises(TypeError):
+        core.Person.edit(123, no_option=123)
+    with pytest.raises(TypeError):
+        core.Person.edit(123, id=124)
