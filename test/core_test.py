@@ -6,18 +6,18 @@ import peewee
 
 from buchschloss import core, models, utils
 
-testing_db = peewee.SqliteDatabase(':memory:')
+temp_test_db = peewee.SqliteDatabase(':memory:')
 
 
 @pytest.fixture  # adapted from http://docs.peewee-orm.com/en/3.1.0/peewee/api.html#Database.bind_ctx
 def db():
     """bind the models to the test database"""
-    with testing_db.bind_ctx(models.models):
-        testing_db.create_tables(models.models)
+    with temp_test_db.bind_ctx(models.models):
+        temp_test_db.create_tables(models.models)
         try:
             yield
         finally:
-            testing_db.drop_tables(models.models)
+            temp_test_db.drop_tables(models.models)
 
 
 def test_misc_data(db):
@@ -146,3 +146,49 @@ def test_person_view_str(db):
         (str(models.Borrow.get_by_id(2)), str(models.Borrow.get_by_id(1))),
     )
     assert info['borrow_book_ids'] in ([1, 2], [2, 1])
+
+
+def test_book_new(db):
+    """test Book.new"""
+    models.Library.create(name='main')
+    for level in range(2):
+        core.current_login.level = level
+        with pytest.raises(core.BuchSchlossBaseError):
+            core.Book.new(0, 0, author='', title='', language='', publisher='',
+                          medium='', shelf='')
+    core.current_login.level = 2
+    b_id = core.Book.new(123, 456, author='author', title='title', language='lang',
+                         publisher='publisher', medium='medium', shelf='A1')
+    assert b_id == 1
+    b = models.Book.get_by_id(b_id)
+    assert b.isbn == 123
+    assert b.year == 456
+    assert b.author == 'author'
+    assert b.title == 'title'
+    assert b.language == 'lang'
+    assert b.publisher == 'publisher'
+    assert b.medium == 'medium'
+    assert b.shelf == 'A1'
+    assert b.library.name == 'main'
+    assert tuple(b.groups) == ()
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Book.new(123, 456, author='author', title='title', language='lang',
+                      publisher='publisher', medium='medium', shelf='A1',
+                      library='does_not_exist')
+    models.Library.create(name='other_lib')
+    b_id = core.Book.new(123, 456, author='author', title='title', language='lang',
+                         publisher='publisher', medium='medium', shelf='A1',
+                         library='other_lib')
+    assert b_id == 2
+    assert models.Book.get_by_id(b_id).library.name == 'other_lib'
+    b_id = core.Book.new(123, 456, author='author', title='title', language='lang',
+                         publisher='publisher', medium='medium', shelf='A1',
+                         groups=['grp0'])
+    assert b_id == 3
+    assert list(models.Book.get_by_id(b_id).groups) == [models.Group.get_by_id('grp0')]
+    b_id = core.Book.new(123, 456, author='author', title='title', language='lang',
+                         publisher='publisher', medium='medium', shelf='A1',
+                         groups=['grp0', 'grp1'])
+    assert b_id == 4
+    assert set(models.Book.get_by_id(b_id).groups) == {
+        models.Group.get_by_id('grp0'), models.Group.get_by_id('grp1')}

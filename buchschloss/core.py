@@ -419,7 +419,7 @@ class Book(ActionNamespace):
 
     @staticmethod
     @level_required(2)
-    def new(isbn: int, year: int, groups: T.Iterable[str] = (),
+    def new(isbn: int, year: int, groups: T.Iterable[str] = (),  # TODO: don't accept **kwargs
             library: str = 'main', **kwargs: str) -> int:
         """Attempt to create a new Book with the given arguments and return the ID
 
