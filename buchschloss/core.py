@@ -576,13 +576,13 @@ class Person(ActionNamespace):
     @staticmethod
     @level_required(1)
     @from_db(models.Person)
-    def view_str(person: models.Person):
+    def view_str(person: T.Union[models.Person, int]):
         """Return data about a Person.
 
         Return a dict consisting of the following items as strings:
             - id, first_name, last_name, class_ max_borrow, pay_date attributes
             - libraries as a string, individual libraries separated by ;
-            - borrows as a tuple of strings;
+            - borrows as a tuple of strings representing the borrows
             - __str__ , the string representation
         and 'borrow_book_ids', a sequence of the IDs of the borrowed books
             in the same order their representations appear in 'borrows'"""

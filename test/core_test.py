@@ -4,7 +4,7 @@ import datetime
 import pytest
 import peewee
 
-from buchschloss import core, models
+from buchschloss import core, models, utils
 
 testing_db = peewee.SqliteDatabase(':memory:')
 
@@ -102,3 +102,47 @@ def test_person_edit(db):
         core.Person.edit(123, no_option=123)
     with pytest.raises(TypeError):
         core.Person.edit(123, id=124)
+
+
+def test_person_view_str(db):
+    """test Person.view_str"""
+    p = models.Person.create(id=123, first_name='first', last_name='last', class_='cls',
+                             max_borrow=3, pay_date=datetime.date(1956, 1, 31))
+    core.current_login.level = 0
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Person.view_str(123)
+    core.current_login.level = 1
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Person.view_str(12345)
+    assert core.Person.view_str(123) == {
+        'id': '123',
+        'first_name': 'first',
+        'last_name': 'last',
+        'class_': 'cls',
+        'max_borrow': '3',
+        'pay_date': str(utils.FormattedDate.fromdate(datetime.date(1956, 1, 31))),
+        'borrows': (),
+        'borrow_book_ids': [],
+        'libraries': '',
+        '__str__': str(models.Person.get_by_id(123)),
+    }
+    p.libraries.add(models.Library.create(name='main'))
+    assert core.Person.view_str(123)['libraries'] == 'main'
+    models.Book.create(isbn=0, author='', title='', language='', publisher='',
+                       year=0, medium='', shelf='', library='main')
+    models.Borrow.create(person=123, book=1, return_date=datetime.date(1956, 1, 31))
+    info = core.Person.view_str(123)
+    assert info['borrows'] == (str(models.Borrow.get_by_id(1)),)
+    assert info['borrow_book_ids'] == [1]
+    p.libraries.add(models.Library.create(name='testlib'))
+    info = core.Person.view_str(123)
+    assert info['libraries'] in ('main;testlib', 'testlib;main')
+    models.Book.create(isbn=0, author='', title='', language='', publisher='',
+                       year=0, medium='', shelf='', library='')
+    models.Borrow.create(person=123, book=2, return_date=datetime.date(1956, 1, 31))
+    info = core.Person.view_str(123)
+    assert info['borrows'] in (
+        (str(models.Borrow.get_by_id(1)), str(models.Borrow.get_by_id(2))),
+        (str(models.Borrow.get_by_id(2)), str(models.Borrow.get_by_id(1))),
+    )
+    assert info['borrow_book_ids'] in ([1, 2], [2, 1])
