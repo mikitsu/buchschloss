@@ -93,12 +93,12 @@ class Person(Model):
         - borrows: current borrows; derzeitige Ausleihen
         - libraries: libraries allowed; erlaubte Bibliotheken
     """
-    id: int = IntegerField(primary_key=True)
-    first_name: str = CharField()
-    last_name: str = CharField()
-    class_: str = CharField()
-    max_borrow: int = IntegerField()
-    pay_date: datetime.date = FormattedDateField(null=True)
+    id: T.Union[int, IntegerField] = IntegerField(primary_key=True)
+    first_name: T.Union[str, CharField] = CharField()
+    last_name: T.Union[str, CharField] = CharField()
+    class_: T.Union[str, CharField] = CharField()
+    max_borrow: T.Union[int, IntegerField] = IntegerField()
+    pay_date: T.Union[datetime.date, DateField] = FormattedDateField(null=True)
     libraries: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # libraries as backref
     borrows: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # borrows as backref
 
@@ -123,8 +123,8 @@ class Library(Model):
     people: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]\
         = ManyToManyField(Person, 'libraries')
     books: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]
-    name: str = CharField(primary_key=True)
-    pay_required: bool = BooleanField(default=True)
+    name: T.Union[str, CharField] = CharField(primary_key=True)
+    pay_required: T.Union[bool, BooleanField] = BooleanField(default=True)
 
     def __str__(self):
         return utils.get_name('Library[{}]').format(self.name)
@@ -152,22 +152,22 @@ class Book(Model):
         - is_active [automatically added]: indicate if the book
             is still there (loss, damage, sold...)
     """
-    isbn: int = IntegerField()
-    author: str = CharField()
-    title: str = CharField()
-    series: str = CharField(null=True)
-    language: str = CharField()
-    publisher: str = CharField()
-    concerned_people: str = CharField(null=True)
-    year: int = IntegerField()
-    medium: str = CharField()
-    genres: str = CharField(null=True)
+    isbn: T.Union[int, IntegerField] = IntegerField()
+    author: T.Union[str, CharField] = CharField()
+    title: T.Union[str, CharField] = CharField()
+    series: T.Union[str, CharField] = CharField(null=True)
+    language: T.Union[str, CharField] = CharField()
+    publisher: T.Union[str, CharField] = CharField()
+    concerned_people: T.Union[str, CharField] = CharField(null=True)
+    year: T.Union[int, IntegerField] = IntegerField()
+    medium: T.Union[str, CharField] = CharField()
+    genres: T.Union[str, CharField] = CharField(null=True)
 
     groups: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # groups as backref
-    id: int = AutoField(primary_key=True)
-    library: Library = ForeignKeyField(Library, backref='books')
-    shelf: str = CharField()
-    is_active: bool = BooleanField(default=True)
+    id: T.Union[int, IntegerField] = AutoField(primary_key=True)
+    library: T.Union[Library, ForeignKeyField] = ForeignKeyField(Library, backref='books')
+    shelf: T.Union[str, CharField] = CharField()
+    is_active: T.Union[bool, BooleanField] = BooleanField(default=True)
 
     @property
     def borrow(self):
@@ -190,7 +190,7 @@ class Group(Model):
     Repräsentiert eine Gruppe"""
     books: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]\
         = ManyToManyField(Book, 'groups')
-    name: str = CharField(primary_key=True)
+    name: T.Union[str, CharField] = CharField(primary_key=True)
 
     def __str__(self):
         return utils.get_name('Group[{}]').format(self.name)
@@ -215,11 +215,11 @@ class Borrow(Model):
         - is_back: if the Book was returned; ob das Buch bereits zurckgegeben wurde
         - return_date: date by which the Book must de returned; Datum bis zu dem das Buch zurckgegeben sein muss
     """
-    id: int = AutoField(primary_key=True)
+    id: T.Union[int, IntegerField] = AutoField(primary_key=True)
     person: Person = ForeignKeyField(Person, backref='borrows')
     book: Book = ForeignKeyField(Book)
-    is_back: bool = BooleanField(default=False)
-    return_date: datetime.date = FormattedDateField()
+    is_back: T.Union[bool, BooleanField] = BooleanField(default=False)
+    return_date: T.Union[datetime.date, DateField] = FormattedDateField()
 
     repr_data = {
         'ein': 'ein',
@@ -239,10 +239,10 @@ class Member(Model):
 
     Repräsentiert ein Mitglied der Rund-ums-Lesen-AG,
     d.h. eine Person, die Ausleihen, Rückgaben und ggf. Verwaltungsaufgeben durchführen kann."""
-    name: str = CharField(primary_key=True)
-    password: bytes = BlobField()
-    salt: bytes = BlobField()
-    level: int = IntegerField()
+    name: T.Union[str, CharField] = CharField(primary_key=True)
+    password: T.Union[bytes, BlobField] = BlobField()
+    salt: T.Union[bytes, BlobField] = BlobField()
+    level: T.Union[int, IntegerField] = IntegerField()
 
     repr_data = {
         'ein': 'ein',
@@ -261,8 +261,8 @@ class Misc(Model):
     """Store singular data (e.g. date for recurring action)
 
     Usable through the misc_data, instance of MiscData"""
-    pk: int = CharField(primary_key=True)
-    data: object = PickleField()
+    pk: T.Union[str, CharField] = CharField(primary_key=True)
+    data: T.Any = PickleField()
 
     repr_data = {
         'ein': 'ein',

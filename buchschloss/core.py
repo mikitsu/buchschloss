@@ -203,6 +203,7 @@ class LibraryGroupAction(enum.Enum):
     ADD = 'add'
     REMOVE = 'remove'
     DELETE = 'delete'
+    NONE = 'none'
 
 
 def pbkdf(pw, salt, iterations=config.HASH_ITERATIONS[0]):
@@ -610,13 +611,16 @@ class Library(ActionNamespace):
 
     @staticmethod
     @level_required(3)
-    def new(name: str, books: T.Sequence[int],
-            people: T.Sequence[int], pay_required: bool = True):
+    def new(name: str, *, books: T.Sequence[int] = (),
+            people: T.Sequence[int] = (), pay_required: bool = True):
         """Create a new Library with the specified name and add it to the specified
                 people and books.
 
-            ``people`` and ``books`` are iterables of the IDs of the people and books
+            ``people`` and ``books`` are sequences of the IDs of the people and books
                 to gain access / be transferred to the new library
+
+            ``pay_required`` indicates whether people need to have paid
+                in order to borrow from the library
             
             raise a BuchSchlossBaseError if the Library exists
         """
@@ -626,17 +630,20 @@ class Library(ActionNamespace):
             except peewee.IntegrityError as e:
                 if str(e).startswith('UNIQUE'):
                     raise BuchSchlossError('Library_exists', 'Library_{}_exists', name)
+                else:
+                    raise
             else:
                 lib.people = people
-                lib.books = books
+                models.Book.update({models.Book.library: lib}
+                                   ).where(models.Book.id << books).execute()
 
     @staticmethod
     @level_required(3)
-    def edit(action: LibraryGroupAction, name: str, people: T.Iterable[int] = (),
-             books: T.Iterable[int] = (), pay_required: bool = None):
+    def edit(action: LibraryGroupAction, name: str, people: T.Sequence[int] = (),
+             books: T.Sequence[int] = (), pay_required: bool = None):
         """Perform the given action on the Library with the given name
 
-            DELETE will remove the reference to the library from all given people
+            DELETE will remove the reference to the library from all people
                 and books (setting their library to 'main'),
                 but not actually delete the Library itself
                 ``people`` and ``books`` are ignored in this case
@@ -644,6 +651,8 @@ class Library(ActionNamespace):
                 of all the given books to the specified one
             REMOVE will remove the reference to the given Library in the given people
                 and set the library of the given books to 'main'
+            NONE will ignore ``people`` and ``books`` and
+                take no action other than setting ``pay_required``
 
             ``name`` is the name of the Library to modify
             ``people`` is an iterable of the IDs of the people to modify
@@ -653,18 +662,25 @@ class Library(ActionNamespace):
             raise a BuchSchlossBaseError if the Library doesn't exist
         """
         try:
-            lib = models.Library.get_by_id(name)
+            lib: models.Library = models.Library.get_by_id(name)
         except models.Library.DoesNotExist:
             raise BuchSchlossNotFoundError('Library', name)
         with models.db:
             if action is LibraryGroupAction.DELETE:
-                lib.books = ()
                 lib.people = ()
-            else:
-                for b in books:
-                    getattr(lib.books, action.value)(b)
+                models.Book.update({models.Book.library: models.Library.get_by_id('main')}
+                                   ).where(models.Book.library == lib).execute()
+            elif action is LibraryGroupAction.ADD:
+                models.Book.update({models.Book.library: lib}
+                                   ).where(models.Book.id << books).execute()
                 for p in people:
-                    getattr(lib.people, action.value)(p)
+                    lib.people.add(p)
+            elif action is LibraryGroupAction.REMOVE:
+                models.Book.update({models.Book.Library: models.Library.get_by_id('main')}
+                                   ).where((models.Book.library == lib)
+                                           & (models.Book.id << books)).execute()
+                for p in people:
+                    lib.people.remove(p)
             if pay_required is not None:
                 lib.pay_required = pay_required
                 lib.save()
@@ -695,7 +711,7 @@ class Group(ActionNamespace):
 
     @staticmethod
     @level_required(3)
-    def new(name: str, books: T.Sequence[int]):
+    def new(name: str, books: T.Sequence[int] = ()):
         """Create a new Group with the given name and books
 
             raise a BuchSchlossBaseError if the Group exists
@@ -722,6 +738,7 @@ class Group(ActionNamespace):
                 ignore IDs of non-existing books
             REMOVE will remove the reference to the Group in all of the given books
                 ignore books not in the Group and IDs of nonexistent books
+            NONE does nothing
         """
         with models.db:
             try:
@@ -731,6 +748,8 @@ class Group(ActionNamespace):
             else:
                 if action is LibraryGroupAction.DELETE:
                     group.books = ()
+                elif action is LibraryGroupAction.NONE:
+                    pass
                 else:
                     for book in books:
                         getattr(group, action.value)(book)
