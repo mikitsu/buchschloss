@@ -675,7 +675,7 @@ class Library(ActionNamespace):
                 for p in people:
                     lib.people.add(p)
             elif action is LibraryGroupAction.REMOVE:
-                models.Book.update({models.Book.Library: models.Library.get_by_id('main')}
+                models.Book.update({models.Book.library: models.Library.get_by_id('main')}
                                    ).where((models.Book.library == lib)
                                            & (models.Book.id << books)).execute()
                 for p in people:

@@ -26,6 +26,12 @@ def create_book(lib='main'):
                               year=0, medium='', shelf='', library=lib)
 
 
+def create_person(id_):
+    """create a Person with falsey values"""
+    return models.Person.create(id=id_, first_name='', last_name='',
+                                class_='', max_borrow=0)
+
+
 def test_misc_data(db):
     """test the misc_data accessor for the misc table"""
     models.Misc.create(pk='test_pk_1', data=[1, 2, 3])
@@ -312,3 +318,34 @@ def test_library_new(db):
             {models.Library.get_by_id('test-1'), models.Library.get_by_id('test-2')})
     assert (tuple(models.Person.get_by_id(456).libraries)
             == (models.Library.get_by_id('test-2'),))
+
+
+def test_library_edit(db):
+    """test Library.edit"""
+    models.Library.create(name='main')
+    models.Library.create(name='testlib')
+    models.Library.create(name='test-2')
+    create_book()
+    create_book()
+    create_book()
+    create_book('test-2')
+    create_person(123)
+    create_person(124)
+    for level in range(3):
+        core.current_login.level = level
+        with pytest.raises(core.BuchSchlossBaseError):
+            core.Library.edit(core.LibraryGroupAction.NONE, 'testlib')
+    core.current_login.level = 3
+    core.Library.edit(core.LibraryGroupAction.NONE, 'testlib')
+    core.Library.edit(core.LibraryGroupAction.ADD, 'testlib', books=[1])
+    assert models.Book.get_by_id(1).library.name == 'testlib'
+    core.Library.edit(core.LibraryGroupAction.ADD, 'testlib', books=[2, 3], people=[123])
+    assert all(models.Book.get_by_id(n).library.name == 'testlib' for n in range(1, 4))
+    assert [p.id for p in models.Library.get_by_id('testlib').people] == [123]
+    core.Library.edit(core.LibraryGroupAction.REMOVE, 'testlib', books=[3, 4], people=[123])
+    assert models.Book.get_by_id(4).library.name == 'test-2'
+    assert models.Book.get_by_id(3).library.name == 'main'
+    assert not models.Person.get_by_id(123).libraries
+    core.Library.edit(core.LibraryGroupAction.DELETE, 'testlib')
+    assert not models.Library.get_by_id('testlib').people
+    assert not models.Library.get_by_id('testlib').books
