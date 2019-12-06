@@ -4,7 +4,7 @@ import datetime
 import pytest
 import peewee
 
-from buchschloss import core, models, utils
+from buchschloss import core, models, utils, config
 
 temp_test_db = peewee.SqliteDatabase(':memory:')
 
@@ -226,3 +226,57 @@ def test_book_edit(db):
     assert models.Book.get_by_id(1).year == 123
     assert models.Book.get_by_id(2).medium == ''
     assert models.Book.get_by_id(2).year == 0
+
+
+def test_book_view_str(db):
+    """test Book.view_str"""
+    for n in range(2):
+        models.Library.create(name='lib{}'.format(n))
+        models.Group.create(name='grp{}'.format(n))
+    models.Book.create(isbn=123, author='author', title='title', language='lang',
+                       publisher='publ', year=456, medium='rare', library='lib0',
+                       shelf='A5')
+    b = models.Book.get_by_id(1)
+    core.current_login.level = 0
+    assert core.Book.view_str(1) == {
+        'id': '1',
+        'isbn': '123',
+        'author': 'author',
+        'title': 'title',
+        'language': 'lang',
+        'publisher': 'publ',
+        'year': '456',
+        'medium': 'rare',
+        'series': '',
+        'concerned_people': '',
+        'genres': '',
+        'shelf': 'A5',
+        'library': 'lib0',
+        'groups': '',
+        'status': utils.get_name('available'),
+        'return_date': '-----',
+        'borrowed_by': '-----',
+        'borrowed_by_id': None,
+        '__str__': str(b),
+    }
+    b.library = models.Library.get_by_id('lib1')
+    b.save()
+    assert core.Book.view_str(1)['library'] == 'lib1'
+    b.groups.add('grp0')
+    assert core.Book.view_str(1)['groups'] == 'grp0'
+    b.groups.add('grp1')
+    assert core.Book.view_str(1)['groups'] in ('grp0;grp1', 'grp1;grp0')
+    models.Person.create(id=123, first_name='first', last_name='last',
+                         class_='cls', max_borrow=3)
+    borrow = models.Borrow.create(book=1, person=123, return_date=datetime.date(1956, 1, 31))
+    data = core.Book.view_str(1)
+    assert data['status'] == utils.get_name('borrowed')
+    assert data['return_date'] == datetime.date(1956, 1, 31).strftime(config.DATE_FORMAT)
+    assert data['borrowed_by'] == str(models.Person.get_by_id(123))
+    assert data['borrowed_by_id'] == 123
+    borrow.is_back = True
+    borrow.save()
+    assert core.Book.view_str(1)['status'] == utils.get_name('available')
+    b.is_active = False
+    b.save()
+    assert core.Book.view_str(1)['status'] == utils.get_name('inactive')
