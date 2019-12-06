@@ -476,26 +476,31 @@ class Book(ActionNamespace):
 
     @staticmethod
     @from_db(models.Book)
-    def view_str(book: models.Book):
+    def view_str(book: T.Union[int, models.Book]):
         """Return data about a Book.
 
         Return a dictionary consisting of the following items as strings:
-            - contents of config.BOOK_DATA and id and library attributes
+            - author, isbn, title, series, language, publisher, concerned_people,
+                year, medium, genres, id
+            - the name of the Library the Book is in
             - groups as a string consisting of group names separated by ';'
             - the book's status (available, borrowed or inactive)
-            - return_date either '-----' or the date the book will be returned
+            - return_date: either '-----' or the date the book will be returned
             - borrowed_by: '-----' or a representation of the borrowing Person
             - __str__: the string representation of the Book
-        and 'borrowed_by_id', the ID of the Person that borrowed the Book
+        and 'borrowed_by_id', the ID of the Person that borrowed the Book (int)
+            or None if not borrowed
         """
         r = {k: str(getattr(book, k) or '') for k in
-             config.BOOK_DATA + ['id', 'library', 'shelf']}
+             ('author', 'isbn', 'title', 'series', 'language', 'publisher',
+              'concerned_people', 'year', 'medium', 'genres', 'id')}
+        r['library'] = book.library.name
         r['groups'] = ';'.join(g.name for g in book.groups)
         borrow = book.borrow or Dummy(id=None, _bool=False)
         r['status'] = utils.get_name('borrowed' if borrow else
                                      ('available' if book.is_active
                                       else 'inactive'))
-        r['return_date'] = borrow.return_date.strftime(config.DATE_FORMAT)
+        r['return_date'] = str(borrow.return_date.strftime(config.DATE_FORMAT))
         r['borrowed_by'] = str(borrow.person)
         r['borrowed_by_id'] = borrow.person.id
         r['__str__'] = str(book)
