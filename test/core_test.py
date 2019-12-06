@@ -20,6 +20,12 @@ def db():
             temp_test_db.drop_tables(models.models)
 
 
+def create_book(lib='main'):
+    """create a Book with falsey values. The Library can be specified"""
+    return models.Book.create(isbn=0, author='', title='', language='', publisher='',
+                              year=0, medium='', shelf='', library=lib)
+
+
 def test_misc_data(db):
     """test the misc_data accessor for the misc table"""
     models.Misc.create(pk='test_pk_1', data=[1, 2, 3])
@@ -128,8 +134,7 @@ def test_person_view_str(db):
     }
     p.libraries.add(models.Library.create(name='main'))
     assert core.Person.view_str(123)['libraries'] == 'main'
-    models.Book.create(isbn=0, author='', title='', language='', publisher='',
-                       year=0, medium='', shelf='', library='main')
+    create_book()
     models.Borrow.create(person=123, book=1, return_date=datetime.date(1956, 1, 31))
     info = core.Person.view_str(123)
     assert info['borrows'] == (str(models.Borrow.get_by_id(1)),)
@@ -137,8 +142,7 @@ def test_person_view_str(db):
     p.libraries.add(models.Library.create(name='testlib'))
     info = core.Person.view_str(123)
     assert info['libraries'] in ('main;testlib', 'testlib;main')
-    models.Book.create(isbn=0, author='', title='', language='', publisher='',
-                       year=0, medium='', shelf='', library='')
+    create_book()
     models.Borrow.create(person=123, book=2, return_date=datetime.date(1956, 1, 31))
     info = core.Person.view_str(123)
     assert info['borrows'] in (
@@ -154,8 +158,8 @@ def test_book_new(db):
     for level in range(2):
         core.current_login.level = level
         with pytest.raises(core.BuchSchlossBaseError):
-            core.Book.new(0, 0, author='', title='', language='', publisher='',
-                          medium='', shelf='')
+            core.Book.new(123, 456, author='author', title='title', language='lang',
+                          publisher='publisher', medium='medium', shelf='A1')
     core.current_login.level = 2
     b_id = core.Book.new(123, 456, author='author', title='title', language='lang',
                          publisher='publisher', medium='medium', shelf='A1')
@@ -197,10 +201,8 @@ def test_book_new(db):
 def test_book_edit(db):
     """test Book.edit"""
     models.Library.create(name='main')
-    models.Book.create(isbn=0, author='', title='', language='', publisher='',
-                       year=0, medium='', library='main', shelf='')
-    models.Book.create(isbn=0, author='', title='', language='', publisher='',
-                       year=0, medium='', library='main', shelf='')
+    create_book()
+    create_book()
     for level in range(2):
         core.current_login.level = level
         with pytest.raises(core.BuchSchlossBaseError):
@@ -280,3 +282,33 @@ def test_book_view_str(db):
     b.is_active = False
     b.save()
     assert core.Book.view_str(1)['status'] == utils.get_name('inactive')
+
+
+def test_library_new(db):
+    """test Library.new"""
+    models.Library.create(name='main')
+    create_book()
+    create_book()
+    models.Person.create(id=123, first_name='', last_name='', class_='', max_borrow=0)
+    models.Person.create(id=456, first_name='', last_name='', class_='', max_borrow=0)
+    for level in range(3):
+        core.current_login.level = level
+        with pytest.raises(core.BuchSchlossBaseError):
+            core.Library.new('testlib')
+    core.current_login.level = 3
+    core.Library.new('testlib')
+    assert models.Library.get_or_none(name='testlib')
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Library.new('testlib')
+    assert models.Library.get_by_id('testlib').pay_required
+    core.Library.new('test-1', books=[1], people=[123])
+    assert models.Book.get_by_id(1).library.name == 'test-1'
+    assert (tuple(models.Person.get_by_id(123).libraries)
+            == (models.Library.get_by_id('test-1'),))
+    core.Library.new('test-2', books=(1, 2), people=[123, 456])
+    assert models.Book.get_by_id(1).library.name == 'test-2'
+    assert models.Book.get_by_id(1).library.name == 'test-2'
+    assert (set(models.Person.get_by_id(123).libraries) ==
+            {models.Library.get_by_id('test-1'), models.Library.get_by_id('test-2')})
+    assert (tuple(models.Person.get_by_id(456).libraries)
+            == (models.Library.get_by_id('test-2'),))

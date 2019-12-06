@@ -599,7 +599,6 @@ class Person(ActionNamespace):
 
 
 class Library(ActionNamespace):
-
     """Namespace for Library-related functions"""
     model = models.Library
 
