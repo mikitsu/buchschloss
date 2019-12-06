@@ -192,3 +192,37 @@ def test_book_new(db):
     assert b_id == 4
     assert set(models.Book.get_by_id(b_id).groups) == {
         models.Group.get_by_id('grp0'), models.Group.get_by_id('grp1')}
+
+
+def test_book_edit(db):
+    """test Book.edit"""
+    models.Library.create(name='main')
+    models.Book.create(isbn=0, author='', title='', language='', publisher='',
+                       year=0, medium='', library='main', shelf='')
+    models.Book.create(isbn=0, author='', title='', language='', publisher='',
+                       year=0, medium='', library='main', shelf='')
+    for level in range(2):
+        core.current_login.level = level
+        with pytest.raises(core.BuchSchlossBaseError):
+            core.Book.edit(1, isbn=1)
+    core.current_login.level = 2
+    assert not core.Book.edit(1, isbn=1)
+    assert models.Book.get_by_id(1).isbn == 1
+    assert models.Book.get_by_id(2).isbn == 0
+    assert not core.Book.edit(1, author='author', shelf='shl')
+    assert models.Book.get_by_id(1).author == 'author'
+    assert models.Book.get_by_id(1).shelf == 'shl'
+    assert models.Book.get_by_id(2).author == ''
+    assert models.Book.get_by_id(2).shelf == ''
+    models.Library.create(name='lib')
+    assert not core.Book.edit(1, library='lib')
+    assert models.Book.get_by_id(1).library.name == 'lib'
+    assert models.Book.get_by_id(2).library.name == 'main'
+    assert core.Book.edit(1, library='does_not_exist')
+    assert models.Book.get_by_id(1).library.name == 'lib'
+    assert not core.Book.edit(1, medium='med')
+    assert not core.Book.edit(1, year=123)
+    assert models.Book.get_by_id(1).medium == 'med'
+    assert models.Book.get_by_id(1).year == 123
+    assert models.Book.get_by_id(2).medium == ''
+    assert models.Book.get_by_id(2).year == 0
