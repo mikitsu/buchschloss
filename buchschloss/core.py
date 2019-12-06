@@ -454,7 +454,7 @@ class Book(ActionNamespace):
         See Book.__doc__ for more information on the arguments
         raise a BuchSchlossBaseError if the Book isn't found.
         """
-        if ((not set(kwargs.keys()) <= {k for k in dir(models.Person)
+        if ((not set(kwargs.keys()) <= {k for k in dir(models.Book)
                                         if isinstance(getattr(models.Book, k),
                                                       peewee.Field)})
                 or 'id' in kwargs):
