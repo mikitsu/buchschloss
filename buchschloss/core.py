@@ -714,6 +714,7 @@ class Group(ActionNamespace):
         """Create a new Group with the given name and books
 
             raise a BuchSchlossBaseError if the Group exists
+            ignore nonexistent Books
         """
         with models.db:
             try:

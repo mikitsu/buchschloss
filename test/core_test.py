@@ -368,9 +368,9 @@ def test_library_view_str(db):
         'people': '',
         'books': '',
     }
-    lib.people.add(123)
+    lib.people.add(p_1)
     assert core.Library.view_str('lib')['people'] == '123'
-    lib.people.add(124)
+    lib.people.add(p_2)
     assert set(core.Library.view_str('lib')['people'].split(';')) == {'123', '124'}
     b_1.library = lib
     b_1.save()
@@ -378,3 +378,26 @@ def test_library_view_str(db):
     b_2.library = lib
     b_2.save()
     assert set(core.Library.view_str('lib')['books'].split(';')) == {'1', '2'}
+
+
+def test_group_new(db):
+    """test Group.new"""
+    models.Library.create(name='main')
+    create_book()
+    create_book()
+    for level in range(3):
+        core.current_login.level = level
+        with pytest.raises(core.BuchSchlossBaseError):
+            core.Group.new('test-grp')
+    core.current_login.level = 3
+    core.Group.new('test-grp')
+    assert not models.Group.get_by_id('test-grp').books
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Group.new('test-grp')
+    core.Group.new('test-2', [1, 2])
+    assert list(g.name for g in models.Book.get_by_id(1).groups) == ['test-2']
+    assert list(g.name for g in models.Book.get_by_id(2).groups) == ['test-2']
+    core.Group.new('test-3', [2])
+    assert list(g.name for g in models.Book.get_by_id(1).groups) == ['test-2']
+    assert set(g.name for g in models.Book.get_by_id(2).groups) == {'test-2', 'test-3'}
+    core.Group.new('test-4', [12345])
