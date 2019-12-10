@@ -349,3 +349,32 @@ def test_library_edit(db):
     core.Library.edit(core.LibraryGroupAction.DELETE, 'testlib')
     assert not models.Library.get_by_id('testlib').people
     assert not models.Library.get_by_id('testlib').books
+
+
+def test_library_view_str(db):
+    """test Library.biew_str"""
+    models.Library.create(name='main')
+    lib = models.Library.create(name='lib')
+    b_1 = create_book()
+    b_2 = create_book()
+    p_1 = create_person(123)
+    p_2 = create_person(124)
+    core.current_login.level = 0
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Library.view_str('does not exist')
+    assert core.Library.view_str('lib') == {
+        '__str__': str(lib),
+        'name': 'lib',
+        'people': '',
+        'books': '',
+    }
+    lib.people.add(123)
+    assert core.Library.view_str('lib')['people'] == '123'
+    lib.people.add(124)
+    assert set(core.Library.view_str('lib')['people'].split(';')) == {'123', '124'}
+    b_1.library = lib
+    b_1.save()
+    assert core.Library.view_str('lib')['books'] == '1'
+    b_2.library = lib
+    b_2.save()
+    assert set(core.Library.view_str('lib')['books'].split(';')) == {'1', '2'}

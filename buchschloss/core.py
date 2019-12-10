@@ -698,8 +698,8 @@ class Library(ActionNamespace):
         return {
             '__str__': str(lib),
             'name': lib.name,
-            'people': ';'.join(p.id for p in lib.people),
-            'books': ';'.join(b.id for b in lib.books),
+            'people': ';'.join(map(str, (p.id for p in lib.people))),
+            'books': ';'.join(map(str, (b.id for b in lib.books))),
         }
 
 
