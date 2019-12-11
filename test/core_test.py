@@ -337,6 +337,8 @@ def test_library_edit(db):
             core.Library.edit(core.LibraryGroupAction.NONE, 'testlib')
     core.current_login.level = 3
     core.Library.edit(core.LibraryGroupAction.NONE, 'testlib')
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Library.edit(core.LibraryGroupAction.NONE, 'does not exist')
     core.Library.edit(core.LibraryGroupAction.ADD, 'testlib', books=[1])
     assert models.Book.get_by_id(1).library.name == 'testlib'
     core.Library.edit(core.LibraryGroupAction.ADD, 'testlib', books=[2, 3], people=[123])
@@ -352,7 +354,7 @@ def test_library_edit(db):
 
 
 def test_library_view_str(db):
-    """test Library.biew_str"""
+    """test Library.view_str"""
     models.Library.create(name='main')
     lib = models.Library.create(name='lib')
     b_1 = create_book()
@@ -401,3 +403,34 @@ def test_group_new(db):
     assert list(g.name for g in models.Book.get_by_id(1).groups) == ['test-2']
     assert set(g.name for g in models.Book.get_by_id(2).groups) == {'test-2', 'test-3'}
     core.Group.new('test-4', [12345])
+
+
+def test_group_edit(db):
+    """test Group.edit"""
+    models.Library.create(name='main')
+    models.Group.create(name='group-1')
+    models.Group.create(name='group-2')
+    create_book()
+    create_book()
+    for level in range(3):
+        core.current_login.level = level
+        with pytest.raises(core.BuchSchlossBaseError):
+            core.Group.edit(core.LibraryGroupAction.NONE, 'group-1', ())
+    core.current_login.level = 3
+    core.Group.edit(core.LibraryGroupAction.NONE, 'group-1', ())
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Group.edit(core.LibraryGroupAction.NONE, 'does not exist', ())
+    core.Group.edit(core.LibraryGroupAction.ADD, 'group-1', [1])
+    assert set(g.name for g in models.Book.get_by_id(1).groups) == {'group-1'}
+    assert not models.Book.get_by_id(2).groups
+    assert 'group-2' not in models.Book.get_by_id(1).groups + models.Book.get_by_id(2).groups
+    core.Group.edit(core.LibraryGroupAction.REMOVE, 'group-1', iter([1, 2, 3]))
+    core.Group.edit(core.LibraryGroupAction.ADD, 'group-1', [2])
+    assert not models.Book.get_by_id(1).groups
+    assert set(g.name for g in models.Book.get_by_id(2).groups) == {'group-1'}
+    assert 'group-2' not in models.Book.get_by_id(1).groups + models.Book.get_by_id(2).groups
+    core.Group.edit(core.LibraryGroupAction.DELETE, 'group-1', ())
+    assert not models.Book.get_by_id(1).groups
+    assert not models.Book.get_by_id(2).groups
+    assert set() == {'group-1', 'group-2'} & set(models.Book.get_by_id(1).groups
+                                                 + models.Book.get_by_id(2).groups)

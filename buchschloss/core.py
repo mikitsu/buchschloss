@@ -752,7 +752,7 @@ class Group(ActionNamespace):
                     pass
                 else:
                     for book in books:
-                        getattr(group, action.value)(book)
+                        getattr(group.books, action.value)(book)
 
     @staticmethod
     @level_required(3)
