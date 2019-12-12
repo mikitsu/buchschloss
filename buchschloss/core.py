@@ -754,22 +754,38 @@ class Group(ActionNamespace):
     @staticmethod
     @level_required(3)
     @from_db(models.Group)
-    def activate(group, src: T.Iterable[str] = (), dest: str = 'main'):
+    def activate(group, src: T.Sequence[str] = (), dest: str = 'main'):
         """Activate a Group
 
             ``src`` is an iterable of the names of origin libraries
                 if it is falsey (empty), books are taken from all libraries
             ``dest`` is the name of the target Library
 
-            return a set of strings describing encountered errors such as
-                missing source libraries
-            raise a BuchSchlossBaseError it the target Library does not exist
+            raise a BuchSchlossBaseError it the Group, the target Library
+                or a source Library does not exist
         """
-        errors = set()
-        for book in group.books:
-            # it would probably be better to somehow do this selection at SQL level...
-            if (not src) or book.library.name in src:
-                _try_set_lib(book, dest, errors)
+        if src and (models.Library.select(None)
+                    .where(models.Library.name << src).count()
+                    != len(src)):
+            present_libraries = set(lib.name for lib in
+                                    models.Library.select(models.Library.name)
+                                    .where(models.Library.name << src))
+            not_found = ', '.join(present_libraries ^ set(src))
+            raise BuchSchlossNotFoundError('Libraries', not_found)
+        try:
+            dest = models.Library.get_by_id(dest)
+        except models.Library.DoesNotExist:
+            raise BuchSchlossNotFoundError('Library', dest)
+        books_to_update = (models.Book.select(models.Book.id)
+                           .join(models.Book.groups.through_model)
+                           .join(models.Group)
+                           .where(models.Group.name == group.name)
+                           .switch(models.Book))
+        if src:
+            books_to_update = books_to_update.where(models.Book.library << src)
+        (models.Book.update(library=dest)
+         .where(models.Book.id << [b.id for b in books_to_update])
+         .execute())
 
     @staticmethod
     @from_db(models.Group)

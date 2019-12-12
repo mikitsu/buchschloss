@@ -448,6 +448,7 @@ def test_group_activate(db):
     """test Group.activate"""
     models.Library.create(name='main')
     models.Library.create(name='lib-1')
+    models.Library.create(name='lib-2')
     models.Group.create(name='group-1')
     models.Group.create(name='group-2')
     books = [create_book(),
@@ -470,12 +471,10 @@ def test_group_activate(db):
     b = models.Book.get_by_id(3)
     assert b.library.name == 'main'
     b.groups.add('group-1')
-    b.library = models.Library.get_by_id('lib-1')
+    b.library = models.Library.get_by_id('lib-2')
     b.save()
     assert not core.Group.activate('group-1', ['lib-1'])
     assert models.Book.get_by_id(1).library.name == 'main'
-    assert models.Book.get_by_id(3).library.name == 'lib-1'
-    e = core.Group.activate('group-1', ['does not exist', 'lib-1', 'also'])
-    assert e == {utils.get_name('no_Library_with_id_{}').format('does not exist'),
-                 utils.get_name('no_Library_with_id_{}').format('also')}
-    assert models.Book.get_by_id(3).library.name == 'main'
+    assert models.Book.get_by_id(3).library.name == 'lib-2'
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Group.activate('group-1', ['does not exist', 'lib-2'])
