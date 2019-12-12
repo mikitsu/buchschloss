@@ -207,6 +207,8 @@ def test_book_new(db):
 def test_book_edit(db):
     """test Book.edit"""
     models.Library.create(name='main')
+    models.Group.create(name='group-1')
+    models.Group.create(name='group-2')
     create_book()
     create_book()
     for level in range(2):
@@ -226,7 +228,13 @@ def test_book_edit(db):
     assert not core.Book.edit(1, library='lib')
     assert models.Book.get_by_id(1).library.name == 'lib'
     assert models.Book.get_by_id(2).library.name == 'main'
-    assert core.Book.edit(1, library='does_not_exist')
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Book.edit(1, library='does_not_exist')
+    assert not core.Book.edit(1, groups=['group-1'])
+    assert set(g.name for g in models.Book.get_by_id(1).groups) == {'group-1'}
+    e = core.Book.edit(1, groups=('group-2', 'does not exist'))
+    assert e == {utils.get_name('no_Group_with_id_{}').format('does not exist')}
+    assert set(g.name for g in models.Book.get_by_id(1).groups) == {'group-2'}
     assert models.Book.get_by_id(1).library.name == 'lib'
     assert not core.Book.edit(1, medium='med')
     assert not core.Book.edit(1, year=123)

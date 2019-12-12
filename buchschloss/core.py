@@ -293,13 +293,6 @@ def auth_required(f):
 auth_required.functions = []
 
 
-def _try_set_lib(b: models.Book, lib: str, e: set = Dummy(add=lambda x: 0)):
-    try:
-        b.library = models.Library.get(models.Library.name == lib)
-    except models.Library.DoesNotExist:
-        e.add(BuchSchlossNotFoundError('Library', lib).message)
-
-
 def authenticate(m, password):
     """Check if the given password corresponds to the hashed one.
     Update the hash if newer iteration number present"""
@@ -453,19 +446,23 @@ class Book(ActionNamespace):
         """Edit a Book based on the arguments given.
 
         See Book.__doc__ for more information on the arguments
-        raise a BuchSchlossBaseError if the Book isn't found.
+        raise a BuchSchlossBaseError if the Book isn't found
+            or the new library does not exist
+        return a set of error messages for errors during group changes
         """
         if ((not set(kwargs.keys()) <= {k for k in dir(models.Book)
                                         if isinstance(getattr(models.Book, k),
                                                       peewee.Field)})
                 or 'id' in kwargs):
             raise TypeError('unexpected kwarg')
-        errors = set()
         groups = set(kwargs.pop('groups', ()))
-        errors.update(_update_library_group(models.Group, book.groups, groups))
+        errors = _update_library_group(models.Group, book.groups, groups)
         lib = kwargs.pop('library', None)
         if lib is not None:
-            _try_set_lib(book, lib, errors)
+            try:
+                book.library = models.Library.get_by_id(lib)
+            except models.Library.DoesNotExist:
+                raise BuchSchlossNotFoundError('Library', lib)
         for k, v in kwargs.items():
             if isinstance(v, str) and not isinstance(getattr(models.Book, k), peewee.CharField):
                 logging.warning('auto-type-conversion used')
