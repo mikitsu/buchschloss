@@ -478,3 +478,24 @@ def test_group_activate(db):
     assert models.Book.get_by_id(3).library.name == 'lib-2'
     with pytest.raises(core.BuchSchlossBaseError):
         core.Group.activate('group-1', ['does not exist', 'lib-2'])
+
+
+def test_group_view_str(db):
+    """test Group.view_str"""
+    models.Library.create(name='main')
+    models.Group.create(name='group-1')
+    create_book()
+    create_book()
+    assert core.Group.view_str('group-1') == {
+        '__str__': str(models.Group.get_by_id('group-1')),
+        'name': 'group-1',
+        'books': ''
+    }
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Group.view_str('does not exist')
+    models.Group.get_by_id('group-1').books = [1]
+    assert core.Group.view_str('group-1')['books'] == '1'
+    models.Group.get_by_id('group-1').books.add(2)
+    assert core.Group.view_str('group-1')['books'] in ('1;2', '2;1')
+    models.Group.get_by_id('group-1').books.remove(1)
+    assert core.Group.view_str('group-1')['books'] == '2'
