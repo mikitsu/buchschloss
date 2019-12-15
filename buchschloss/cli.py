@@ -11,6 +11,11 @@ import traceback
 import inspect
 import operator
 import datetime
+try:
+    # on linux (all? some?), importing will make arrow keys usable
+    import readline
+except ImportError:
+    pass
 
 from . import core
 from . import utils
@@ -18,33 +23,44 @@ from . import config
 
 
 class MyArgumentParser(argparse.ArgumentParser):
+    """Raise a ParsingError when parsing fails"""
     def error(self, message):
         raise ParsingError(message)
 
 
 class Level8Error(Exception):
+    """Error by user"""
     pass
 
 
 class ParsingError(Level8Error):
+    """Invalid command format"""
     pass
 
 
 class ExecutionError(Level8Error):
+    """Error while executing the given command"""
     pass
 
 
 class VariableNameError(Level8Error):
+    """Invalid variable name"""
     pass
 
 
 class ExitException(Exception):
+    """raised to exit"""
     @classmethod
     def throw(cls, *si, **nk):
         raise cls()
 
 
 def execute(command, args, kwargs):
+    """execute the given command with the given arguments
+
+        get passwords with getpass
+        display encountered errors
+    """
     func = COMMANDS[command]
     try:
         f_args = inspect.signature(func).parameters.keys()
@@ -61,14 +77,15 @@ def execute(command, args, kwargs):
         return func(*args, **kwargs)
     except core.BuchSchlossBaseError as e:
         raise ExecutionError('{0.title}: {0.message}'.format(e))
-    except ExitException as e:
+    except ExitException:
         raise
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         raise ExecutionError(utils.get_name('unexpected_error'))
 
 
 def parse_args(arg_list):
+    """filter out keyword-arguments"""
     args = []
     kwargs = {}
     for arg in arg_list:
@@ -84,6 +101,13 @@ def parse_args(arg_list):
 
 
 def eval_val(val):
+    """evaluate a given argument:
+
+        if enclosed in <>, get the variable
+        if a date in %Y-%m-%d format, use it
+        if a valid Python literal, use it
+        treat as a string
+    """
     if val == '<>':
         return eval_val.last_result
     elif val.startswith('<') and val.endswith('>'):
@@ -104,6 +128,7 @@ eval_val.last_result = None
 
 
 def read_input(prompt):
+    """get the user input. Split it with shlex.split"""
     try:
         return shlex.split(input(prompt))
     except ValueError as e:
@@ -113,14 +138,17 @@ def read_input(prompt):
 
 
 def do_execution(data, args, kwargs):
+    """perform the execution of a command with arguments"""
     r = execute(data.action, args, kwargs)
-    if data.cmd:
+    if data.cmd in COMMANDS:
         class NS:
             action = data.cmd
             store = data.store
             cmd = None
         do_execution(NS, (r,), {})
     else:
+        if data.cmd:
+            print(data.cmd, 'is not a valid command')
         if r is not None:
             pprint.pprint(r)
             eval_val.last_result = r
@@ -129,12 +157,14 @@ def do_execution(data, args, kwargs):
 
 
 def handle_user_input(ui):
+    """read input, parse arguments and execute the command"""
     ns = parser.parse_args(ui)
     args, kwargs = parse_args(ns.args)
     do_execution(ns, args, kwargs)
 
 
 def start():
+    """Entry point. Provide a REPL"""
     if not getattr(config, 'DEBUG', False):
         sys.stderr = core.DummyErrorFile()
     print(config.intro['text'], end='\n\n')
@@ -198,8 +228,9 @@ def setvar(name, value):
 def foreach(iterable):
     """Iterate over the given iterable.
 
-        execute the following commands for each elemen tin the iterable
-        the element is accessible as <> in the first instruction"""
+        execute the following commands for each element in the iterable
+        the element is accessible as <> in the first instruction
+    """
     inputs = []
     ui = read_input('... ')
     while ui:
@@ -211,19 +242,17 @@ def foreach(iterable):
             handle_user_input(ui)
 
 
-def search_wrapper(obj, condition):
-    return obj.search(condition)
-search_wrapper.__doc__ = core.search.__doc__
-
 COMMANDS = {
     'login': core.login,
     'logout': core.logout,
     'new_person': core.Person.new,
     'edit_person': core.Person.edit,
     'view_person': core.Person.view_str,
+    'search_person': core.Person.search,
     'new_book': core.Book.new,
     'edit_book': core.Book.edit,
     'view_book': core.Book.view_str,
+    'search_book': core.Book.search,
     'new_library': core.Library.new,
     'edit_library': core.Library.edit,
     'new_group': core.Group.new,
@@ -233,12 +262,14 @@ COMMANDS = {
     'edit_member': core.Member.edit,
     'change_password': core.Member.change_password,
     'view_member': core.Member.view_str,
+    'search_member': core.Member.search,
     'borrow': core.Borrow.new,
     'restitute': core.Borrow.restitute,
     'view_borrow': core.Borrow.view_str,
-    'search': search_wrapper,
+    'search_borrow': core.Borrow.search,
     'help': help,
     'list': lambda x: tuple(x),
+    'build_list': lambda *a: a,
     'print': pprint.pprint,
     'attr': getattr,
     'item': operator.getitem,
@@ -247,11 +278,7 @@ COMMANDS = {
     'vars': lsvars,
     'foreach': foreach,
 }
-variables = {
-    'Book': core.Book,
-    'Person': core.Person,
-    'Borrow': core.Borrow,
-}
+variables = {}
 
 
 parser = MyArgumentParser('', add_help=False)
