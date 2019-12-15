@@ -11,6 +11,11 @@ import traceback
 import inspect
 import operator
 import datetime
+try:
+    # on linux (all? some?), importing will make arrow keys usable
+    import readline
+except ImportError:
+    pass
 
 from . import core
 from . import utils
