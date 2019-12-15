@@ -564,3 +564,27 @@ def test_member_edit(db, with_current_login):
             member_edit('name', **kw)
     with pytest.raises(core.BuchSchlossBaseError):
         member_edit('does not exist')
+
+
+def test_member_change_password(db, with_current_login):
+    """test Member.change_password"""
+    change_password = with_current_login(core.Member.change_password)
+    models.Member.create(name='name', level=0, salt=b'', password=b'')
+    core.current_login.name = ''
+    for_levels(lambda: change_password('name', 'new'), 4)
+    assert core.authenticate(models.Member.get_by_id('name'), 'new')
+    core.current_login.name = 'name'
+    core.current_login.level = 0
+    change_password('name', 'other')
+    assert core.authenticate(models.Member.get_by_id('name'), 'other')
+
+
+def test_member_view_str(db):
+    """test Member.view_str"""
+    models.Member.create(name='name', level=0, salt=b'', password=b'')
+    core.current_login.level = 0
+    assert core.Member.view_str('name') == {
+        '__str__': str(models.Member.get_by_id('name')),
+        'name': 'name',
+        'level': utils.get_name('level_0'),
+    }

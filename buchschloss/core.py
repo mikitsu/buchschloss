@@ -981,7 +981,7 @@ class Member(ActionNamespace):
         if current_login.level < 4 and current_login.name != member.name:
             raise BuchSchlossPermError('4_or_editee')
         member.salt = urandom(config.HASH_SALT_LENGTH)
-        member.password = pbkdf(new_password, member.salt)
+        member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
         if current_login.name == member.name:
             current_login = member
@@ -990,9 +990,9 @@ class Member(ActionNamespace):
     @staticmethod
     @from_db(models.Member)
     def view_str(member):
-        """Retrun information about a Member
+        """Return information about a Member
 
-            Return a dictionatry with the following string items:
+            Return a dictionary with the following string items:
             - __str__: a representation of the Member
             - name: the Member's name
             - level: the Member's level
@@ -1000,7 +1000,7 @@ class Member(ActionNamespace):
         return {
             '__str__': str(member),
             'name': member.name,
-            'level': utils.get_name(member.level),
+            'level': utils.get_name('level_%s' % member.level),
         }
 
 
