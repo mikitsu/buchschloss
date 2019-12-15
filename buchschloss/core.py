@@ -203,6 +203,7 @@ class LibraryGroupAction(enum.Enum):
     ADD = 'add'
     REMOVE = 'remove'
     DELETE = 'delete'
+    NONE = 'none'
 
 
 def pbkdf(pw, salt, iterations=config.HASH_ITERATIONS[0]):
@@ -290,13 +291,6 @@ def auth_required(f):
     auth_required.functions.append(f.__name__)
     return auth_required_wrapper
 auth_required.functions = []
-
-
-def _try_set_lib(b: models.Book, lib: str, e: set = Dummy(add=lambda x: 0)):
-    try:
-        b.library = models.Library.get(models.Library.name == lib)
-    except models.Library.DoesNotExist:
-        e.add(BuchSchlossNotFoundError('Library', lib).message)
 
 
 def authenticate(m, password):
@@ -419,7 +413,7 @@ class Book(ActionNamespace):
 
     @staticmethod
     @level_required(2)
-    def new(isbn: int, year: int, groups: T.Iterable[str] = (),
+    def new(isbn: int, year: int, groups: T.Iterable[str] = (),  # TODO: don't accept **kwargs
             library: str = 'main', **kwargs: str) -> int:
         """Attempt to create a new Book with the given arguments and return the ID
 
@@ -452,19 +446,23 @@ class Book(ActionNamespace):
         """Edit a Book based on the arguments given.
 
         See Book.__doc__ for more information on the arguments
-        raise a BuchSchlossBaseError if the Book isn't found.
+        raise a BuchSchlossBaseError if the Book isn't found
+            or the new library does not exist
+        return a set of error messages for errors during group changes
         """
         if ((not set(kwargs.keys()) <= {k for k in dir(models.Book)
                                         if isinstance(getattr(models.Book, k),
                                                       peewee.Field)})
                 or 'id' in kwargs):
             raise TypeError('unexpected kwarg')
-        errors = set()
         groups = set(kwargs.pop('groups', ()))
-        errors.update(_update_library_group(models.Group, book.groups, groups))
+        errors = _update_library_group(models.Group, book.groups, groups)
         lib = kwargs.pop('library', None)
         if lib is not None:
-            _try_set_lib(book, lib, errors)
+            try:
+                book.library = models.Library.get_by_id(lib)
+            except models.Library.DoesNotExist:
+                raise BuchSchlossNotFoundError('Library', lib)
         for k, v in kwargs.items():
             if isinstance(v, str) and not isinstance(getattr(models.Book, k), peewee.CharField):
                 logging.warning('auto-type-conversion used')
@@ -581,13 +579,13 @@ class Person(ActionNamespace):
     @staticmethod
     @level_required(1)
     @from_db(models.Person)
-    def view_str(person: models.Person):
+    def view_str(person: T.Union[models.Person, int]):
         """Return data about a Person.
 
         Return a dict consisting of the following items as strings:
             - id, first_name, last_name, class_ max_borrow, pay_date attributes
             - libraries as a string, individual libraries separated by ;
-            - borrows as a tuple of strings;
+            - borrows as a tuple of strings representing the borrows
             - __str__ , the string representation
         and 'borrow_book_ids', a sequence of the IDs of the borrowed books
             in the same order their representations appear in 'borrows'"""
@@ -604,19 +602,21 @@ class Person(ActionNamespace):
 
 
 class Library(ActionNamespace):
-
     """Namespace for Library-related functions"""
     model = models.Library
 
     @staticmethod
     @level_required(3)
-    def new(name: str, books: T.Sequence[int],
-            people: T.Sequence[int], pay_required: bool = True):
+    def new(name: str, *, books: T.Sequence[int] = (),
+            people: T.Sequence[int] = (), pay_required: bool = True):
         """Create a new Library with the specified name and add it to the specified
                 people and books.
 
-            ``people`` and ``books`` are iterables of the IDs of the people and books
+            ``people`` and ``books`` are sequences of the IDs of the people and books
                 to gain access / be transferred to the new library
+
+            ``pay_required`` indicates whether people need to have paid
+                in order to borrow from the library
             
             raise a BuchSchlossBaseError if the Library exists
         """
@@ -626,17 +626,20 @@ class Library(ActionNamespace):
             except peewee.IntegrityError as e:
                 if str(e).startswith('UNIQUE'):
                     raise BuchSchlossError('Library_exists', 'Library_{}_exists', name)
+                else:
+                    raise
             else:
                 lib.people = people
-                lib.books = books
+                models.Book.update({models.Book.library: lib}
+                                   ).where(models.Book.id << books).execute()
 
     @staticmethod
     @level_required(3)
-    def edit(action: LibraryGroupAction, name: str, people: T.Iterable[int] = (),
-             books: T.Iterable[int] = (), pay_required: bool = None):
+    def edit(action: LibraryGroupAction, name: str, people: T.Sequence[int] = (),
+             books: T.Sequence[int] = (), pay_required: bool = None):
         """Perform the given action on the Library with the given name
 
-            DELETE will remove the reference to the library from all given people
+            DELETE will remove the reference to the library from all people
                 and books (setting their library to 'main'),
                 but not actually delete the Library itself
                 ``people`` and ``books`` are ignored in this case
@@ -644,6 +647,8 @@ class Library(ActionNamespace):
                 of all the given books to the specified one
             REMOVE will remove the reference to the given Library in the given people
                 and set the library of the given books to 'main'
+            NONE will ignore ``people`` and ``books`` and
+                take no action other than setting ``pay_required``
 
             ``name`` is the name of the Library to modify
             ``people`` is an iterable of the IDs of the people to modify
@@ -653,18 +658,25 @@ class Library(ActionNamespace):
             raise a BuchSchlossBaseError if the Library doesn't exist
         """
         try:
-            lib = models.Library.get_by_id(name)
+            lib: models.Library = models.Library.get_by_id(name)
         except models.Library.DoesNotExist:
             raise BuchSchlossNotFoundError('Library', name)
         with models.db:
             if action is LibraryGroupAction.DELETE:
-                lib.books = ()
                 lib.people = ()
-            else:
-                for b in books:
-                    getattr(lib.books, action.value)(b)
+                models.Book.update({models.Book.library: models.Library.get_by_id('main')}
+                                   ).where(models.Book.library == lib).execute()
+            elif action is LibraryGroupAction.ADD:
+                models.Book.update({models.Book.library: lib}
+                                   ).where(models.Book.id << books).execute()
                 for p in people:
-                    getattr(lib.people, action.value)(p)
+                    lib.people.add(p)
+            elif action is LibraryGroupAction.REMOVE:
+                models.Book.update({models.Book.library: models.Library.get_by_id('main')}
+                                   ).where((models.Book.library == lib)
+                                           & (models.Book.id << books)).execute()
+                for p in people:
+                    lib.people.remove(p)
             if pay_required is not None:
                 lib.pay_required = pay_required
                 lib.save()
@@ -683,8 +695,8 @@ class Library(ActionNamespace):
         return {
             '__str__': str(lib),
             'name': lib.name,
-            'people': ';'.join(p.id for p in lib.people),
-            'books': ';'.join(b.id for b in lib.books),
+            'people': ';'.join(map(str, (p.id for p in lib.people))),
+            'books': ';'.join(map(str, (b.id for b in lib.books))),
         }
 
 
@@ -695,10 +707,11 @@ class Group(ActionNamespace):
 
     @staticmethod
     @level_required(3)
-    def new(name: str, books: T.Sequence[int]):
+    def new(name: str, books: T.Sequence[int] = ()):
         """Create a new Group with the given name and books
 
             raise a BuchSchlossBaseError if the Group exists
+            ignore nonexistent Books
         """
         with models.db:
             try:
@@ -722,6 +735,7 @@ class Group(ActionNamespace):
                 ignore IDs of non-existing books
             REMOVE will remove the reference to the Group in all of the given books
                 ignore books not in the Group and IDs of nonexistent books
+            NONE does nothing
         """
         with models.db:
             try:
@@ -731,29 +745,47 @@ class Group(ActionNamespace):
             else:
                 if action is LibraryGroupAction.DELETE:
                     group.books = ()
+                elif action is LibraryGroupAction.NONE:
+                    pass
                 else:
                     for book in books:
-                        getattr(group, action.value)(book)
+                        getattr(group.books, action.value)(book)
 
     @staticmethod
     @level_required(3)
     @from_db(models.Group)
-    def activate(group, src: T.Iterable[str] = (), dest: str = 'main'):
+    def activate(group, src: T.Sequence[str] = (), dest: str = 'main'):
         """Activate a Group
 
             ``src`` is an iterable of the names of origin libraries
                 if it is falsey (empty), books are taken from all libraries
             ``dest`` is the name of the target Library
 
-            return a set of strings describing encountered errors such as
-                missing source libraries
-            raise a BuchSchlossBaseError it the target Library does not exist
+            raise a BuchSchlossBaseError it the Group, the target Library
+                or a source Library does not exist
         """
-        errors = set()
-        for book in group.books:
-            # it would probably be better to somehow do this selection at SQL level...
-            if (not src) or book.library.name in src:
-                _try_set_lib(book, dest, errors)
+        if src and (models.Library.select(None)
+                    .where(models.Library.name << src).count()
+                    != len(src)):
+            present_libraries = set(lib.name for lib in
+                                    models.Library.select(models.Library.name)
+                                    .where(models.Library.name << src))
+            not_found = ', '.join(set(src) - present_libraries)
+            raise BuchSchlossNotFoundError('Libraries', not_found)
+        try:
+            dest = models.Library.get_by_id(dest)
+        except models.Library.DoesNotExist:
+            raise BuchSchlossNotFoundError('Library', dest)
+        books_to_update = (models.Book.select(models.Book.id)
+                           .join(models.Book.groups.through_model)
+                           .join(models.Group)
+                           .where(models.Group.name == group.name)
+                           .switch(models.Book))
+        if src:
+            books_to_update = books_to_update.where(models.Book.library << src)
+        (models.Book.update(library=dest)
+         .where(models.Book.id << [b.id for b in books_to_update])
+         .execute())
 
     @staticmethod
     @from_db(models.Group)
@@ -906,7 +938,7 @@ class Member(ActionNamespace):
                                          salt=salt, level=level)
             except peewee.IntegrityError as e:
                 if str(e).startswith('UNIQUE'):
-                    raise BuchSchlossError('Member_exists', 'Member_{}_exists')
+                    raise BuchSchlossError('Member_exists', 'Member_{}_exists', name)
                 else:
                     raise
         logging.info('{} created {}'.format(current_login, m))
@@ -949,7 +981,7 @@ class Member(ActionNamespace):
         if current_login.level < 4 and current_login.name != member.name:
             raise BuchSchlossPermError('4_or_editee')
         member.salt = urandom(config.HASH_SALT_LENGTH)
-        member.password = pbkdf(new_password, member.salt)
+        member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
         if current_login.name == member.name:
             current_login = member
@@ -958,9 +990,9 @@ class Member(ActionNamespace):
     @staticmethod
     @from_db(models.Member)
     def view_str(member):
-        """Retrun information about a Member
+        """Return information about a Member
 
-            Return a dictionatry with the following string items:
+            Return a dictionary with the following string items:
             - __str__: a representation of the Member
             - name: the Member's name
             - level: the Member's level
@@ -968,7 +1000,7 @@ class Member(ActionNamespace):
         return {
             '__str__': str(member),
             'name': member.name,
-            'level': utils.get_name(member.level),
+            'level': utils.get_name('level_%s' % member.level),
         }
 
 
