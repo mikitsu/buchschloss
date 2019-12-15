@@ -148,7 +148,7 @@ def do_execution(data, args, kwargs):
         do_execution(NS, (r,), {})
     else:
         if data.cmd:
-            print('')
+            print(data.cmd, 'is not a valid command')
         if r is not None:
             pprint.pprint(r)
             eval_val.last_result = r
