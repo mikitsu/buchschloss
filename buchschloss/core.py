@@ -242,15 +242,6 @@ def from_db(*arguments: T.Type[models.Model]):
     return wrapper_maker
 
 
-@contextlib.contextmanager
-def catch_not_found(model, pk):
-    """catch model.DoesNotExist errors and raise a BuchSchlossNotFoundError instead"""
-    try:
-        yield
-    except model.DoesNotExist:
-        raise BuchSchlossNotFoundError(model.__name__, pk)
-
-
 def check_level(level, resource):
     """check if the currently logged in member has the given level.
         otherwise, raise a BuchSchlossBaseError and log"""
@@ -378,26 +369,31 @@ class ActionNamespace(abc.ABC):
     def view_ns(cls, id_: T.Union[int, str]):
         """Return a namespace of information"""
         check_level(cls.view_level, cls.__name__+'.view_ns')
-        with catch_not_found(cls.model, id_):
+        try:
             return cls.model.get_by_id(id_)
+        except cls.model.DoesNotExist:
+            raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
     @classmethod
     def view_repr(cls, id_: T.Union[str, int]) -> str:
         """Return a string representation"""
         check_level(cls.view_level, cls.__name__+'.view_repr')
-        with catch_not_found(cls.model, id_):
-            return str(cls.model.select_str_fields().where(
-                getattr(cls.model, cls.model.pk_name) == id_))
+        try:
+            return str(next(iter(cls.model.select_str_fields().where(
+                getattr(cls.model, cls.model.pk_name) == id_))))
+        except StopIteration:
+            raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
     @classmethod
     def view_attr(cls, id_: T.Union[str, int], name: str):
         """Return the value of a specific attribute"""
         # this is said to be faster...
         check_level(cls.view_level, cls.__name__+'.view_attr')
-        with catch_not_found(cls.model, id_):
-            return cls.model.select(getattr(cls.model, name)).where(
-                getattr(cls.model, cls.model.pk_name) == id_
-            )
+        try:
+            return getattr(next(iter(cls.model.select(getattr(cls.model, name)).where(
+                getattr(cls.model, cls.model.pk_name) == id_))), name)
+        except StopIteration:
+            raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
     @classmethod
     def search(cls,

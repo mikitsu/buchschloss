@@ -50,7 +50,7 @@ def for_levels(func, perm_level):
         with pytest.raises(core.BuchSchlossBaseError):
             func()
     core.current_login.level = perm_level
-    func()
+    return func()
 
 
 def test_auth_required(db):
@@ -224,6 +224,23 @@ def test_person_view_str(db):
         (str(models.Borrow.get_by_id(2)), str(models.Borrow.get_by_id(1))),
     )
     assert info['borrow_book_ids'] in ([1, 2], [2, 1])
+
+# since view_repr and view_attr are implemented in ActionNamespace,
+# I hope we only need one test each. Person is chosen bc. you need level 1
+
+
+def test_person_view_repr(db):
+    """test Person.view_repr"""
+    p = create_person(123)
+    assert str(p) == for_levels(lambda: core.Person.view_repr(123), 1)
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Person.view_repr(124)
+
+
+def test_person_view_attr(db):
+    """test Person.view_attr"""
+    create_person(123)
+    assert for_levels(lambda: core.Person.view_attr(123, 'id'), 1) == 123
 
 
 def test_book_new(db):
