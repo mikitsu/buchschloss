@@ -20,6 +20,17 @@ def db():
             temp_test_db.drop_tables(models.models)
 
 
+@pytest.fixture
+def with_current_login():
+    """work with functions needing the currently logged in members password"""
+    def inner(func):
+        core.current_login.password = core.pbkdf(b'current', b'')
+        def wrapper(*args, **kwargs):
+            return func(*args, current_password='current', **kwargs)
+        return wrapper
+    return inner
+
+
 def create_book(lib='main'):
     """create a Book with falsey values. The Library can be specified"""
     return models.Book.create(isbn=0, author='', title='', language='', publisher='',
@@ -30,6 +41,35 @@ def create_person(id_):
     """create a Person with falsey values"""
     return models.Person.create(id=id_, first_name='', last_name='',
                                 class_='', max_borrow=0)
+
+
+def for_levels(func, perm_level):
+    """test for correct level testing"""
+    for level in range(perm_level):
+        core.current_login.level = level
+        with pytest.raises(core.BuchSchlossBaseError):
+            func()
+    core.current_login.level = perm_level
+    func()
+
+
+def test_auth_required(db):
+    """test the @auth_required decorator"""
+    core.current_login = models.Member.create(
+        name='name', salt=b'', level=0, password=core.pbkdf(b'Pa$$w0rd', b''))
+
+    @core.auth_required
+    def test():
+        """the initial docstring"""
+        return True
+
+    assert test.__doc__.startswith('the initial docstring')
+    assert test.__doc__ != 'the initial docstring'
+    assert test(current_password='Pa$$w0rd')
+    with pytest.raises(core.BuchSchlossBaseError):
+        test(current_password='something else')
+    with pytest.raises(TypeError):
+        test()
 
 
 def test_misc_data(db):
@@ -499,3 +539,28 @@ def test_group_view_str(db):
     assert core.Group.view_str('group-1')['books'] in ('1;2', '2;1')
     models.Group.get_by_id('group-1').books.remove(1)
     assert core.Group.view_str('group-1')['books'] == '2'
+
+
+def test_member_new(db, with_current_login):
+    """test member.new"""
+    member_new = with_current_login(core.Member.new)
+    for_levels(lambda: member_new('name', 'Pa$$w0rd', 3), 4)
+    m = models.Member.get_by_id('name')
+    assert m.level == 3
+    assert core.pbkdf(b'Pa$$w0rd', m.salt) == m.password
+    with pytest.raises(core.BuchSchlossBaseError):
+        member_new('name', 'other Pa$$w0rd', 1)
+
+
+def test_member_edit(db, with_current_login):
+    """test Member.edit"""
+    member_edit = with_current_login(core.Member.edit)
+    models.Member.create(name='name', level=0, salt=b'', password=b'')
+    assert models.Member.get_by_id('name').level == 0
+    for_levels(lambda: member_edit('name', level=4), 4)
+    assert models.Member.get_by_id('name').level == 4
+    for kw in ({'name': 'new'}, {'salt': b''}, {'password': b''}):
+        with pytest.raises(TypeError):
+            member_edit('name', **kw)
+    with pytest.raises(core.BuchSchlossBaseError):
+        member_edit('does not exist')

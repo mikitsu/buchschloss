@@ -938,7 +938,7 @@ class Member(ActionNamespace):
                                          salt=salt, level=level)
             except peewee.IntegrityError as e:
                 if str(e).startswith('UNIQUE'):
-                    raise BuchSchlossError('Member_exists', 'Member_{}_exists')
+                    raise BuchSchlossError('Member_exists', 'Member_{}_exists', name)
                 else:
                     raise
         logging.info('{} created {}'.format(current_login, m))
