@@ -131,6 +131,10 @@ def test_person_new(db):
     assert p.max_borrow == 3
     assert len(p.libraries) == 0
     assert p.pay_date is None
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Person.new(123, 'first', 'last', 'cls')
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Person.new(124, 'first', 'last', 'cls', 5, pay=True)
     core.current_login.level = 4
     old_today = datetime.date.today()  # in case this is run around midnight...
     core.Person.new(124, 'first', 'last', 'cls', 5, pay=True)
@@ -423,6 +427,12 @@ def test_library_edit(db):
     core.Library.edit(core.LibraryGroupAction.DELETE, 'testlib')
     assert not models.Library.get_by_id('testlib').people
     assert not models.Library.get_by_id('testlib').books
+    core.Library.edit(core.LibraryGroupAction.NONE, 'testlib', pay_required=True)
+    assert models.Library.get_by_id('testlib').pay_required
+    core.Library.edit(core.LibraryGroupAction.NONE, 'testlib', pay_required=None)
+    assert models.Library.get_by_id('testlib').pay_required
+    core.Library.edit(core.LibraryGroupAction.NONE, 'testlib', pay_required=False)
+    assert not models.Library.get_by_id('testlib').pay_required
 
 
 def test_library_view_str(db):
@@ -542,6 +552,8 @@ def test_group_activate(db):
     assert models.Book.get_by_id(3).library.name == 'lib-2'
     with pytest.raises(core.BuchSchlossBaseError):
         core.Group.activate('group-1', ['does not exist', 'lib-2'])
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Group.activate('group-1', ['lib-1'], 'does not exist')
 
 
 def test_group_view_str(db):
