@@ -6,6 +6,7 @@
 __pycache__/*
 *-ignore/*
 .idea/*
+.coverage
 doc/*.pdf
 doc/*.synctex*
 doc/*.out
