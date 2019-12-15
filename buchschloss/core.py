@@ -770,7 +770,7 @@ class Group(ActionNamespace):
             present_libraries = set(lib.name for lib in
                                     models.Library.select(models.Library.name)
                                     .where(models.Library.name << src))
-            not_found = ', '.join(present_libraries ^ set(src))
+            not_found = ', '.join(set(src) - present_libraries)
             raise BuchSchlossNotFoundError('Libraries', not_found)
         try:
             dest = models.Library.get_by_id(dest)
