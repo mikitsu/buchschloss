@@ -228,8 +228,9 @@ def setvar(name, value):
 def foreach(iterable):
     """Iterate over the given iterable.
 
-        execute the following commands for each elemen tin the iterable
-        the element is accessible as <> in the first instruction"""
+        execute the following commands for each element in the iterable
+        the element is accessible as <> in the first instruction
+    """
     inputs = []
     ui = read_input('... ')
     while ui:
@@ -241,19 +242,17 @@ def foreach(iterable):
             handle_user_input(ui)
 
 
-def search_wrapper(obj, condition):
-    return obj.search(condition)
-search_wrapper.__doc__ = core.search.__doc__
-
 COMMANDS = {
     'login': core.login,
     'logout': core.logout,
     'new_person': core.Person.new,
     'edit_person': core.Person.edit,
     'view_person': core.Person.view_str,
+    'search_person': core.Person.search,
     'new_book': core.Book.new,
     'edit_book': core.Book.edit,
     'view_book': core.Book.view_str,
+    'search_book': core.Book.search,
     'new_library': core.Library.new,
     'edit_library': core.Library.edit,
     'new_group': core.Group.new,
@@ -263,12 +262,14 @@ COMMANDS = {
     'edit_member': core.Member.edit,
     'change_password': core.Member.change_password,
     'view_member': core.Member.view_str,
+    'search_member': core.Member.search,
     'borrow': core.Borrow.new,
     'restitute': core.Borrow.restitute,
     'view_borrow': core.Borrow.view_str,
-    'search': search_wrapper,
+    'search_borrow': core.Borrow.search,
     'help': help,
     'list': lambda x: tuple(x),
+    'build_list': lambda *a: a,
     'print': pprint.pprint,
     'attr': getattr,
     'item': operator.getitem,
@@ -277,11 +278,7 @@ COMMANDS = {
     'vars': lsvars,
     'foreach': foreach,
 }
-variables = {
-    'Book': core.Book,
-    'Person': core.Person,
-    'Borrow': core.Borrow,
-}
+variables = {}
 
 
 parser = MyArgumentParser('', add_help=False)
