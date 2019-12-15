@@ -63,6 +63,7 @@ def test_auth_required(db):
         """the initial docstring"""
         return True
 
+    test.__doc__: str
     assert test.__doc__.startswith('the initial docstring')
     assert test.__doc__ != 'the initial docstring'
     assert test(current_password='Pa$$w0rd')
@@ -70,6 +71,29 @@ def test_auth_required(db):
         test(current_password='something else')
     with pytest.raises(TypeError):
         test()
+
+
+def test_login_logout(db):
+    """test login and logout"""
+    m = models.Member.create(name='name', level=0, salt=b'',
+                             password=core.pbkdf(b'Pa$$w0rd', b''))
+    core.current_login = core.dummy_member
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.login('name', 'wrong password')
+    assert core.current_login is core.dummy_member
+    core.login('name', 'Pa$$w0rd')
+    assert core.current_login == m
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.login('does not exist', '')
+    assert core.current_login == m
+    config.HASH_ITERATIONS.insert(0, 1)
+    try:
+        core.logout()
+        assert core.current_login is core.dummy_member
+        core.login('name', 'Pa$$w0rd')
+        assert models.Member.get_by_id('name').password == core.pbkdf(b'Pa$$w0rd', b'')
+    finally:
+        config.HASH_ITERATIONS.pop(0)
 
 
 def test_misc_data(db):
