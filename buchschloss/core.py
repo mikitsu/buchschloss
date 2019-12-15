@@ -19,8 +19,6 @@ from datetime import datetime, timedelta, date
 from os import urandom
 import warnings
 import operator
-# noinspection PyPep8Naming
-import typing as T
 import re
 import enum
 import abc
@@ -28,6 +26,12 @@ import contextlib
 import builtins
 import traceback
 import logging
+try:
+    # noinspection PyPep8Naming
+    import typing as T
+except ImportError:
+    T = None
+
 import peewee
 
 from . import config
