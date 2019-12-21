@@ -13,4 +13,6 @@ doc/*.synctex*
 doc/*.out
 doc/*.toc
 doc/old/*
-buchschloss/config.py
+*.cfg
+!exampleconfig.cfg
+!configspec.cfg
