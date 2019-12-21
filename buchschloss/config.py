@@ -15,6 +15,8 @@ def is_timedelta(value):
     if isinstance(value, (int, float)):
         return datetime.timedelta(days=value)
     elif isinstance(value, str):
+        if value.count(':') > 2:
+            raise validate.VdtValueError(value)
         try:
             items = [(n, float(x)) for n, x in zip(
                 ('days', 'hours', 'minutes'), value.split(':'))]
@@ -26,7 +28,7 @@ def is_timedelta(value):
 
 
 def is_optionlist(value, *options):
-    """check whether all list items"""
+    """check whether all list items are in ``options``"""
     try:
         if not all(isinstance(v, str) for v in options):
             raise validate.VdtParamError(options, value)
