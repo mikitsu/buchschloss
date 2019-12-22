@@ -16,6 +16,7 @@ import os
 import ftplib
 import ftputil
 import requests
+import logging
 import re
 import bs4
 import string
@@ -123,12 +124,34 @@ def send_mailgun(subject, text, to=''):
 
 
 def get_name(internal: str):
-    """Get the pretty name.
+    """Get an end-user suitable name.
 
-    Try lookup in config.NAMES, else capitalize and replace "_" with " "
-    "__" are replaced with ": " and components are converted individually
+    Try lookup in config.utils.names.
+    "__" is replaced by ": " with components looked up individually
+    If a name isn't found, a warning is logged and the internal name returned., potentially modified
+    "<namespace>::<name>" may specify a namespace in which lookups are performed first,
+        falling back to the global names if nothing is found
+    "__" takes precedence over "::"
     """
-    raise NotImplementedError
+    if '__' in internal:
+        return ': '.join(get_name(s) for s in internal.split('__'))
+    *path, name = internal.split('::')
+    current = config.utils.names
+    look_in = [current]
+    try:
+        for k in path:
+            current = current._mapping[k]
+            look_in.append(current)
+    except KeyError:
+        pass
+    look_in.reverse()
+    for ns in look_in:
+        try:
+            return ns._mapping[name]
+        except KeyError:
+            pass
+    logging.warning('Name "{}" was not found in the namefile'.format('::'.join(path+[name])))
+    return '::'.join(path+[name])
 
 
 def break_string(text, size, break_char=string.punctuation, cut_char=string.whitespace):
