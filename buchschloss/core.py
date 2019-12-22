@@ -984,7 +984,7 @@ class Member(ActionNamespace):
         """
         global current_login
         if current_login.level < 4 and current_login.name != member.name:
-            raise BuchSchlossPermError('4_or_editee')
+            raise BuchSchlossError('no_permission', 'must_be_level_4_or_editee')
         member.salt = urandom(config.core.salt_length)
         member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
