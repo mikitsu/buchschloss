@@ -84,10 +84,8 @@ class App:
         font_conf = {'family': config.gui2.font.family, 'size': config.gui2.font.size}
         tk_font.nametofont('TkDefaultFont').config(**font_conf)
         tk_font.nametofont('TkTextFont').config(**font_conf)
-        if not getattr(config, 'DEBUG', False):
+        if not config.debug:
             sys.stderr = core.DummyErrorFile()
-        else:
-            print('ATTENTION -- sys.stderr not redirected', file=sys.stderr)
         self.queue = queue.Queue()
         self.greeter = tk.Label(self.root,
                                 text=config.gui2.intro.text,

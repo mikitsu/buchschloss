@@ -17,6 +17,7 @@ from hashlib import pbkdf2_hmac
 from functools import wraps, reduce, partial
 from datetime import datetime, timedelta, date
 from os import urandom
+import sys
 import warnings
 import operator
 import re
@@ -25,6 +26,7 @@ import abc
 import builtins
 import traceback
 import logging
+import logging.handlers
 try:
     # noinspection PyPep8Naming
     import typing as T
@@ -43,11 +45,32 @@ __all__ = [
     'login', 'logout',
 ]
 
-logging.basicConfig(level=logging.INFO,
+log_conf = config.core.log
+if log_conf.file:
+    if log_conf.rotate.how == 'none':
+        handler = logging.FileHandler(log_conf.file)
+    elif log_conf.rotate.how == 'size':
+        handler = logging.handlers.RotatingFileHandler(
+            log_conf.file,
+            maxBytes=2**10*log_conf.rotate.size,
+            backupCount=log_conf.rotate.copy_count,
+        )
+    elif log_conf.rotate.how == 'time':
+        handler = logging.handlers.TimedRotatingFileHandler(
+            log_conf.file,
+            when=log_conf.interval_unit,
+            interval=log_conf.interval_value,
+        )
+    else:
+        raise ValueError('config.core.log.rotate.how had an invalid value')
+else:
+    handler = logging.StreamHandler(sys.stdout)
+del log_conf
+logging.basicConfig(level=getattr(logging, config.core.log.level),
                     format='{asctime} - {levelname} - {funcName}: {msg}',
                     datefmt='%Y-%m-%d %H:%M:%S',
                     style='{',
-                    filename='buchschloss.log'
+                    handlers=[handler],
                     )
 
 
