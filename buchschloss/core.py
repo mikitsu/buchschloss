@@ -124,8 +124,14 @@ class BuchSchlossError(BuchSchlossBaseError):
                          utils.get_name(message).format(*message_format))
 
 
-BuchSchlossPermError = partial(BuchSchlossError.template_message('must_be_%s'),
-                               'no_permission')
+class BuchSchlossPermError(BuchSchlossBaseError):
+    """use utils.get_name for level and message name"""
+    def __init__(self, level):
+        super().__init__(utils.get_name('no_permission'),
+                         utils.get_name('must_be_{}').format(
+                             utils.get_name('level_%i' % (level,))))
+
+
 BuchSchlossDataMissingError = partial(BuchSchlossError, message='data_missing')
 
 
@@ -247,7 +253,7 @@ def check_level(level, resource):
     if current_login.level < level:
         logging.info('access to {} denied to {}'
                      .format(resource, current_login))
-        raise BuchSchlossPermError('must_be_level_{}', utils.get_level(level))
+        raise BuchSchlossPermError(level)
 
 
 def level_required(level):
@@ -527,7 +533,7 @@ class Person(ActionNamespace):
         if pay_date is None and pay:
             pay_date = date.today()
         if max_borrow > 3 and not current_login.level >= 4:
-            raise BuchSchlossPermError(utils.get_level(4))
+            raise BuchSchlossPermError(4)
         p = models.Person(id=id_, first_name=first_name, last_name=last_name,
                           class_=class_, max_borrow=max_borrow, pay_date=pay_date)
         p.libraries = libraries

@@ -86,14 +86,14 @@ def test_login_logout(db):
     with pytest.raises(core.BuchSchlossBaseError):
         core.login('does not exist', '')
     assert core.current_login == m
-    config.HASH_ITERATIONS.insert(0, 1)
+    config.core.hash_iterations.insert(0, 1)
     try:
         core.logout()
         assert core.current_login is core.dummy_member
         core.login('name', 'Pa$$w0rd')
         assert models.Member.get_by_id('name').password == core.pbkdf(b'Pa$$w0rd', b'')
     finally:
-        config.HASH_ITERATIONS.pop(0)
+        config.core.hash_iterations.pop(0)
 
 
 def test_misc_data(db):
@@ -372,7 +372,7 @@ def test_book_view_str(db):
     borrow = models.Borrow.create(book=1, person=123, return_date=datetime.date(1956, 1, 31))
     data = core.Book.view_str(1)
     assert data['status'] == utils.get_name('borrowed')
-    assert data['return_date'] == datetime.date(1956, 1, 31).strftime(config.DATE_FORMAT)
+    assert data['return_date'] == datetime.date(1956, 1, 31).strftime(config.core.date_format)
     assert data['borrowed_by'] == str(models.Person.get_by_id(123))
     assert data['borrowed_by_id'] == 123
     borrow.is_back = True
