@@ -1,6 +1,7 @@
 """test config"""
 
 import datetime
+import base64
 from configobj import validate
 import pytest
 from buchschloss import config
@@ -31,4 +32,17 @@ def test_optionlist():
         config.is_optionlist(['asdf', 'ghjk'], *list('asdfghjk'))
 
 
-# test tasklist later whin it's more than just an optionlist wrapper
+def test_base64bytes():
+    assert config.is_base64bytes(base64.b64encode(b'\x00\t').decode()) == b'\x00\t'
+    assert config.is_base64bytes(base64.b64encode(b'\x00\a').decode(), length=2) == b'\x00\a'
+    with pytest.raises(validate.ValidateError):
+        config.is_base64bytes(base64.b64encode(b'\x00\a\t').decode(), length=2)
+    with pytest.raises(validate.ValidateError):
+        config.is_base64bytes(base64.b64encode(b'\x00\t\a').decode()+'a')
+    with pytest.raises(validate.ValidateError):
+        config.is_base64bytes(['a', 'b'])
+    with pytest.raises(validate.ValidateError):
+        config.is_base64bytes('\tA\a')
+
+
+# test tasklist later when it's more than just an optionlist wrapper
