@@ -3,6 +3,8 @@
 import os
 import datetime
 import json
+import base64
+import binascii
 from collections.abc import Mapping
 import configobj
 from configobj import validate
@@ -56,11 +58,28 @@ def is_file(value):
     return value
 
 
+def is_base64bytes(value, length=None):
+    """check whether the value is ``length`` base64-encoded bytes
+
+        if ``length`` is not given, allow any length
+    """
+    if not isinstance(value, str):
+        raise validate.VdtTypeError(value)
+    try:
+        data = base64.b64decode(value)
+    except binascii.Error:
+        raise validate.VdtValueError(value)
+    if length is not None and len(data) != length:
+        raise validate.VdtValueError(value)
+    return data
+
+
 validator = validate.Validator({
     'timedelta': is_timedelta,
     'optionlist': is_optionlist,
     'task_list': is_task_list,
     'file': is_file,
+    'base64bytes': is_base64bytes,
 })
 
 
