@@ -25,7 +25,7 @@ from buchschloss import core, config
 
 
 class FormattedDate(date):
-    """print a datetime.date as specified in config.DATE_FORMAT"""
+    """print a datetime.date as specified in config.core.date_format"""
     def __str__(self):
         return self.strftime(config.core.date_format)
 
@@ -104,8 +104,8 @@ def web_backup():
 
 
 def backup_shift(fs, depth):
-    """shift all name.number up one number to config.backup_depth
-    in the given filesystem (os or remote FTP host)"""
+    """shift all name.number up one number to the given depth
+        in the given filesystem (os or remote FTP host)"""
     number_name = lambda n: '.'.join((config.core.database_name, str(n)))
     try:
         fs.remove(number_name(depth))
@@ -128,7 +128,7 @@ def get_name(internal: str):
 
     Try lookup in config.utils.names.
     "__" is replaced by ": " with components looked up individually
-    If a name isn't found, a warning is logged and the internal name returned., potentially modified
+    If a name isn't found, a warning is logged and the internal name returned, potentially modified
     "<namespace>::<name>" may specify a namespace in which lookups are performed first,
         falling back to the global names if nothing is found
     "__" takes precedence over "::"
