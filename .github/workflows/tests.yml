@@ -1,6 +1,9 @@
 name: tests
 
 on: []
+  
+env:
+  BUCHSCHLOSS_CONFIG:  exampleconfig.cfg
 
 jobs:
   build:
@@ -25,9 +28,7 @@ jobs:
       if: matrix.python-version == 3.5
       run: |
         pip install strip-hints~=0.1.3
-        strip-hints buchschloss/models.py > buchschloss/models.py
-        strip-hints buchschloss/core.py > buchschloss/core.py
-        strip-hints buchschloss/utils.py > buchschloss/utils.py
+        python strip_hints.py
     - name: Test with pytest
       run: |
         pip install pytest
