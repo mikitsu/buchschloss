@@ -167,7 +167,7 @@ def start():
     """Entry point. Provide a REPL"""
     if not getattr(config, 'DEBUG', False):
         sys.stderr = core.DummyErrorFile()
-    print(config.intro['text'], end='\n\n')
+    print(config.gui2.intro.text, end='\n\n')  # TODO: have a separate config section
     try:
         while True:
             try:

@@ -81,14 +81,17 @@ class App:
         self.root.protocol('WM_CLOSE_WINDOW', self.onexit)
         self.root.attributes('-fullscreen', True)
         self.root.title('Buchschloss')
-        tk_font.nametofont('TkDefaultFont').config(**config.gui_font)
-        tk_font.nametofont('TkTextFont').config(**config.gui_font)
+        font_conf = {'family': config.gui2.font.family, 'size': config.gui2.font.size}
+        tk_font.nametofont('TkDefaultFont').config(**font_conf)
+        tk_font.nametofont('TkTextFont').config(**font_conf)
         if not getattr(config, 'DEBUG', False):
             sys.stderr = core.DummyErrorFile()
         else:
             print('ATTENTION -- sys.stderr not redirected', file=sys.stderr)
         self.queue = queue.Queue()
-        self.greeter = tk.Label(self.root, **config.intro)
+        self.greeter = tk.Label(self.root,
+                                text=config.gui2.intro.text,
+                                font=config.gui2.intro.font)
         self.greeter.pack(fill=tk.BOTH)
         self.center = tk.Frame(self.root)
         self.header = widgets.Header(

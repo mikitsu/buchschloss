@@ -22,7 +22,6 @@ import operator
 import re
 import enum
 import abc
-import contextlib
 import builtins
 import traceback
 import logging
@@ -210,7 +209,7 @@ class LibraryGroupAction(enum.Enum):
     NONE = 'none'
 
 
-def pbkdf(pw, salt, iterations=config.HASH_ITERATIONS[0]):
+def pbkdf(pw, salt, iterations=config.core.hash_iterations[0]):
     """return pbkdf2_hmac('sha256', pw, salt, iterations)"""
     return pbkdf2_hmac('sha256', pw, salt, iterations)
 
@@ -292,7 +291,7 @@ def authenticate(m, password):
     """Check if the given password corresponds to the hashed one.
     Update the hash if newer iteration number present"""
     password = password.encode()
-    for old, iterations in enumerate(config.HASH_ITERATIONS):
+    for old, iterations in enumerate(config.core.hash_iterations):
         if m.password == pbkdf(password, m.salt, iterations):
             if old:
                 close_db = models.db.connect(reuse_if_open=True)
@@ -498,7 +497,7 @@ class Book(ActionNamespace):
         r['status'] = utils.get_name('borrowed' if borrow else
                                      ('available' if book.is_active
                                       else 'inactive'))
-        r['return_date'] = str(borrow.return_date.strftime(config.DATE_FORMAT))
+        r['return_date'] = str(borrow.return_date.strftime(config.core.date_format))
         r['borrowed_by'] = str(borrow.person)
         r['borrowed_by_id'] = borrow.person.id
         r['__str__'] = str(book)
@@ -832,7 +831,7 @@ class Borrow(ActionNamespace):
             the maximum amount of time a book may be borrowed for is defined
             in the configuration settings
         """
-        if weeks > config.borrow_time_limit[current_login.level]:
+        if weeks > config.core.borrow_time_limit[current_login.level]:
             raise BuchSchlossPermError(1)
         if weeks <= 0:
             raise BuchSchlossError('Borrow', 'borrow_length_not_positive')
@@ -857,7 +856,7 @@ class Borrow(ActionNamespace):
         if person.id in latest:
             latest.remove(person.id)
         else:
-            latest = latest[:config.no_latest_borrowers_save - 1]
+            latest = latest[:config.core.save_latest_borrowers - 1]
         latest.insert(0, person.id)
         misc_data.latest_borrowers = latest
 
@@ -930,7 +929,7 @@ class Member(ActionNamespace):
             ``name`` must be unique among members and is case-sensitive
             ``level`` must be between 0 and 4, inclusive
         """
-        salt = urandom(config.HASH_SALT_LENGTH)
+        salt = urandom(config.core.salt_length)
         pass_hash = pbkdf(password.encode(), salt)
         with models.db:
             try:
@@ -980,7 +979,7 @@ class Member(ActionNamespace):
         global current_login
         if current_login.level < 4 and current_login.name != member.name:
             raise BuchSchlossPermError('4_or_editee')
-        member.salt = urandom(config.HASH_SALT_LENGTH)
+        member.salt = urandom(config.core.salt_length)
         member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
         if current_login.name == member.name:

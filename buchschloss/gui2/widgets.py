@@ -21,7 +21,8 @@ class ActionChoiceWidget(mtk.ContainingWidget):
         super().__init__(master, *widgets, **kw)
 
 
-@mtk.ScrollableWidget(height=config.GUI2_INFO_HEIGHT, width=config.GUI2_INFO_WIDTH)
+@mtk.ScrollableWidget(height=config.gui2.info_widget.height,
+                      width=config.gui2.info_widget.width)
 class InfoWidget(mtk.ContainingWidget):
     def __init__(self, master, data):
         widgets = []
@@ -30,7 +31,8 @@ class InfoWidget(mtk.ContainingWidget):
             if v is None:
                 widgets.append((Label, {}))
             elif isinstance(v, str):
-                widgets.append((Label, {'text': utils.break_string(v, config.INFO_LENGTH)}))
+                widgets.append((Label, {
+                    'text': utils.break_string(v, config.gui2.info_widget.item_length)}))
             elif isinstance(v, abc.Sequence):
                 if len(v) and isinstance(v[0], type) and issubclass(v[0], tk.Widget):
                     widgets.append(v)
@@ -97,13 +99,15 @@ class Header:
         return getattr(self.container, name)
 
 
-@mtk.ScrollableWidget(height=config.GUI2_SEARCH_HEIGHT, width=config.GUI2_SEARCH_WIDTH)
+@mtk.ScrollableWidget(height=config.gui2.search_result_widget.height,
+                      width=config.gui2.search_result_widget.width)
 class SearchResultWidget(mtk.ContainingWidget):
     def __init__(self, master, results, view_func):
         widgets = [(Label, {'text': utils.get_name('{}_results').format(len(results))})]
         for r in results:
-            widgets.append((Button, {'text': utils.break_string(str(r), config.RESULT_LENGTH),
-                                     'command': partial(view_func, r.id)}))
+            widgets.append((Button, {
+                'text': utils.break_string(str(r), config.gui2.search_result_widget.item_length),
+                'command': partial(view_func, r.id)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))
 
 
