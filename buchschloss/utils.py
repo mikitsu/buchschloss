@@ -75,7 +75,7 @@ def backup():
     """Local backups.
 
     Run backup_shift and copy name.ext db to name1.ext"""
-    backup_shift(os)
+    backup_shift(os, config.utils.tasks.backup_depth)
     while True:
         try:
             shutil.copyfile(config.core.database_name,
@@ -96,9 +96,9 @@ def web_backup():
     conf = config.utils.ftp
     data = conf.host, conf.username, conf.password
     factory = ftplib.FTP_TLS if conf.tls else ftplib.FTP
-    # foonoinspection PyDeprecation
-    with ftputil.FTPHost(*data, session_factory=factory) as host:
-        backup_shift(host)
+    # noinspection PyDeprecation
+    with ftputil.FTPHost(*data, session_factory=factory, use_list_a_option=False) as host:
+        backup_shift(host, config.utils.tasks.web_backup_depth)
         host.upload(config.core.database_name, config.core.database_name+'.1')
 
 
