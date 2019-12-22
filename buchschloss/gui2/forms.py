@@ -6,6 +6,7 @@ import enum
 import misc.tkstuff as mtk
 import misc.tkstuff.forms as mtkf
 
+from buchschloss import config
 from buchschloss.utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
@@ -72,8 +73,8 @@ class SearchableForm(BaseForm, template=True):
 
 
 class BookForm(SearchableForm):
-    # class FormWidget:  TODO: implement as soon as config is set
-    #     default_content = config.BOOK_DEFAULT
+    class FormWidget:
+        default_content = config.gui2.get('entry defaults').get('Book').mapping
 
     id: GroupElement.ONLY_EDIT = IntEntry
 
@@ -94,8 +95,8 @@ class BookForm(SearchableForm):
 
 
 class PersonForm(SearchableForm):
-    # class FormWidget:  TODO: implement as soon as config is set
-    #     default_content = config.PERSON_DEFAULT
+    class FormWidget:
+        default_content = config.gui2.get('entry defaults').get('Person').mapping
 
     def get_name(name: str):
         if name == 'id':

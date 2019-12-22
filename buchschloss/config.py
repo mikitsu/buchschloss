@@ -85,11 +85,23 @@ validator = validate.Validator({
 
 class AttrAccess:
     """Provide attribute access to mappings, supporting nesting"""
+    EMPTY_INST = type('', (), {'__repr__': lambda s: 'AttrAccess.EMPTY_INST'})
+
     def __init__(self, mapping):
-        self._mapping = mapping
+        self.mapping = mapping
+
+    def get(self, item, fallback=EMPTY_INST):
+        """return ``item`` if present, otherwise the given fallback
+            (an empty AttrAccess instance by default)"""
+        if fallback is self.EMPTY_INST:
+            fallback = type(self)({})
+        return self.mapping.get(item, fallback)
+
+    def __getitem__(self, item):
+        return self.mapping[item]
 
     def __getattr__(self, item):
-        val = self._mapping[item.replace('_', ' ')]
+        val = self.mapping[item.replace('_', ' ')]
         if isinstance(val, Mapping):
             val = type(self)(val)
         return val

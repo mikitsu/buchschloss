@@ -140,14 +140,14 @@ def get_name(internal: str):
     look_in = [current]
     try:
         for k in path:
-            current = current._mapping[k]
+            current = current[k]
             look_in.append(current)
     except KeyError:
         pass
     look_in.reverse()
     for ns in look_in:
         try:
-            return ns._mapping[name]
+            return ns[name]
         except KeyError:
             pass
     logging.warning('Name "{}" was not found in the namefile'.format('::'.join(path+[name])))
