@@ -2,6 +2,7 @@
 
 import os
 import datetime
+import json
 from collections.abc import Mapping
 import configobj
 from configobj import validate
@@ -46,10 +47,20 @@ def is_task_list(value, _tasks=('backup', 'web_backup', 'late_books')):
     return validator.check('optionlist{}'.format(_tasks), value)
 
 
+def is_file(value):
+    """check whether the value is a valid file system path"""
+    if not isinstance(value, str):
+        raise validate.VdtTypeError(value)
+    if not os.path.isfile(value):
+        raise validate.VdtValueError(value)
+    return value
+
+
 validator = validate.Validator({
     'timedelta': is_timedelta,
     'optionlist': is_optionlist,
     'task_list': is_task_list,
+    'file': is_file,
 })
 
 
@@ -96,6 +107,17 @@ def start(noisy_success=True):
         print('\n\nSee the confspec.cfg file for information on how the data has to be')
         raise Exception
     else:
+        # since this can get quite large, it is an external file
+        name_format = config['utils']['names']['format']
+        try:
+            with open(config['utils']['names']['file']) as f:
+                if name_format == 'json':
+                    name_data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            raise Exception('error reading name file')
+        else:
+            config['utils']['names'] = name_data
+
         # multiline defaults aren't allowed (AFAIK)
         if config['gui2']['intro']['text'] is None:
             config['gui2']['intro']['text'] = 'Buchschloss\n\nhttps://github.com/mik2k2/buchschloss'
