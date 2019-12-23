@@ -3,8 +3,8 @@
 import functools
 import itertools
 import typing as T
-import misc.validation as mval
-import misc
+from ..misc import validation as mval
+from .. import misc
 
 try:
     from .. import utils

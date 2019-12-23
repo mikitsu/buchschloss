@@ -9,7 +9,7 @@ import threading
 import time
 import sys
 
-import misc.tkstuff as mtk
+from ..misc import tkstuff as mtk
 try:
     from collections.abc import Mapping
 except ImportError:

@@ -6,8 +6,8 @@ from tkinter.ttk import Button
 from functools import partial
 from collections import abc
 
-import misc.tkstuff as mtk
-from misc.tkstuff.blocks import PasswordEntry, CheckbuttonWithVar
+from ..misc import tkstuff as mtk
+from ..misc.tkstuff.blocks import PasswordEntry, CheckbuttonWithVar
 
 from . import validation
 from .. import utils

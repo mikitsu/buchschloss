@@ -3,8 +3,8 @@
 import tkinter as tk
 import enum
 
-import misc.tkstuff as mtk
-import misc.tkstuff.forms as mtkf
+from ..misc import tkstuff as mtk
+from ..misc.tkstuff import forms as mtkf
 
 from buchschloss import config
 from buchschloss.utils import get_name

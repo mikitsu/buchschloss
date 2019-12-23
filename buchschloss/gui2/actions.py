@@ -6,9 +6,9 @@ from functools import partial
 import logging
 import typing as T
 
-import misc.tkstuff as mtk
-import misc.tkstuff.dialogs as mtkd
-import misc.validation as mval
+from ..misc import tkstuff as mtk
+from ..misc.tkstuff import dialogs as mtkd
+from ..misc import validation as mval
 from . import main
 from . import forms
 from . import widgets
