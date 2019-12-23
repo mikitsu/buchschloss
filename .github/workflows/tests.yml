@@ -28,7 +28,7 @@ jobs:
       if: matrix.python-version == 3.5
       run: |
         pip install strip-hints~=0.1.3
-        python strip_hints.py
+        python strip_buchschloss_hints.py
     - name: Create dummy DB
       run: touch the.db
     - name: Test with pytest
