@@ -1,6 +1,6 @@
 name: tests
 
-on: []
+on: [push]
   
 env:
   BUCHSCHLOSS_CONFIG:  exampleconfig.cfg
