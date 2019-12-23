@@ -2,7 +2,7 @@
 import os
 import strip_hints
 
-for dirpath, __, filenames in os.walk('buchschloss'):
+for dirpath, __, filenames in os.walk('.'):
     for filename in filenames:
         full_path = os.path.join(dirpath, filename)
         if not full_path.endswith('.py'):
