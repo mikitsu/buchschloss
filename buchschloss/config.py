@@ -1,6 +1,7 @@
 """Get configuration settings"""
 
 import os
+import sys
 import datetime
 import json
 import base64
@@ -161,4 +162,15 @@ def __getattr__(name):
     global config_data
     if config_data is None:
         config_data = AttrAccess(start(False))
-    return getattr(config_data, name)
+    val = getattr(config_data, name)
+    globals()[name] = val
+    return val
+
+
+if sys.version_info < (3, 7):
+    # pre-3.7 don't support module-level __getattr__
+    # get configuration now and assign top-level structures
+    config_data = AttrAccess(start(False))
+    for k, v in config_data.mapping.items():
+        globals()[k] = AttrAccess(v)
+    debug = config_data['debug']
