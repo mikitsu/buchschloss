@@ -2,15 +2,14 @@
 
 import tkinter as tk
 import tkinter.simpledialog as tk_dia
-import misc.tkstuff as mtk
-import misc.tkstuff.forms as mtkf
+from .. import tkstuff as mtk
 
 
 class UserExitedDialog(Exception):
     """The User exited the dialog without selecting an option"""
 
 
-class ResultlessDialogMixIn:
+class ResultlessDialogMixIn(tk_dia.Dialog):
     """remove the `self.result = None` set in tkinter.simpledialog.Dialog.__init__"""
     def body(self, master):
         # this doesn't really belong here, but, short of rewriting the
@@ -30,7 +29,7 @@ class UserExitDialogMixIn(ResultlessDialogMixIn):
             self.result = UserExitedDialog()
 
 
-class AskableDialogMixIn:
+class AskableDialogMixIn(tk_dia.Dialog):
     """add an `ask` method that allows getting the result
         without manual creation of a dialog
 

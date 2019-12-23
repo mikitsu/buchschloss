@@ -1,6 +1,6 @@
 """Stuff"""
 import functools
-import threaing
+import threading
 import builtins
 import re
 import operator
@@ -68,6 +68,11 @@ def threadsafe_class(name: str = 'lock', exclude: T.Container[str] =
     return modifier
 
 
+def temp_function(static_method: staticmethod):
+    """for wrapping temporary functions in a class body"""
+    return static_method.__func__
+
+
 class Instance:
     """Delay lookups
 
@@ -95,7 +100,7 @@ class Instance:
             instance_obj = [somefunc(x) for x in instance_obj][0]
         """
     CALLABLES = {k: getattr(builtins, k) for k in
-                 'len repr str bytes int float bool complex'.split()}
+                 'len repr str bytes int float bool'.split()}
     CALLABLES.update({
         'not': operator.not_,
         'is': operator.is_,
@@ -105,6 +110,8 @@ class Instance:
 
     iter_flag = False
 
+    @temp_function
+    @staticmethod
     def _dunder_lookup(__name__=None):
         def wrapper(self, *args, **kwargs):
             super().__getattribute__('stored_lookups').append(
@@ -209,6 +216,8 @@ class SocketFile:
 
 
 class MultiUseShelf:
+    @temp_function
+    @staticmethod
     def with_open_shelf(method):
         def wrapped(self, *args):
             if self.shelf is None:

@@ -4,7 +4,7 @@ import inspect
 import copy
 import tkinter as tk
 import tkinter.messagebox as tk_msg
-import misc.tkstuff as mtk
+from .. import tkstuff as mtk
 
 try:
     import typing
@@ -290,8 +290,8 @@ class Form:
 
             Example:
 
-            >>> from misc.tk import forms
-            >>> import misc.tk as mtk
+            >>> from misc.tkstuff import forms
+            >>> import misc.tkstuff as mtk
             >>> import tkinter as tk
             >>> from functools import partial
 

@@ -1,7 +1,7 @@
 """Validation"""
 
 import re
-from misc import Instance
+from . import Instance
 
 
 class Validator:

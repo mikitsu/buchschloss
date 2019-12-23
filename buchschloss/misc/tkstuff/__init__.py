@@ -6,16 +6,13 @@ use(d) will be overridden (if applicable)
 
 import tkinter as tk
 import tkinter.ttk as ttk
-
-from functools import wraps
-import types
-import enum
+from .. import __init__ as misc
 
 GEOMETRY_MANAGERS = ('grid', 'pack', 'place')
 GEOMETRY_MANAGERS_FORGET = [(n, n + '_forget') for n in GEOMETRY_MANAGERS]
 
 
-class ContainingWidget(tk.Widget):
+class ContainingWidget:
     """Provide a widget that includes other widgets.
 
     Currently applies .grid(), .pack() and .place() and their respecive .*_forget()
@@ -64,6 +61,8 @@ class ContainingWidget(tk.Widget):
             raise AttributeError('{!r} has no attribute "container_widget"'.format(self))
         return getattr(self.base, name)
 
+    @misc.temp_function
+    @staticmethod
     def _geo_wrapper(name, forget):
         def wrapper(self, *args, rcoords=None, **kwargs):
             getattr(self.base, name)(*args, **kwargs)
@@ -141,7 +140,7 @@ class ContainingWidget(tk.Widget):
 
 class BaseProxyWidget(tk.Widget):
     """Provide a widget that delegates some lookups to a .container
-        in a way compatile with ContainningWidget
+        in a way compatible with ContainningWidget
 
         the delegated lookups are:
         - .grid, .pack, .place and their .*_forget counterparts
@@ -167,6 +166,8 @@ class BaseProxyWidget(tk.Widget):
             self.container = container
             self.container_list.append(container)
 
+    @misc.temp_function
+    @staticmethod
     def _geo_wrapper(name, forget):
         def wrapper(self, *args, **kwargs):
             self.__visible = True
@@ -183,7 +184,7 @@ class BaseProxyWidget(tk.Widget):
             getattr(next(container_list), forget)(self)
             for container in container_list:
                 container.grid_forget(self)
-            super().grid_forget(self)
+            super().grid_forget()
         wrapper.__name__ = name
         forgetter.__name__ = forget
         return wrapper, forgetter
@@ -275,7 +276,7 @@ class ScrollableWidget(tk.Widget):
     """Provide a scrollable widget.
 
         create a ContainingWidget with a canvas and a scrollbar and add the
-        given widget to the canvas. Attach the apropriate methods.
+        given widget to the canvas. Attach the appropriate methods.
 
         This class is to be used as a decorator/wrapper:
 

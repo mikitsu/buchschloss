@@ -2,9 +2,9 @@
 
 import tkinter as tk
 from tkinter import ttk
-import misc.validation as mval
-import misc.tkstuff as mtk
-import misc.tkstuff.forms as mtkf
+from .. import validation as mval
+from .. import tkstuff as mtk
+from ..tkstuff import forms as mtkf
 
 class PasswordEntry(tk.Entry):
     def __init__(self, *args, **kwargs):
