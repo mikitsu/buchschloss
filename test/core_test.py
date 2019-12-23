@@ -50,7 +50,7 @@ def for_levels(func, perm_level):
         with pytest.raises(core.BuchSchlossBaseError):
             func()
     core.current_login.level = perm_level
-    func()
+    return func()
 
 
 def test_auth_required(db):
@@ -86,14 +86,14 @@ def test_login_logout(db):
     with pytest.raises(core.BuchSchlossBaseError):
         core.login('does not exist', '')
     assert core.current_login == m
-    config.HASH_ITERATIONS.insert(0, 1)
+    config.core.hash_iterations.insert(0, 1)
     try:
         core.logout()
         assert core.current_login is core.dummy_member
         core.login('name', 'Pa$$w0rd')
         assert models.Member.get_by_id('name').password == core.pbkdf(b'Pa$$w0rd', b'')
     finally:
-        config.HASH_ITERATIONS.pop(0)
+        config.core.hash_iterations.pop(0)
 
 
 def test_misc_data(db):
@@ -225,6 +225,23 @@ def test_person_view_str(db):
     )
     assert info['borrow_book_ids'] in ([1, 2], [2, 1])
 
+# since view_repr and view_attr are implemented in ActionNamespace,
+# I hope we only need one test each. Person is chosen bc. you need level 1
+
+
+def test_person_view_repr(db):
+    """test Person.view_repr"""
+    p = create_person(123)
+    assert str(p) == for_levels(lambda: core.Person.view_repr(123), 1)
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Person.view_repr(124)
+
+
+def test_person_view_attr(db):
+    """test Person.view_attr"""
+    create_person(123)
+    assert for_levels(lambda: core.Person.view_attr(123, 'id'), 1) == 123
+
 
 def test_book_new(db):
     """test Book.new"""
@@ -355,7 +372,7 @@ def test_book_view_str(db):
     borrow = models.Borrow.create(book=1, person=123, return_date=datetime.date(1956, 1, 31))
     data = core.Book.view_str(1)
     assert data['status'] == utils.get_name('borrowed')
-    assert data['return_date'] == datetime.date(1956, 1, 31).strftime(config.DATE_FORMAT)
+    assert data['return_date'] == datetime.date(1956, 1, 31).strftime(config.core.date_format)
     assert data['borrowed_by'] == str(models.Person.get_by_id(123))
     assert data['borrowed_by_id'] == 123
     borrow.is_back = True

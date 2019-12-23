@@ -11,17 +11,11 @@ try:
     from . import config
 except ImportError:
     try:
-        import buchschloss.config
+        from buchschloss import config
     except ImportError:
-        try:
-            from buchschloss import config
-        except ImportError:
-            config = None
-try:
+        config = None
+if __name__ != '__main__':
     from . import utils
-except ImportError:
-    if __name__ != '__main__':
-        raise
 
 __all__ = [
     'db',
@@ -39,7 +33,7 @@ __all__ = [
 T = typing
 
 if config is not None:
-    db = SqliteDatabase('.'.join(config.DATABASE_NAME))
+    db = SqliteDatabase(config.core.database_name)
 else:
     db = SqliteDatabase(input('Unable to locate config module. Please insert DB name -> '))
 
@@ -254,7 +248,7 @@ class Member(Model):
 
     def __str__(self):
         return utils.get_name("Member[{}]({})").format(
-            self.name, config.MEMBER_LEVELS[self.level])
+            self.name, utils.get_name('level_{}'.format(self.level)))
 
 
 class Misc(Model):

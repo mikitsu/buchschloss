@@ -17,15 +17,16 @@ from hashlib import pbkdf2_hmac
 from functools import wraps, reduce, partial
 from datetime import datetime, timedelta, date
 from os import urandom
+import sys
 import warnings
 import operator
 import re
 import enum
 import abc
-import contextlib
 import builtins
 import traceback
 import logging
+import logging.handlers
 try:
     # noinspection PyPep8Naming
     import typing as T
@@ -44,11 +45,32 @@ __all__ = [
     'login', 'logout',
 ]
 
-logging.basicConfig(level=logging.INFO,
+log_conf = config.core.log
+if log_conf.file:
+    if log_conf.rotate.how == 'none':
+        handler = logging.FileHandler(log_conf.file)
+    elif log_conf.rotate.how == 'size':
+        handler = logging.handlers.RotatingFileHandler(
+            log_conf.file,
+            maxBytes=2**10*log_conf.rotate.size,
+            backupCount=log_conf.rotate.copy_count,
+        )
+    elif log_conf.rotate.how == 'time':
+        handler = logging.handlers.TimedRotatingFileHandler(
+            log_conf.file,
+            when=log_conf.interval_unit,
+            interval=log_conf.interval_value,
+        )
+    else:
+        raise ValueError('config.core.log.rotate.how had an invalid value')
+else:
+    handler = logging.StreamHandler(sys.stdout)
+del log_conf
+logging.basicConfig(level=getattr(logging, config.core.log.level),
                     format='{asctime} - {levelname} - {funcName}: {msg}',
                     datefmt='%Y-%m-%d %H:%M:%S',
                     style='{',
-                    filename='buchschloss.log'
+                    handlers=[handler],
                     )
 
 
@@ -125,8 +147,14 @@ class BuchSchlossError(BuchSchlossBaseError):
                          utils.get_name(message).format(*message_format))
 
 
-BuchSchlossPermError = partial(BuchSchlossError.template_message('must_be_%s'),
-                               'no_permission')
+class BuchSchlossPermError(BuchSchlossBaseError):
+    """use utils.get_name for level and message name"""
+    def __init__(self, level):
+        super().__init__(utils.get_name('no_permission'),
+                         utils.get_name('must_be_{}').format(
+                             utils.get_name('level_%i' % (level,))))
+
+
 BuchSchlossDataMissingError = partial(BuchSchlossError, message='data_missing')
 
 
@@ -210,7 +238,7 @@ class LibraryGroupAction(enum.Enum):
     NONE = 'none'
 
 
-def pbkdf(pw, salt, iterations=config.HASH_ITERATIONS[0]):
+def pbkdf(pw, salt, iterations=config.core.hash_iterations[0]):
     """return pbkdf2_hmac('sha256', pw, salt, iterations)"""
     return pbkdf2_hmac('sha256', pw, salt, iterations)
 
@@ -242,22 +270,13 @@ def from_db(*arguments: T.Type[models.Model]):
     return wrapper_maker
 
 
-@contextlib.contextmanager
-def catch_not_found(model, pk):
-    """catch model.DoesNotExist errors and raise a BuchSchlossNotFoundError instead"""
-    try:
-        yield
-    except model.DoesNotExist:
-        raise BuchSchlossNotFoundError(model.__name__, pk)
-
-
 def check_level(level, resource):
     """check if the currently logged in member has the given level.
         otherwise, raise a BuchSchlossBaseError and log"""
     if current_login.level < level:
         logging.info('access to {} denied to {}'
                      .format(resource, current_login))
-        raise BuchSchlossPermError('must_be_level_{}', utils.get_level(level))
+        raise BuchSchlossPermError(level)
 
 
 def level_required(level):
@@ -301,7 +320,7 @@ def authenticate(m, password):
     """Check if the given password corresponds to the hashed one.
     Update the hash if newer iteration number present"""
     password = password.encode()
-    for old, iterations in enumerate(config.HASH_ITERATIONS):
+    for old, iterations in enumerate(config.core.hash_iterations):
         if m.password == pbkdf(password, m.salt, iterations):
             if old:
                 close_db = models.db.connect(reuse_if_open=True)
@@ -378,26 +397,31 @@ class ActionNamespace(abc.ABC):
     def view_ns(cls, id_: T.Union[int, str]):
         """Return a namespace of information"""
         check_level(cls.view_level, cls.__name__+'.view_ns')
-        with catch_not_found(cls.model, id_):
+        try:
             return cls.model.get_by_id(id_)
+        except cls.model.DoesNotExist:
+            raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
     @classmethod
     def view_repr(cls, id_: T.Union[str, int]) -> str:
         """Return a string representation"""
         check_level(cls.view_level, cls.__name__+'.view_repr')
-        with catch_not_found(cls.model, id_):
-            return str(cls.model.select_str_fields().where(
-                getattr(cls.model, cls.model.pk_name) == id_))
+        try:
+            return str(next(iter(cls.model.select_str_fields().where(
+                getattr(cls.model, cls.model.pk_name) == id_))))
+        except StopIteration:
+            raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
     @classmethod
     def view_attr(cls, id_: T.Union[str, int], name: str):
         """Return the value of a specific attribute"""
         # this is said to be faster...
         check_level(cls.view_level, cls.__name__+'.view_attr')
-        with catch_not_found(cls.model, id_):
-            return cls.model.select(getattr(cls.model, name)).where(
-                getattr(cls.model, cls.model.pk_name) == id_
-            )
+        try:
+            return getattr(next(iter(cls.model.select(getattr(cls.model, name)).where(
+                getattr(cls.model, cls.model.pk_name) == id_))), name)
+        except StopIteration:
+            raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
     @classmethod
     def search(cls,
@@ -502,7 +526,7 @@ class Book(ActionNamespace):
         r['status'] = utils.get_name('borrowed' if borrow else
                                      ('available' if book.is_active
                                       else 'inactive'))
-        r['return_date'] = str(borrow.return_date.strftime(config.DATE_FORMAT))
+        r['return_date'] = str(borrow.return_date.strftime(config.core.date_format))
         r['borrowed_by'] = str(borrow.person)
         r['borrowed_by_id'] = borrow.person.id
         r['__str__'] = str(book)
@@ -532,7 +556,7 @@ class Person(ActionNamespace):
         if pay_date is None and pay:
             pay_date = date.today()
         if max_borrow > 3 and not current_login.level >= 4:
-            raise BuchSchlossPermError(utils.get_level(4))
+            raise BuchSchlossPermError(4)
         p = models.Person(id=id_, first_name=first_name, last_name=last_name,
                           class_=class_, max_borrow=max_borrow, pay_date=pay_date)
         p.libraries = libraries
@@ -836,7 +860,7 @@ class Borrow(ActionNamespace):
             the maximum amount of time a book may be borrowed for is defined
             in the configuration settings
         """
-        if weeks > config.borrow_time_limit[current_login.level]:
+        if weeks > config.core.borrow_time_limit[current_login.level]:
             raise BuchSchlossPermError(1)
         if weeks <= 0:
             raise BuchSchlossError('Borrow', 'borrow_length_not_positive')
@@ -861,7 +885,7 @@ class Borrow(ActionNamespace):
         if person.id in latest:
             latest.remove(person.id)
         else:
-            latest = latest[:config.no_latest_borrowers_save - 1]
+            latest = latest[:config.core.save_latest_borrowers - 1]
         latest.insert(0, person.id)
         misc_data.latest_borrowers = latest
 
@@ -934,7 +958,7 @@ class Member(ActionNamespace):
             ``name`` must be unique among members and is case-sensitive
             ``level`` must be between 0 and 4, inclusive
         """
-        salt = urandom(config.HASH_SALT_LENGTH)
+        salt = urandom(config.core.salt_length)
         pass_hash = pbkdf(password.encode(), salt)
         with models.db:
             try:
@@ -983,8 +1007,8 @@ class Member(ActionNamespace):
         """
         global current_login
         if current_login.level < 4 and current_login.name != member.name:
-            raise BuchSchlossPermError('4_or_editee')
-        member.salt = urandom(config.HASH_SALT_LENGTH)
+            raise BuchSchlossError('no_permission', 'must_be_level_4_or_editee')
+        member.salt = urandom(config.core.salt_length)
         member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
         if current_login.name == member.name:

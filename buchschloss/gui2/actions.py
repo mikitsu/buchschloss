@@ -244,7 +244,8 @@ class ShowInfoNS:
         core.Book,
         {'borrowed_by': lambda d: (
             utils.get_name('borrowed_by'), (widgets.Button, {
-                'text': utils.break_string(str(d['borrowed_by']), config.INFO_LENGTH),
+                'text': utils.break_string(str(d['borrowed_by']),
+                                           config.gui2.info_widget.item_length),
                 'command': (partial(ShowInfoNS.person, d['borrowed_by_id'])
                             if d['borrowed_by_id'] is not None else None)
             }))
@@ -256,7 +257,7 @@ class ShowInfoNS:
         core.Person,
         {'borrows': lambda d: (
             [(widgets.Button, {
-                'text': utils.break_string(t, config.INFO_LENGTH),
+                'text': utils.break_string(t, config.gui2.info_widget.item_length),
                 'command': partial(ShowInfoNS.book, i)})
              for t, i in zip(d['borrows'], d['borrow_book_ids'])],
             )
@@ -268,12 +269,14 @@ class ShowInfoNS:
         core.Borrow,
         {'person': lambda d: (
             (widgets.Button, {
-                'text': utils.break_string(d['person'], config.INFO_LENGTH),
+                'text': utils.break_string(d['person'],
+                                           config.gui2.info_widget.item_length),
                 'command': partial(ShowInfoNS.person, d['person_id'])
             }),),
          'book': lambda d: (
              (widgets.Button, {
-                 'text': utils.break_string(d['book'], config.INFO_LENGTH),
+                 'text': utils.break_string(d['book'],
+                                            config.gui2.info_widget.item_length),
                  'command': partial(ShowInfoNS.book, d['book_id'])
              }),),
          'is_back': lambda d: (

@@ -16,6 +16,7 @@ import os
 import ftplib
 import ftputil
 import requests
+import logging
 import re
 import bs4
 import string
@@ -24,9 +25,9 @@ from buchschloss import core, config
 
 
 class FormattedDate(date):
-    """print a datetime.date as specified in config.DATE_FORMAT"""
+    """print a datetime.date as specified in config.core.date_format"""
     def __str__(self):
-        return self.strftime(config.DATE_FORMAT)
+        return self.strftime(config.core.date_format)
 
     @classmethod
     def fromdate(cls, date_: date):
@@ -47,7 +48,7 @@ def run_checks():
         if datetime.now() > core.misc_data.check_date+timedelta(minutes=45):
             for stuff in stuff_to_do:
                 threading.Thread(target=stuff).start()
-            core.misc_data.check_date = datetime.now() + config.bgtasks_every
+            core.misc_data.check_date = datetime.now() + config.utils.tasks.repeat_every
         time.sleep(5*60*60)
 
 
@@ -62,7 +63,7 @@ def late_books():
     today = date.today()
     for b in core.Borrow.search((
             ('is_back', 'eq', False),
-            'and', ('return_date', 'gt', today+config.warn_time))):
+            'and', ('return_date', 'gt', today+config.utils.late_books_warn_time))):
         if b.return_date < today:
             late.append(b)
         else:
@@ -75,11 +76,11 @@ def backup():
     """Local backups.
 
     Run backup_shift and copy name.ext db to name1.ext"""
-    backup_shift(os)
+    backup_shift(os, config.utils.tasks.backup_depth)
     while True:
         try:
-            shutil.copyfile('.'.join(config.DATABASE_NAME),
-                            '1.'.join(config.DATABASE_NAME))
+            shutil.copyfile(config.core.database_name,
+                            config.core.database_name+'.1')
         except FileNotFoundError:
             pass
         except PermissionError:  # currently accessing db
@@ -93,58 +94,71 @@ def web_backup():
 
     Run backup_shift and upload name.ext db as name1.ext
     """
+    conf = config.utils.ftp
+    data = conf.host, conf.username, conf.password
+    factory = ftplib.FTP_TLS if conf.tls else ftplib.FTP
     # noinspection PyDeprecation
-    with ftputil.FTPHost(*config.ftp, session_factory=ftplib.FTP_TLS) as host:
-        backup_shift(host)
-        host.upload('.'.join(config.DATABASE_NAME), '1.'.join(config.DATABASE_NAME))
+    with ftputil.FTPHost(*data, session_factory=factory, use_list_a_option=False) as host:
+        backup_shift(host, config.utils.tasks.web_backup_depth)
+        host.upload(config.core.database_name, config.core.database_name+'.1')
 
 
-def backup_shift(fs):
-    """shift all nameX.ext up one number to config.backup_depth
-    in the given filesystem (os or remote FTP host)"""
+def backup_shift(fs, depth):
+    """shift all name.number up one number to the given depth
+        in the given filesystem (os or remote FTP host)"""
+    number_name = lambda n: '.'.join((config.core.database_name, str(n)))
     try:
-        fs.remove(('%i.' % config.backup_depth).join(config.DATABASE_NAME))
+        fs.remove(number_name(depth))
     except FileNotFoundError:
         pass
-    for f in range(config.backup_depth, 1, -1):
+    for f in range(depth, 1, -1):
         try:
-            fs.rename(('%i.' % (f-1,)).join(config.DATABASE_NAME),
-                      ('%i.' % (f,)).join(config.DATABASE_NAME))
+            fs.rename(number_name(f-1), number_name(f))
         except FileNotFoundError:
             pass
 
 
 def send_mailgun(subject, text, to=''):
     """Send an Email using mailgun"""
-    recipients = config.implicit_recipients.copy()
-    if to:
-        recipients.append(to)
-    return requests.post(
-        config.email_endpoint,
-        auth=('api', config.email_auth),
-        data={'from': config.email_from,
-              'to': recipients,
-              'subject': subject,
-              'text': text})
+    raise NotImplementedError
 
 
 def get_name(internal: str):
-    """Get the pretty name.
+    """Get an end-user suitable name.
 
-    Try lookup in config.NAMES, else capitalize and replace "_" with " "
-    "__" are replaced with ": " and components are converted individually
+    Try lookup in config.utils.names.
+    "__" is replaced by ": " with components looked up individually
+    If a name isn't found, a warning is logged and the internal name returned, potentially modified
+    "<namespace>::<name>" may specify a namespace in which lookups are performed first,
+        falling back to the global names if nothing is found
+    "__" takes precedence over "::"
     """
     if '__' in internal:
         return ': '.join(get_name(s) for s in internal.split('__'))
-    return config.NAMES.get(internal, internal.capitalize().replace('_', ' '))
-
-
-def get_level(n: int = None):
-    """Get the representation of the given level. If None is given, use the logged in Member's one."""
-    if n is None:
-        return config.MEMBER_LEVELS[core.current_login.level]
-    else:
-        return config.MEMBER_LEVELS[n]
+    *path, name = internal.split('::')
+    current = config.utils.names
+    look_in = [current]
+    try:
+        for k in path:
+            current = current[k]
+            look_in.append(current)
+    except KeyError:
+        # noinspection PyUnboundLocalVariable
+        logging.warning('invalid namespace {!r} of {!r}'.format(k, internal))
+    look_in.reverse()
+    for ns in look_in:
+        try:
+            val = ns[name]
+            if isinstance(val, str):
+                return val
+            elif isinstance(val, dict):
+                return val['*this*']
+            else:
+                raise TypeError('{!r} is neither dict nor str'.format(val))
+        except KeyError:
+            pass
+    logging.warning('Name "{}" was not found in the namefile'.format('::'.join(path+[name])))
+    return '::'.join(path+[name])
 
 
 def break_string(text, size, break_char=string.punctuation, cut_char=string.whitespace):
@@ -237,13 +251,13 @@ def get_book_data(isbn: int):
 
 def run():
     """handling function."""
-    for k in config.onstart:
+    for k in config.utils.tasks.startup:
         threading.Thread(target=globals()[k], daemon=True).start()
     threading.Thread(target=run_checks, daemon=True).start()
 
 
 def _default_late_handler(late, warn):
-    head = datetime.now().strftime(config.DATE_FORMAT).join(('\n\n',))
+    head = datetime.now().strftime(config.core.date_format).join(('\n\n',))
     with open('late.txt', 'w') as f:
         f.write(head)
         f.write('\n'.join(str(L) for L in late))
@@ -253,4 +267,4 @@ def _default_late_handler(late, warn):
 
 
 late_handlers = [_default_late_handler]
-stuff_to_do = [globals()[k] for k in config.tasks]
+stuff_to_do = [globals()[k] for k in config.utils.tasks.recurring]

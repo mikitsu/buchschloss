@@ -165,9 +165,9 @@ def handle_user_input(ui):
 
 def start():
     """Entry point. Provide a REPL"""
-    if not getattr(config, 'DEBUG', False):
+    if not config.debug:
         sys.stderr = core.DummyErrorFile()
-    print(config.intro['text'], end='\n\n')
+    print(config.gui2.intro.text, end='\n\n')  # TODO: have a separate config section
     try:
         while True:
             try:
@@ -176,7 +176,7 @@ def start():
             except Level8Error as e:
                 print(e.__class__.__name__, e)
     except ExitException:
-        if sys.stderr.error_happened:
+        if sys.stderr.error_happened and not config.debug:
             if input(utils.get_name('send_error_report')+'\n')[0] in 'yYjJ':
                 try:
                     utils.send_mailgun('Error in Schuelerbuecherei', '\n\n\n'.join(sys.stderr.error_texts))

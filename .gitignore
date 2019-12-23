@@ -3,6 +3,7 @@
 !requirements.txt
 *.sqlite
 *.json
+!example_names.json
 **/__pycache__/*
 __pycache__/*
 *-ignore/*
@@ -13,4 +14,6 @@ doc/*.synctex*
 doc/*.out
 doc/*.toc
 doc/old/*
-buchschloss/config.py
+*.cfg
+!exampleconfig.cfg
+!configspec.cfg

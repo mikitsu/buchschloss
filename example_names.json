@@ -1,0 +1,5 @@
+{
+  "level_0": "inactive",
+  "no_permission": "Permission denied",
+  "must_be_{}": "For this action, you must be at least {}."
+}

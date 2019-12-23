@@ -8,23 +8,22 @@ from threading import Thread
 import sys
 import os
 
-try:
-    from . import config
-except ImportError:
-    raise ImportError('config not found. make sure it exists and BuchSchloss'
-                      ' is run with the -m switch')
-from . import utils
+os.chdir(os.environ.get('BUCHSCHLOSS_DIR', '.'))
 
 parser = ArgumentParser(description='Launcher for Buchschloss Interfaces')
 parser.add_argument('interface', help='The interface type to run',
-                    choices=('cli', 'gui2', 'cli2'))
+                    choices=('cli', 'gui2', 'cli2', 'config'))
 parser.add_argument('--no-tasks', action='store_false', dest='do_tasks',
                     help="Don't run tasks specified in config")
 args = parser.parse_args()
 
-os.chdir(config.WORKING_DIR)
-mod = import_module('.'+args.interface, __package__)
+try:
+    mod = import_module('.'+args.interface, __package__)
+except ImportError:
+    raise ImportError("interface couldn't be located. Did you run with the -m flag?")
+
 if args.do_tasks:
+    from . import utils
     Thread(target=utils.run).start()
 mod.start()
 sys.exit()

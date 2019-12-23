@@ -6,7 +6,7 @@ import enum
 import misc.tkstuff as mtk
 import misc.tkstuff.forms as mtkf
 
-from .. import config
+from buchschloss import config
 from buchschloss.utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
@@ -74,7 +74,7 @@ class SearchableForm(BaseForm, template=True):
 
 class BookForm(SearchableForm):
     class FormWidget:
-        default_content = config.BOOK_DEFAULT
+        default_content = config.gui2.get('entry defaults').get('Book').mapping
 
     id: GroupElement.ONLY_EDIT = IntEntry
 
@@ -96,7 +96,7 @@ class BookForm(SearchableForm):
 
 class PersonForm(SearchableForm):
     class FormWidget:
-        default_content = config.PERSON_DEFAULT
+        default_content = config.gui2.get('entry defaults').get('Person').mapping
 
     def get_name(name: str):
         if name == 'id':
@@ -125,8 +125,8 @@ class MemberForm(BaseForm):
 
     name: mtkf.Element = NonEmptyEntry
     level: mtkf.Element = (mtk.OptionChoiceWidget,
-                            {'values': config.MEMBER_LEVELS,
-                             'default': 1})
+                           {'values': get_name('level_list'),
+                            'default': 1})
     current_password: mtkf.Element = NonEmptyPasswordEntry
     password: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
     password2: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
