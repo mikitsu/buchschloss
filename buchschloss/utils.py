@@ -143,11 +143,18 @@ def get_name(internal: str):
             current = current[k]
             look_in.append(current)
     except KeyError:
-        pass
+        # noinspection PyUnboundLocalVariable
+        logging.warning('invalid namespace {!r} of {!r}'.format(k, internal))
     look_in.reverse()
     for ns in look_in:
         try:
-            return ns[name]
+            val = ns[name]
+            if isinstance(val, str):
+                return val
+            elif isinstance(val, dict):
+                return val['*this*']
+            else:
+                raise TypeError('{!r} is neither dict nor str'.format(val))
         except KeyError:
             pass
     logging.warning('Name "{}" was not found in the namefile'.format('::'.join(path+[name])))
