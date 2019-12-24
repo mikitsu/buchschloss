@@ -509,8 +509,8 @@ class Book(ActionNamespace):
         """Return data about a Book.
 
         Return a dictionary consisting of the following items as strings:
-            - author, isbn, title, series, language, publisher, concerned_people,
-                year, medium, genres, shelf, id, series_number
+            - author, isbn, title, series, series_number, language, publisher,
+                concerned_people, year, medium, genres, shelf, id
             - the name of the Library the Book is in
             - groups as a string consisting of group names separated by ';'
             - the book's status (available, borrowed or inactive)
@@ -521,9 +521,9 @@ class Book(ActionNamespace):
             or None if not borrowed
         """
         r = {k: str(getattr(book, k) or '') for k in
-             ('author', 'isbn', 'title', 'series', 'language', 'publisher',
-              'concerned_people', 'year', 'medium', 'genres', 'shelf', 'id',
-              'series_number')}
+             ('author', 'isbn', 'title', 'series', 'series_number', 'language',
+              'publisher', 'concerned_people', 'year', 'medium', 'genres', 'shelf', 'id',
+             )}
         r['library'] = book.library.name
         r['groups'] = ';'.join(g.name for g in book.groups)
         borrow = book.borrow or Dummy(id=None, _bool=False)
