@@ -73,8 +73,16 @@ class SearchableForm(BaseForm, template=True):
 
 
 class BookForm(SearchableForm):
-    class FormWidget:
+    class FormWidget(mtkf.FormWidget):
         default_content = config.gui2.get('entry defaults').get('Book').mapping
+
+        def clean_data(self):
+            """separate series and series_number"""
+            super().clean_data()
+            if self.data['series'] is None:
+                self.data['series_number'] = None
+            else:
+                self.data['series'], self.data['series_number'] = self.data['series']
 
     id: GroupElement.ONLY_EDIT = IntEntry
 

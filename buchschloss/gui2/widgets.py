@@ -14,6 +14,53 @@ from .. import utils
 from .. import config
 
 
+class ListEntryMixin(tk.Entry):
+    def __init__(self, master, cnf={}, sep=';', **kw):
+        self.sep = sep
+        super().__init__(master, cnf, **kw)
+
+    def get(self):
+        v = super().get()
+        if v:
+            return v.split(self.sep)
+        else:
+            return []
+
+
+ListEntry = type('ListEntry', (ListEntryMixin, Entry), {})
+ListREntry = type('ListREntry', (ListEntryMixin, mtk.RememberingEntry), {})
+ISBNEntry = mtk.ValidatedWidget.new_cls(Entry, validation.ISBN_validator)
+NonEmptyEntry = mtk.ValidatedWidget.new_cls(Entry, validation.nonempty)
+NonEmptyREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.nonempty)
+ClassEntry = mtk.ValidatedWidget.new_cls(Entry, validation.class_validator)
+IntListEntry = mtk.ValidatedWidget.new_cls(ListEntry, validation.int_list)
+IntEntry = mtk.ValidatedWidget.new_cls(Entry, validation.type_int)
+NullEntry = mtk.ValidatedWidget.new_cls(Entry, validation.none_on_empty)
+NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_on_empty)
+
+
+class SeriesEntry(mtk.ContainingWidget):
+    """Entry combining a name for the series and an integer input for the number"""
+    def __init__(self, master, **kw):
+        widgets = [
+            (NullREntry, {'rem_key': 'book-series'}),
+            (NullEntry, {}),
+        ]
+        super().__init__(master, *widgets, **kw)
+
+    def validate(self):
+        series = self.widgets[0].get()
+        series_number = self.widgets[1].get()
+        if series is None and series_number is not None:
+            return False, utils.get_name('error_number_without_series')
+        if series_number is not None:
+            try:
+                series_number = int(series_number)
+            except ValueError:
+                return False, utils.get_name('error_series_number_must_be_int')
+        return True, (series, series_number)
+
+
 class ActionChoiceWidget(mtk.ContainingWidget):
     def __init__(self, master, actions, **kw):
         widgets = [(Button, {'text': utils.get_name(txt), 'command': cmd})
@@ -43,19 +90,6 @@ class InfoWidget(mtk.ContainingWidget):
             else:
                 raise ValueError('`{}` could not be handled'.format(v))
         super().__init__(master, *widgets, horizontal=2)
-
-
-class ListEntryMixin(tk.Entry):
-    def __init__(self, master, cnf={}, sep=';', **kw):
-        self.sep = sep
-        super().__init__(master, cnf, **kw)
-
-    def get(self):
-        v = super().get()
-        if v:
-            return v.split(self.sep)
-        else:
-            return []
 
 
 class OptionalCheckbuttonWithVar(CheckbuttonWithVar):
@@ -109,18 +143,6 @@ class SearchResultWidget(mtk.ContainingWidget):
                 'text': utils.break_string(str(r), config.gui2.search_result_widget.item_length),
                 'command': partial(view_func, r.id)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))
-
-
-ListEntry = type('ListEntry', (ListEntryMixin, Entry), {})
-ListREntry = type('ListREntry', (ListEntryMixin, mtk.RememberingEntry), {})
-ISBNEntry = mtk.ValidatedWidget.new_cls(Entry, validation.ISBN_validator)
-NonEmptyEntry = mtk.ValidatedWidget.new_cls(Entry, validation.nonempty)
-NonEmptyREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.nonempty)
-ClassEntry = mtk.ValidatedWidget.new_cls(Entry, validation.class_validator)
-IntListEntry = mtk.ValidatedWidget.new_cls(ListEntry, validation.int_list)
-IntEntry = mtk.ValidatedWidget.new_cls(Entry, validation.type_int)
-NullEntry = mtk.ValidatedWidget.new_cls(Entry, validation.none_on_empty)
-NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_on_empty)
 
 
 class NonEmptyPasswordEntry(PasswordEntry, NonEmptyEntry):
