@@ -150,6 +150,7 @@ class Book(Model):
     author: T.Union[str, CharField] = CharField()
     title: T.Union[str, CharField] = CharField()
     series: T.Union[str, CharField] = CharField(null=True)
+    series_number: T.Union[int, IntegerField] = IntegerField(null=True)
     language: T.Union[str, CharField] = CharField()
     publisher: T.Union[str, CharField] = CharField()
     concerned_people: T.Union[str, CharField] = CharField(null=True)
