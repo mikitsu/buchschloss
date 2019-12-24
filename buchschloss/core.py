@@ -441,8 +441,12 @@ class Book(ActionNamespace):
 
     @staticmethod
     @level_required(2)
-    def new(isbn: int, year: int, groups: T.Iterable[str] = (),  # TODO: don't accept **kwargs
-            library: str = 'main', **kwargs: str) -> int:
+    def new(*, isbn: int, author: str, title: str, language: str, publisher: str,
+            year: int, medium: str, shelf: str, series: T.Optional[str] = None,
+            series_number: T.Optional[int] = None,
+            concerned_people: T.Optional[str] = None,
+            genres: T.Optional[str] = None, groups: T.Iterable[str] = (),
+            library: str = 'main') -> int:
         """Attempt to create a new Book with the given arguments and return the ID
 
         automatically create groups as needed
@@ -451,18 +455,17 @@ class Book(ActionNamespace):
         See models.Book.__doc__ for details on arguments"""
         with models.db:
             try:
-                b = models.Book.create(isbn=isbn, year=year,
-                                       library=models.Library.get_by_id(library),
-                                       **kwargs)
+                b = models.Book.create(
+                    isbn=isbn, author=author,title=title, language=language,
+                    publisher=publisher, year=year, medium=medium,
+                    shelf=shelf, series=series, series_number=series_number,
+                    concerned_people=concerned_people, genres=genres,
+                    library=models.Library.get_by_id(library),
+                )
                 for g in groups:
                     b.groups.add(models.Group.get_or_create(name=g)[0])
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Book', library)
-            except peewee.IntegrityError as e:
-                if str(e).startswith('NOT NULL'):
-                    raise BuchSchlossDataMissingError('new_book')
-                else:
-                    raise
             else:
                 logging.info('{} created {}'.format(current_login, b))
         return b.id
