@@ -12,6 +12,7 @@ from ..misc.tkstuff.blocks import PasswordEntry, CheckbuttonWithVar
 from . import validation
 from .. import utils
 from .. import config
+from .. import core
 
 
 class ListEntryMixin(tk.Entry):
@@ -42,15 +43,21 @@ NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_o
 class SeriesEntry(mtk.ContainingWidget):
     """Entry combining a name for the series and an integer input for the number"""
     def __init__(self, master, **kw):
+        self.number_dummy = core.Dummy(set=self.set_number)
         widgets = [
             (NullREntry, {'rem_key': 'book-series'}),
-            (NullEntry, {}),
+            (NullEntry, {'width': 2}),
         ]
         super().__init__(master, *widgets, **kw)
 
     def validate(self):
-        series = self.widgets[0].get()
-        series_number = self.widgets[1].get()
+        """check whether the series number is valid
+
+            - if it is a number
+            - if it is only given in combination with a series
+        """
+        _, series = self.widgets[0].validate()
+        _, series_number = self.widgets[1].validate()
         if series is None and series_number is not None:
             return False, utils.get_name('error_number_without_series')
         if series_number is not None:
@@ -59,6 +66,12 @@ class SeriesEntry(mtk.ContainingWidget):
             except ValueError:
                 return False, utils.get_name('error_series_number_must_be_int')
         return True, (series, series_number)
+
+    def set_number(self, number):
+        mtk.get_setter(self.widgets[1])(number)
+
+    def set(self, value):
+        mtk.get_setter(self.widgets[0])(value)
 
 
 class ActionChoiceWidget(mtk.ContainingWidget):

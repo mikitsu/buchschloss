@@ -10,9 +10,10 @@ from buchschloss import config
 from buchschloss.utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
-                      IntEntry, NullREntry, ListEntry,
-                      ListREntry, IntListEntry, NonEmptyPasswordEntry, Entry,
-                      OptionalCheckbuttonWithVar, CheckbuttonWithVar)
+                      IntEntry, NullREntry, ListEntry, ListREntry,
+                      IntListEntry, NonEmptyPasswordEntry, Entry,
+                      OptionalCheckbuttonWithVar, CheckbuttonWithVar,
+                      SeriesEntry)
 
 
 class ElementGroup(enum.Enum):
@@ -76,6 +77,11 @@ class BookForm(SearchableForm):
     class FormWidget(mtkf.FormWidget):
         default_content = config.gui2.get('entry defaults').get('Book').mapping
 
+        def __init__(self, *args, **kwargs):
+            """hack"""
+            super().__init__(*args, **kwargs)
+            self.widget_dict['series_number'] = self.widget_dict['series'].number_dummy
+
         def clean_data(self):
             """separate series and series_number"""
             super().clean_data()
@@ -89,7 +95,7 @@ class BookForm(SearchableForm):
     isbn: mtkf.Element = ISBNEntry
     author: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-author'})
     title: mtkf.Element = NonEmptyEntry
-    series: mtkf.Element = (NullREntry, {'rem_key': 'book-series'})
+    series: mtkf.Element = SeriesEntry
     language: mtkf.Element = NonEmptyEntry
     publisher: mtkf.Element = NonEmptyEntry
     concerned_people: mtkf.Element = (NullREntry, {'rem_key': 'book-cpeople'})
