@@ -344,6 +344,7 @@ def test_book_view_str(db):
         'year': '456',
         'medium': 'rare',
         'series': '',
+        'series_number': '',
         'concerned_people': '',
         'genres': '',
         'shelf': 'A5',
