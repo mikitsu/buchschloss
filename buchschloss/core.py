@@ -155,9 +155,6 @@ class BuchSchlossPermError(BuchSchlossBaseError):
                              utils.get_name('level_%i' % (level,))))
 
 
-BuchSchlossDataMissingError = partial(BuchSchlossError, message='data_missing')
-
-
 class BuchSchlossNotFoundError(BuchSchlossError.template_title('%s_not_found')
                                .template_message('no_%s_with_id_{}')):
     def __init__(self, model: str, pk):
@@ -570,8 +567,6 @@ class Person(ActionNamespace):
             traceback.print_exc()
             if str(e).startswith('UNIQUE'):
                 raise BuchSchlossError('Person_exists', 'Person_{}_exists', id_)
-            elif str(e).startswith('NOT NULL'):
-                raise BuchSchlossDataMissingError('new_person')
             else:
                 raise
         else:
