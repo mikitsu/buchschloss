@@ -155,9 +155,6 @@ class BuchSchlossPermError(BuchSchlossBaseError):
                              utils.get_name('level_%i' % (level,))))
 
 
-BuchSchlossDataMissingError = partial(BuchSchlossError, message='data_missing')
-
-
 class BuchSchlossNotFoundError(BuchSchlossError.template_title('%s_not_found')
                                .template_message('no_%s_with_id_{}')):
     def __init__(self, model: str, pk):
@@ -441,8 +438,12 @@ class Book(ActionNamespace):
 
     @staticmethod
     @level_required(2)
-    def new(isbn: int, year: int, groups: T.Iterable[str] = (),  # TODO: don't accept **kwargs
-            library: str = 'main', **kwargs: str) -> int:
+    def new(*, isbn: int, author: str, title: str, language: str, publisher: str,
+            year: int, medium: str, shelf: str, series: T.Optional[str] = None,
+            series_number: T.Optional[int] = None,
+            concerned_people: T.Optional[str] = None,
+            genres: T.Optional[str] = None, groups: T.Iterable[str] = (),
+            library: str = 'main') -> int:
         """Attempt to create a new Book with the given arguments and return the ID
 
         automatically create groups as needed
@@ -451,18 +452,17 @@ class Book(ActionNamespace):
         See models.Book.__doc__ for details on arguments"""
         with models.db:
             try:
-                b = models.Book.create(isbn=isbn, year=year,
-                                       library=models.Library.get_by_id(library),
-                                       **kwargs)
+                b = models.Book.create(
+                    isbn=isbn, author=author,title=title, language=language,
+                    publisher=publisher, year=year, medium=medium,
+                    shelf=shelf, series=series, series_number=series_number,
+                    concerned_people=concerned_people, genres=genres,
+                    library=models.Library.get_by_id(library),
+                )
                 for g in groups:
                     b.groups.add(models.Group.get_or_create(name=g)[0])
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Book', library)
-            except peewee.IntegrityError as e:
-                if str(e).startswith('NOT NULL'):
-                    raise BuchSchlossDataMissingError('new_book')
-                else:
-                    raise
             else:
                 logging.info('{} created {}'.format(current_login, b))
         return b.id
@@ -506,8 +506,8 @@ class Book(ActionNamespace):
         """Return data about a Book.
 
         Return a dictionary consisting of the following items as strings:
-            - author, isbn, title, series, language, publisher, concerned_people,
-                year, medium, genres, shelf, id
+            - author, isbn, title, series, series_number, language, publisher,
+                concerned_people, year, medium, genres, shelf, id
             - the name of the Library the Book is in
             - groups as a string consisting of group names separated by ';'
             - the book's status (available, borrowed or inactive)
@@ -518,8 +518,9 @@ class Book(ActionNamespace):
             or None if not borrowed
         """
         r = {k: str(getattr(book, k) or '') for k in
-             ('author', 'isbn', 'title', 'series', 'language', 'publisher',
-              'concerned_people', 'year', 'medium', 'genres', 'shelf', 'id')}
+             ('author', 'isbn', 'title', 'series', 'series_number', 'language',
+              'publisher', 'concerned_people', 'year', 'medium', 'genres', 'shelf', 'id',
+             )}
         r['library'] = book.library.name
         r['groups'] = ';'.join(g.name for g in book.groups)
         borrow = book.borrow or Dummy(id=None, _bool=False)
@@ -566,8 +567,6 @@ class Person(ActionNamespace):
             traceback.print_exc()
             if str(e).startswith('UNIQUE'):
                 raise BuchSchlossError('Person_exists', 'Person_{}_exists', id_)
-            elif str(e).startswith('NOT NULL'):
-                raise BuchSchlossDataMissingError('new_person')
             else:
                 raise
         else:

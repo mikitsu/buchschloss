@@ -246,14 +246,9 @@ def test_person_view_attr(db):
 def test_book_new(db):
     """test Book.new"""
     models.Library.create(name='main')
-    for level in range(2):
-        core.current_login.level = level
-        with pytest.raises(core.BuchSchlossBaseError):
-            core.Book.new(123, 456, author='author', title='title', language='lang',
-                          publisher='publisher', medium='medium', shelf='A1')
-    core.current_login.level = 2
-    b_id = core.Book.new(123, 456, author='author', title='title', language='lang',
-                         publisher='publisher', medium='medium', shelf='A1')
+    b_id = for_levels(lambda: core.Book.new(
+        isbn=123, year=456, author='author', title='title', language='lang',
+        publisher='publisher', medium='medium', shelf='A1'), 2)
     assert b_id == 1
     b = models.Book.get_by_id(b_id)
     assert b.isbn == 123
@@ -267,21 +262,21 @@ def test_book_new(db):
     assert b.library.name == 'main'
     assert tuple(b.groups) == ()
     with pytest.raises(core.BuchSchlossBaseError):
-        core.Book.new(123, 456, author='author', title='title', language='lang',
+        core.Book.new(isbn=123, year=456, author='author', title='title', language='lang',
                       publisher='publisher', medium='medium', shelf='A1',
                       library='does_not_exist')
     models.Library.create(name='other_lib')
-    b_id = core.Book.new(123, 456, author='author', title='title', language='lang',
+    b_id = core.Book.new(isbn=123, year=456, author='author', title='title', language='lang',
                          publisher='publisher', medium='medium', shelf='A1',
                          library='other_lib')
     assert b_id == 2
     assert models.Book.get_by_id(b_id).library.name == 'other_lib'
-    b_id = core.Book.new(123, 456, author='author', title='title', language='lang',
+    b_id = core.Book.new(isbn=123, year=456, author='author', title='title', language='lang',
                          publisher='publisher', medium='medium', shelf='A1',
                          groups=['grp0'])
     assert b_id == 3
     assert list(models.Book.get_by_id(b_id).groups) == [models.Group.get_by_id('grp0')]
-    b_id = core.Book.new(123, 456, author='author', title='title', language='lang',
+    b_id = core.Book.new(isbn=123, year=456, author='author', title='title', language='lang',
                          publisher='publisher', medium='medium', shelf='A1',
                          groups=['grp0', 'grp1'])
     assert b_id == 4
@@ -349,6 +344,7 @@ def test_book_view_str(db):
         'year': '456',
         'medium': 'rare',
         'series': '',
+        'series_number': '',
         'concerned_people': '',
         'genres': '',
         'shelf': 'A5',

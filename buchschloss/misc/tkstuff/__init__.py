@@ -6,16 +6,20 @@ use(d) will be overridden (if applicable)
 
 import tkinter as tk
 import tkinter.ttk as ttk
-from .. import __init__ as misc
+# __init__ imports the modules __init__ method
+# get the instance with __self__
+from .. import __init__
+misc = __init__.__self__
+del __init__
 
 GEOMETRY_MANAGERS = ('grid', 'pack', 'place')
 GEOMETRY_MANAGERS_FORGET = [(n, n + '_forget') for n in GEOMETRY_MANAGERS]
 
 
-class ContainingWidget:
+class ContainingWidget(tk.Widget):
     """Provide a widget that includes other widgets.
 
-    Currently applies .grid(), .pack() and .place() and their respecive .*_forget()
+    Currently applies .grid(), .pack() and .place() and their respective .*_forget()
     Other calls and attribute lookups are delegated to the base widget
     """
 
@@ -140,14 +144,14 @@ class ContainingWidget:
 
 class BaseProxyWidget(tk.Widget):
     """Provide a widget that delegates some lookups to a .container
-        in a way compatible with ContainningWidget
+        in a way compatible with ContainingWidget
 
         the delegated lookups are:
         - .grid, .pack, .place and their .*_forget counterparts
         - .destroy
 
         the methods are wrapped in the following way:
-            The first call gets send to .container, the second one is actually
+            The first call gets sent to .container, the second one is actually
             handled by the superclass.
 
         i.e. The method will first be passed to self.container and executed
@@ -272,7 +276,7 @@ class LabeledWidget(BaseWrappedWidget):
         return self
 
 
-class ScrollableWidget(tk.Widget):
+class ScrollableWidget:
     """Provide a scrollable widget.
 
         create a ContainingWidget with a canvas and a scrollbar and add the
@@ -328,6 +332,8 @@ class ScrollableWidget(tk.Widget):
                 sw, sh = self.winfo_width(), self.winfo_height()
                 canvas.config(scrollregion=(-sw // 2, -sh // 2, sw // 2, sh // 2))
 
+            @misc.temp_function
+            @staticmethod
             def _geo_wrapper(name, forget):
                 def wrapper(self, *args, **kwargs):
                     getattr(super(), name)(*args, **kwargs)
@@ -429,7 +435,7 @@ class ValidatedWidget(tk.Widget):
         """Create a new widget.
 
             the class is created by cls.new_cls() and then initialized
-                with the gven arguements
+                with the given arguments
         """
         return cls.new_cls(widget, validator, getter)(master, **widgetkw)
 
@@ -500,13 +506,13 @@ class VarWidget:
 
 
 class OptionChoiceWidget(ttk.OptionMenu):
-    """An Optionmenu with a its own variable"""
+    """An OptionMenu with a its own variable"""
 
     def __init__(self, master, values, default=0, var_type=tk.Variable, **kw):
         """Create a new OptionChoiceWidget
 
             `master` is passed
-            `values` is a sequence of (<code>, <dispaly>) where <code>
+            `values` is a sequence of (<code>, <display>) where <code>
                 is returned bu .get() and <display> is shown to the user.
                 alternatively, it may be a sequence of strings in which case
                 the strings are shown and .get() returns the index
@@ -538,12 +544,17 @@ class OptionChoiceWidget(ttk.OptionMenu):
         self.variable.set({v: k for k, v in self.codes.items()}[value])
 
 
-class RememberingEntry(VarWidget.new_cls(tk.Entry, variable_name='textvariable')):
+class VariableEntry(VarWidget.new_cls(tk.Entry, variable_name='textvariable'),
+                    tk.Entry):  # for benefit of automatic checks
+    """Entry with attached variable"""
+
+
+class RememberingEntry(VariableEntry):
     """An Entry widget that remembers inputs by key pairs and allows pre-filling
 
         When the widget loses focus, the currently entered value is added
-            to a list. The list is sotored under a given key and is used
-            by all RemembringEntry instances with the same key.
+            to a list. The list is stored under a given key and is used
+            by all RememberingEntry instances with the same key.
 
         Note modifications to the list of previous values will mess things
             up if changed while the widget has focus.
@@ -555,9 +566,9 @@ class RememberingEntry(VarWidget.new_cls(tk.Entry, variable_name='textvariable')
 
     def __init__(self, master=None, cnf={}, rem_key=None, evt_next='<Next>',
                  evt_prev='<Prior>', **kw):
-        """Create a new RemembringEntry
+        """Create a new RememberingEntry
 
-            `rem_key` is the key used to store preious entries
+            `rem_key` is the key used to store previous entries
             `evt_next` is the event pattern for going to the next entry
             `evt_prev` is the event pattern for going to the previous entry
         """
@@ -588,3 +599,31 @@ class RememberingEntry(VarWidget.new_cls(tk.Entry, variable_name='textvariable')
 
     def __focus_in(self, evt=None):
         self.__index = -1
+
+
+class AutocompleteEntry(VariableEntry):
+    """entry widget that autocompletes based on the last typed characters"""
+    def __init__(self, master, cnf={}, autocompletes=None,
+                 autocomplete_event=None, **kwargs):
+        """Create a new AutocompleteWidget
+
+            ``autocompletes`` is a mapping from last entered characters to
+                text to complete (without the leading characters)
+        """
+        super().__init__(master, cnf, **kwargs)
+        if autocompletes is None:
+            autocompletes = {}
+        if autocomplete_event is None:
+            autocomplete_event = '<Control-space>'
+        self.autocompletes = autocompletes
+        self.bind(autocomplete_event, self.autocomplete)
+
+    def autocomplete(self, event=None):
+        """attempt to autocomplete"""
+        position = self.index(tk.INSERT)
+        curval = self.get()[:position]
+        for k, v in self.autocompletes.items():
+            if k == curval[-len(k):]:
+                self.insert(position, v)
+                self.icursor(position + len(v))
+                break
