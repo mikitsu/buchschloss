@@ -56,6 +56,7 @@ class SeriesEntry(mtk.ContainingWidget):
             - if it is a number
             - if it is only given in combination with a series
         """
+        # Validation always succeeds
         _, series = self.widgets[0].validate()
         _, series_number = self.widgets[1].validate()
         if series is None and series_number is not None:
