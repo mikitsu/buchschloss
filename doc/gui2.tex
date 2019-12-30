@@ -47,13 +47,13 @@ Alternativ ist es in der Textoberfläche möglich, eine Rückgabe durchzuführen
 \label{sec:interface}
 \subsection{Die Infoleiste}
 \label{subsec:interface:header}
-\begin{figure}\includegraphics{images/gui2/head_not_logged_in.jpg}\caption{Die Infoleiste, wenn man nicht eingeloggt ist}\label{fig:head_not_logged_in}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/head_not_logged_in.jpg}\caption{Die Infoleiste, wenn man nicht eingeloggt ist}\label{fig:head_not_logged_in}\end{figure}
 
 Die Infoleiste (\figref{fig:head_not_logged_in}) befindet sich immer am oberen Bildschirmrand.
 Sie enthält Login-Informationen sowie mit ``Abbrechen'' und ``Programm beenden'' beschriftete Knöpfe.
 
-\begin{figure}\includegraphics{images/gui2/logged_in_info.jpg}\caption{Information, wenn man eingeloggt ist}\label{fig:logged_in_info}\end{figure}
-\begin{figure}\includegraphics{images/gui2/login_form.jpg}\caption{Felder zum Einloggen}\label{fig:login_form}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/logged_in_info.jpg}\caption{Information, wenn man eingeloggt ist}\label{fig:logged_in_info}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/login_form.jpg}\caption{Felder zum Einloggen}\label{fig:login_form}\end{figure}
 
 Oben links befindet sich ein Knopf, der zu Ein- und Ausloggen dient.
 Neben diesem befindet sich ein kurzer Text, der anzeigt, ob und wie man derzeit eingeloggt ist (s. \figref{fig:logged_in_info}). 
@@ -68,8 +68,8 @@ Wenn man auf den ``Programm beenden''-Knopf klickt, wird das Programm nach einer
 In der Mitte des Bildschirms befindet sich der Aktionsbereich. Was hier gezeigt wird, ändert sich, je nach dem, was man macht.
 Generell wird entweder ein Menü, also mehrere Knöpfe, die zur Aktionsauswahl führen, oder eine einzelne Aktion, in der meist Eingaben zu machen sind, gezeigt.
 
-\begin{figure}\includegraphics{images/gui2/initial_menu.jpg}\caption{Das erste Menü: hier kann man aus Unteraktionen wählen}\label{fig:initial_menu}\end{figure}
-\begin{figure}\includegraphics{images/gui2/new_book.jpg}\caption{Aktionsbeispiel Bucherstellung: hier werden Daten eingetragen}\label{fig:new_book_example}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/initial_menu.jpg}\caption{Das erste Menü: hier kann man aus Unteraktionen wählen}\label{fig:initial_menu}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/new_book.jpg}\caption{Aktionsbeispiel Bucherstellung: hier werden Daten eingetragen}\label{fig:new_book_example}\end{figure}
 
 Die meisten Aktionen bestehen daraus, Daten in Eingabefelder einzutragen bzw. bereits eingetragene Daten zu ändern. Danach wird mit Druck auf einen Knopf, meist mit ``Durchführen'' beschriftet, bestätigt. Siehe als Beispiel dazu \figref{fig:new_book_example}.
 
@@ -105,11 +105,11 @@ Im Folgenden werden alle Aktionen genau beschrieben. Daher eignet sich dieser Be
 \label{subsec:detail:new}
 Diese Aktion wird verwendet, um neue Objekte zu erstellen.
 
-\begin{figure}\includegraphics{images/gui2/new_menu.jpg}\caption{Unteraktionen für ``neu''}\label{fig:new_menu}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/new_menu.jpg}\caption{Unteraktionen für ``neu''}\label{fig:new_menu}\end{figure}
 
 \subsubsection{``Buch''}
 \label{subsubsec:detail:new:book}
-\begin{figure}\includegraphics{images/gui2/new_book.jpg}\caption{Die Bucherstellung}\label{fig:new_book}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/new_book.jpg}\caption{Die Bucherstellung}\label{fig:new_book}\end{figure}
 
 Mit dieser Aktion wird ein neues Buch erstellt. Die Aktionsoberfläche besteht aus den folgenden Eingabefeldern sowie dem ``Durchführen''-Knopf, mit dem die Aktion durchgeführt wird.
 Um ein neues Buch zu erstellen, muss man mindestens Supermitarbeiter sein.
@@ -146,7 +146,7 @@ Regal & Regal des Buches & Ja\\
 \end{tabular}
 
 \paragraph{Das Autofüllverhalten}
-\begin{figure}\includegraphics{images/gui2/ask_isbn_autofill.jpg}\caption{Es wird gefragt, ob Daten automatisch gefüllt werden sollen}\label{fig:ask_isbn_autofill}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/ask_isbn_autofill.jpg}\caption{Es wird gefragt, ob Daten automatisch gefüllt werden sollen}\label{fig:ask_isbn_autofill}\end{figure}
 
 Bewegt man sich aus dem ISBN-Feld heraus, wird, sofern die eingegebene ISBN eine gültige Länge hat und die Prüfziffer stimmt, gefragt, ob einige Daten automatisch gefüllt werden sollen.
 Dies geschieht mittels einer Anfrage an die \href{https://portal.dnb.de}{Deutsche Nationalbibliothek}.
@@ -158,7 +158,7 @@ Wird das Buch gefunden, werden die erhaltenen Daten, meist Titel, Autor, Erschei
 
 \subsubsection{``Schüler''}
 \label{subsubsec:detail:new:person}
-\begin{figure}\includegraphics{images/gui2/new_person.jpg}\caption{Schülererstellung}\label{fig:new_person}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/new_person.jpg}\caption{Schülererstellung}\label{fig:new_person}\end{figure}
 
 Mit dieser Aktion wird ein neuer Schüler erstellt. Die Aktionsoberfläche besteht aus den folgenden Eingabefeldern sowie dem ``Durchführen''-Knopf, mit dem die Aktion durchgeführt wird.
 Um einen neuen Schüler zu erstellen, muss man mindestens Administrator sein; um eine maximale Ausleihanzahl über 3 zu erlauben Superadministrator.
@@ -184,7 +184,7 @@ hat bezahlt & Ob der Schüler bezahlt hat &   ---\\
 
 \subsubsection{``Bibliothek''}
 \label{subsubsec:detail:new:library}
-\begin{figure}\includegraphics{images/gui2/new_library.jpg}\caption{Bibliothekserstellung}\label{fig:new_library}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/new_library.jpg}\caption{Bibliothekserstellung}\label{fig:new_library}\end{figure}
 
 Mit dieser Aktion wird eine neue Bibliothek erstellt. Die Aktionsoberfläche besteht aus den folgenden Eingabefeldern sowie dem ``Durchführen''-Knopf, mit dem die Aktion durchgeführt wird.
 Um eine neue Bibliothek zu erstellen, muss man mindestens Administrator sein.
@@ -206,7 +206,7 @@ Bezahlung erforderlich & Ob Bezahlung erforderlich ist, um aus dieser Bibliothek
 
 \subsubsection{``Gruppe''}
 \label{subsubsec:detail:new:group}
-\begin{figure}\includegraphics{images/gui2/new_group.jpg}\caption{Gruppenerstellung}\label{fig:new_group}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/new_group.jpg}\caption{Gruppenerstellung}\label{fig:new_group}\end{figure}
 
 Mit dieser Aktion wird eine neue Gruppe erstellt. Die Aktionsoberfläche besteht aus den folgenden Eingabefeldern sowie dem ``Durchführen''-Knopf, mit dem die Aktion durchgeführt wird.
 Um eine neue Gruppe zu erstellen, muss man mindestens Administrator sein.
@@ -222,7 +222,7 @@ Bücher & Die IDs der Bücher, die sofort der neuen Gruppe hinzugefügt werden s
 
 \subsubsection{``Mitglied''}
 \label{subsubsec:detail:new:member}
-\begin{figure}\includegraphics{images/gui2/new_member.jpg}\caption{Mitgliedserstellung}\label{fig:new_member}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/new_member.jpg}\caption{Mitgliedserstellung}\label{fig:new_member}\end{figure}
 
 Mit dieser Aktion wird ein neues Mitglied erstellt. Die Aktionsoberfläche besteht aus den folgenden Eingabefeldern sowie dem ``Durchführen''-Knopf, mit dem die Aktion durchgeführt wird.
 Um ein neues Mitglied zu erstellen, muss man Superadministrator sein.
@@ -246,13 +246,13 @@ Passwort wdh. & Eine Wiederholung des Passworts des neuen Mitglieds, um Tippfehl
 
 \subsection{``betrachten''}
 \label{subsec:detail:view}
-\begin{figure}\includegraphics{images/gui2/view_menu.jpg}\caption{Unteraktionen für ``betrachten''}\label{fig:view_menu}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/view_menu.jpg}\caption{Unteraktionen für ``betrachten''}\label{fig:view_menu}\end{figure}
 
 Mit dieser Aktion kann man sich Daten zu Schülern oder Büchern anzeigen lassen.
 
 \subsubsection{``Buch''}
 \label{subsubsec:detail:view:book}
-\begin{figure}\includegraphics{images/gui2/view_book_ask.jpg}\caption{Die ID des Buches wird abgefragt}\label{fig:view_book_ask}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/view_book_ask.jpg}\caption{Die ID des Buches wird abgefragt}\label{fig:view_book_ask}\end{figure}
 
 Nach Klick auf den Knopf wird man dazu aufgefordert, die ID des Buches anzugeben.
 
@@ -287,7 +287,7 @@ entliehen von & ggf. eine Kurzdarstellung des Schülers, der das Buch entliehen 
 
 \subsubsection{``Schüler''}
 \label{subsubsec:detail:view:person}
-\begin{figure}\includegraphics{images/gui2/view_person_ask.jpg}\caption{Die Schülerausweisnummer wird abgefragt}\label{fig:view_person_ask}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/view_person_ask.jpg}\caption{Die Schülerausweisnummer wird abgefragt}\label{fig:view_person_ask}\end{figure}
 
 Nach Klick auf den Knopf wird man dazu aufgefordert, die Schüler\-ausweis\-nummer des Schülers anzugeben.
 
@@ -310,13 +310,13 @@ Bezahldatum & letztes Datum, an dem der Schüler bezahlt hat\\
 
 \subsection{``verwalten''}
 \label{subsec:detail:edit}
-\begin{figure}\includegraphics{images/gui2/edit_menu.jpg}\caption{Unteraktionen für ``verwalten''}\label{fig:edit_menu}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/edit_menu.jpg}\caption{Unteraktionen für ``verwalten''}\label{fig:edit_menu}\end{figure}
 
 Mit dieser Aktion können Daten geändert werden
 
 \subsubsection{``Buch''}
 \label{subsubsec:detail:edit:book}
-\begin{figure}\includegraphics{images/gui2/edit_book.jpg}\caption{Die Buchverwatung}\label{fig:edit_book}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/edit_book.jpg}\caption{Die Buchverwatung}\label{fig:edit_book}\end{figure}
 
 In der Buchverwaltung ist die Oberfläche der der Bucherstellung sehr ähnlich. Lediglich das Feld ``ID'' existiert zusätzlich.
 
@@ -327,7 +327,7 @@ Danach können Änderungen vorgenommen werden. Diese werden anschließend mit Kl
 
 \subsubsection{``Schüler''}
 \label{subsubsec:detail:edit:person}
-\begin{figure}\includegraphics{images/gui2/edit_person.jpg}\caption{Die Schülerverwatung}\label{fig:edit_person}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/edit_person.jpg}\caption{Die Schülerverwatung}\label{fig:edit_person}\end{figure}
 
 Die Eingabefelder sind denen der Erstellung gleich. Nach Eingabe der Schülerausweisnummer und Verlassen des Eingabefelds werden die übrigen Felder automatisch mit den bereits vorhandenen Daten gefüllt.
 Zusätzlich zu den Eingabefelder gibt es auch das ``hat bezahlt'' Häckchenfeld. Es soll gewählt werden, falls der Nutzer am Tag der Änderung bezahlt hat.
@@ -336,7 +336,7 @@ Zusätzlich zu den Eingabefelder gibt es auch das ``hat bezahlt'' Häckchenfeld.
 
 \subsubsection{``Bibliothek''}
 \label{subsubsec:detail:edit:library}
-\begin{figure}\includegraphics{images/gui2/edit_library.jpg}\caption{Die Bibliotheksverwatung}\label{fig:edit_library}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/edit_library.jpg}\caption{Die Bibliotheksverwatung}\label{fig:edit_library}\end{figure}
 
 Im Bibliotheksverwaltungsbereich befinden sich folgende Eingabefelder:
 
@@ -371,7 +371,7 @@ Mit dieser Aktion werden alle sich in der Bibliothek befindlichen Bücher zurüc
 
 \subsubsection{``Gruppe''}
 \label{subsubsec:detail:edit:group}
-\begin{figure}\includegraphics{images/gui2/edit_group.jpg}\caption{Die Gruppenverwaltung}\label{fig:edit_group}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/edit_group.jpg}\caption{Die Gruppenverwaltung}\label{fig:edit_group}\end{figure}
 
 Im Gruppenverwaltungsbereich befinden sich folgende Eingabefelder:
 
@@ -399,7 +399,7 @@ Mit dieser Aktion werden alle Bücher, die Teil der angegebenen Gruppe waren, au
 
 \subsubsection{``Gruppe aktivieieren''}
 \label{subsubsec:detail:edit:activate_group}
-\begin{figure}\includegraphics{images/gui2/activate_group.jpg}\caption{Die Gruppenaktivation}\label{fig:activate_group}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/activate_group.jpg}\caption{Die Gruppenaktivation}\label{fig:activate_group}\end{figure}
 
 Diese Aktion besteht aus den folgenden drei Eingabefeldern:
 
@@ -418,7 +418,7 @@ Diese Aktion bewegt alle Bücher, die mindestens einer der angegebenen Gruppen a
 
 \subsubsection{``Mitglied''}
 \label{subsubsec:detail:edit:member}
-\begin{figure}\includegraphics{images/gui2/edit_member.jpg}\caption{Die Mitgliedsverwatung}\label{fig:edit_member}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/edit_member.jpg}\caption{Die Mitgliedsverwatung}\label{fig:edit_member}\end{figure}
 
 Diese Aktion besteht aus einem Eingabefeld für den Namen des Mitglieds und einem Auswahlmenü für das neue Level. Wird auf ``Durchführen'' geklickt, wird das Level des angegebenen Mitglieds auf das angegebene Level gesetzt. Zusätzlich muss noch das Passwort des ausführenden Mitglieds eingegeben werden. \\
 
@@ -428,7 +428,7 @@ Diese Aktion besteht aus einem Eingabefeld für den Namen des Mitglieds und eine
 
 \subsubsection{``Passwort ändern''}
 \label{subsubsec:detail:edit:change_password}
-\begin{figure}\includegraphics{images/gui2/change_password.jpg}\caption{Die Passwortänderung}\label{fig:change_password}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/change_password.jpg}\caption{Die Passwortänderung}\label{fig:change_password}\end{figure}
 
 Diese Aktion besteht aus den folgenden Feldern:
 
@@ -466,7 +466,7 @@ Bei der Suche nach Ausleihvorgängen kann man wählen, ob das betreffende Buch b
 
 \subsection{``ausleihen''}
 \label{subsec:detail:borrow}
-\begin{figure}\includegraphics{images/gui2/borrow_with_people.jpg}\caption{Die Ausleihaktion. Unter den Einagbefeldern sieht man Knöpfe mit Schülern, die zuletzt ausgeliehen haben.}\label{fig:borrow_with_people}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/borrow_with_people.jpg}\caption{Die Ausleihaktion. Unter den Einagbefeldern sieht man Knöpfe mit Schülern, die zuletzt ausgeliehen haben.}\label{fig:borrow_with_people}\end{figure}
 
 Die Ausleihoberfläche besteht aus drei Eingabefeldern, die unten erläutert werden, einem mit ``Durchführen'' beschrifteten Knopf sowie ggf. weiteren Knöpfen, die mit Kurzdarstellungen einiger Schüler beschriftet sind.
 Wird einer dieser Knöpfe gedrückt, wird das angegebene Buch an den auf dem Knopf stehenden Schüler ausgeliehen. Der Wert im Schüler-Eingabefeld wird dann automatisch gefüllt.
@@ -486,7 +486,7 @@ Zeitraum & Wie viele Wochen das Buch ausgeliehen werden soll & Ja\\
 
 \subsection{``zurückgeben''}
 \label{subsec:detail:restitute}
-\begin{figure}\includegraphics{images/gui2/restitute_with_people.jpg}\caption{Die Rückgabeaktion. Unter den Einagbefeldern sieht man Knöpfe mit Schülern, die zuletzt ausgeliehen haben.}\label{fig:restitute_with_people}\end{figure}
+\begin{figure}\includegraphics{../images/gui2/restitute_with_people.jpg}\caption{Die Rückgabeaktion. Unter den Einagbefeldern sieht man Knöpfe mit Schülern, die zuletzt ausgeliehen haben.}\label{fig:restitute_with_people}\end{figure}
 
 
 Die Rückgabeoberfläche besteht aus einem Eingabefeld für die Schülerausweisnummer des zurückgebenden Schülers und ein Eingabefeld für die ID des zurückgegebenen Buches. Darunter befindet sich ein mit ``Durchführen'' beschrifteter Knopf sowie ggf. weitere, mit Kurzdarstellungen von Schülern beschriftete, Knöpfe.
