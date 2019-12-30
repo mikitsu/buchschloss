@@ -9,10 +9,10 @@ __pycache__/*
 *-ignore/*
 .idea/*
 .coverage
-doc/*.pdf
-doc/*.synctex*
-doc/*.out
-doc/*.toc
+doc/**/*.pdf
+doc/**/*.synctex*
+doc/**/*.out
+doc/**/*.toc
 doc/old/*
 *.cfg
 !exampleconfig.cfg
