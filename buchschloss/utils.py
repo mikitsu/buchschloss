@@ -7,7 +7,7 @@ contents (for use):
     - get_book_data() -- attempt to get data about a book based on the ISBN (first local DB, then DNB).
 
 to add late handlers, append them to late_handlers. they will receive arguments as specified in late_books()"""
-
+import base64
 from datetime import datetime, timedelta, date
 import time
 import threading
@@ -20,6 +20,11 @@ import logging
 import re
 import bs4
 import string
+
+try:
+    from cryptography import fernet
+except ImportError:
+    fernet = None
 
 from buchschloss import core, config
 
@@ -77,16 +82,23 @@ def backup():
 
     Run backup_shift and copy name.ext db to name1.ext"""
     backup_shift(os, config.utils.tasks.backup_depth)
-    while True:
-        try:
-            shutil.copyfile(config.core.database_name,
-                            config.core.database_name+'.1')
-        except FileNotFoundError:
-            pass
-        except PermissionError:  # currently accessing db
-            time.sleep(0.5)
-            continue
-        break
+    if config.utils.tasks.secret_key is None:
+        shutil.copyfile(config.core.database_name, config.core.database_name+'.1')
+    else:
+        data = get_encrypted_database()
+        with open(config.core.database_name+'.1', 'wb') as f:
+            f.write(data)
+
+
+def get_encrypted_database():
+    """get the encrypted contents of the database file"""
+    if fernet is None:
+        logging.error('encryption requested, but no cryptography available')
+    with open(config.utils.tasks.secret_key, 'rb') as f:
+        plain = f.read()
+    key = base64.urlsafe_b64encode(config.utils.tasks.secret_key)
+    cipher = fernet.Fernet(key).encrypt(plain)
+    return base64.urlsafe_b64decode(cipher)
 
 
 def web_backup():
