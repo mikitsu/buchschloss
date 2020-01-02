@@ -2,6 +2,7 @@
 import functools
 import threading
 import builtins
+import shelve
 import re
 import operator
 import typing as T
@@ -257,3 +258,49 @@ class MultiUseShelf:
     open = __enter__
     close = __exit__
     del with_open_shelf
+
+
+class FrozenDict:
+    """immutable mapping"""
+    def __init__(self, *args, **kwargs):
+        self.__dict = dict(*args, **kwargs)
+
+    def __contains__(self, item):
+        return item in self.__dict
+
+    def __eq__(self, other):
+        if isinstance(other, __class__):
+            return self.__dict == other.__dict
+        else:
+            return self.__dict.__eq__(other)
+
+    def __getitem__(self, item):
+        return self.__dict[item]
+
+    def __hash__(self):
+        return hash(tuple(self.__dict.items()))
+
+    def __iter__(self):
+        return iter(self.__dict)
+
+    def __len__(self):
+        return len(self.__dict)
+
+    def __repr__(self):
+        return '{}({})'.format(type(self).__name__, self.__dict)
+
+    @classmethod
+    def fromkeys(cls, *args):
+        return cls(dict.fromkeys(*args))
+
+    def get(self, *args):
+        return self.__dict.get(*args)
+
+    def items(self):
+        return self.__dict.items()
+
+    def keys(self):
+        return self.__dict.keys()
+
+    def values(self):
+        return self.__dict.values()
