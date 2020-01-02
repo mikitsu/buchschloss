@@ -15,7 +15,7 @@ from .. import config
 from .. import core
 
 
-class ListEntryMixin(tk.Entry):
+class ListEntryMixin(Entry):
     def __init__(self, master, cnf={}, sep=';', **kw):
         self.sep = sep
         super().__init__(master, cnf, **kw)
