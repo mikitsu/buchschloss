@@ -421,14 +421,15 @@ class ValidatedWidget(tk.Widget):
             """
             if validator is not None:
                 self.validator = validator
-            widget.__init__(self, *args, **kw)
-        return type('Validated{}Widget'.format(widget.__name__),
+            super(r, self).__init__(*args, **kw)
+        r = type('Validated{}Widget'.format(widget.__name__),
                     (cls, widget),
                     {'__new__': object.__new__,
                         '__init__': __init__,
                         'getter': get_getter(widget, getter),
                         'validator': staticmethod(validator)}
                     )
+        return r
 
     @classmethod
     def new(cls, master, widget, widgetkw, validator, getter=None):
