@@ -86,7 +86,7 @@ validator = validate.Validator({
 
 class AttrAccess:
     """Provide attribute access to mappings, supporting nesting"""
-    EMPTY_INST = type('', (), {'__repr__': lambda s: 'AttrAccess.EMPTY_INST'})
+    EMPTY_INST = type('', (), {'__repr__': lambda s: 'AttrAccess.EMPTY_INST'})()
 
     def __init__(self, mapping):
         self.mapping = mapping
@@ -153,6 +153,10 @@ def start(noisy_success=True):
         # multiline defaults aren't allowed (AFAIK)
         if config['gui2']['intro']['text'] is None:
             config['gui2']['intro']['text'] = 'Buchschloss\n\nhttps://github.com/mik2k2/buchschloss'
+
+        if ((config['utils']['email']['smtp']['username'] is None)
+                ^ (config['utils']['email']['smtp']['password'] is None)):
+            raise Exception('smtp.username and smtp.password must both be given or omitted')
         if noisy_success:
             print('YAY, no configuration errors found')
         return config

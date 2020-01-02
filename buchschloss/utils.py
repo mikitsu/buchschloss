@@ -6,8 +6,12 @@ contents (for use):
     - get_name() -- get a pretty name
     - get_book_data() -- attempt to get data about a book based on the ISBN (first local DB, then DNB).
 
-to add late handlers, append them to late_handlers. they will receive arguments as specified in late_books()"""
+to add late handlers, append them to late_handlers. they will receive arguments as specified in late_books()
+"""
 
+import email
+import smtplib
+import ssl
 from datetime import datetime, timedelta, date
 import time
 import threading
@@ -118,9 +122,22 @@ def backup_shift(fs, depth):
             pass
 
 
-def send_mailgun(subject, text, to=''):
-    """Send an Email using mailgun"""
-    raise NotImplementedError
+def send_email(text):
+    """Send an email to the recipient specified in config"""
+    cfg = config.utils.email
+    msg = email.message.Message()
+    msg['From'] = cfg['from']
+    msg['To'] = cfg.recipient
+    msg.set_payload(text)
+    try:
+        with smtplib.SMTP(cfg.smtp.host, cfg.smtp.port) as conn:
+            if cfg.smtp.tls:
+                conn.starttls(context=ssl.create_default_context())
+            if cfg.smtp.username is not None:
+                conn.login(cfg.smtp.username, cfg.smtp.password)
+            conn.send_message(msg)
+    except smtplib.SMTPException as e:
+        logging.error('error while sending email: {}: {}'.format(type(e).__name__, e))
 
 
 def get_name(internal: str):
