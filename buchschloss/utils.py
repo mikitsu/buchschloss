@@ -8,6 +8,7 @@ contents (for use):
 
 to add late handlers, append them to late_handlers. they will receive arguments as specified in late_books()"""
 import base64
+import tempfile
 from datetime import datetime, timedelta, date
 import time
 import threading
@@ -80,7 +81,8 @@ def late_books():
 def backup():
     """Local backups.
 
-    Run backup_shift and copy name.ext db to name1.ext"""
+    Run backup_shift and copy name.ext db to name1.ext, encrypting if a key is given in cofig
+    """
     backup_shift(os, config.utils.tasks.backup_depth)
     if config.utils.tasks.secret_key is None:
         shutil.copyfile(config.core.database_name, config.core.database_name+'.1')
@@ -104,15 +106,25 @@ def get_encrypted_database():
 def web_backup():
     """Remote backups.
 
-    Run backup_shift and upload name.ext db as name1.ext
+    Run backup_shift and upload name.ext db as name1.ext, encrypted if a key is given in config
     """
-    conf = config.utils.ftp
-    data = conf.host, conf.username, conf.password
+    conf = config.utils
     factory = ftplib.FTP_TLS if conf.tls else ftplib.FTP
+    if conf.tasks.secret_key is None:
+        upload_path = config.core.database_name
+        file = None
+    else:
+        file = tempfile.NamedTemporaryFile(delete=False)
+        file.write(get_encrypted_database())
+        file.close()
+        upload_path = file.name
     # noinspection PyDeprecation
-    with ftputil.FTPHost(*data, session_factory=factory, use_list_a_option=False) as host:
-        backup_shift(host, config.utils.tasks.web_backup_depth)
-        host.upload(config.core.database_name, config.core.database_name+'.1')
+    with ftputil.FTPHost(conf.ftp.host, conf.ftp.username, conf.ftp.password,
+                         session_factory=factory, use_list_a_option=False) as host:
+        backup_shift(host, conf.tasks.web_backup_depth)
+        host.upload(upload_path, config.core.database_name+'.1')
+    if file is not None:
+        os.unlink(file.name)
 
 
 def backup_shift(fs, depth):
