@@ -122,12 +122,13 @@ def backup_shift(fs, depth):
             pass
 
 
-def send_email(text):
+def send_email(subject, text):
     """Send an email to the recipient specified in config"""
     cfg = config.utils.email
     msg = email.message.Message()
     msg['From'] = cfg['from']
     msg['To'] = cfg.recipient
+    msg['Subject'] = subject
     msg.set_payload(text)
     try:
         with smtplib.SMTP(cfg.smtp.host, cfg.smtp.port) as conn:
