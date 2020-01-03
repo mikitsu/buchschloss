@@ -6,7 +6,9 @@ contents (for use):
     - get_name() -- get a pretty name
     - get_book_data() -- attempt to get data about a book based on the ISBN (first local DB, then DNB).
 
-to add late handlers, append them to late_handlers. they will receive arguments as specified in late_books()"""
+to add late handlers, append them to late_handlers. they will receive arguments as specified in late_books()
+"""
+
 import base64
 import tempfile
 from datetime import datetime, timedelta, date
@@ -81,7 +83,7 @@ def late_books():
 def backup():
     """Local backups.
 
-    Run backup_shift and copy name.ext db to name1.ext, encrypting if a key is given in cofig
+    Run backup_shift and copy "name" db to "name.1", encrypting if a key is given in config
     """
     backup_shift(os, config.utils.tasks.backup_depth)
     if config.utils.tasks.secret_key is None:
@@ -95,7 +97,7 @@ def backup():
 def get_encrypted_database():
     """get the encrypted contents of the database file"""
     if fernet is None:
-        logging.error('encryption requested, but no cryptography available')
+        raise RuntimeError('encryption requested, but no cryptography available')
     with open(config.utils.tasks.secret_key, 'rb') as f:
         plain = f.read()
     key = base64.urlsafe_b64encode(config.utils.tasks.secret_key)
@@ -106,10 +108,9 @@ def get_encrypted_database():
 def web_backup():
     """Remote backups.
 
-    Run backup_shift and upload name.ext db as name1.ext, encrypted if a key is given in config
+    Run backup_shift and upload "name" DB as "name.1", encrypted if a key is given in config
     """
     conf = config.utils
-    factory = ftplib.FTP_TLS if conf.tls else ftplib.FTP
     if conf.tasks.secret_key is None:
         upload_path = config.core.database_name
         file = None
@@ -118,6 +119,8 @@ def web_backup():
         file.write(get_encrypted_database())
         file.close()
         upload_path = file.name
+
+    factory = ftplib.FTP_TLS if conf.tls else ftplib.FTP
     # noinspection PyDeprecation
     with ftputil.FTPHost(conf.ftp.host, conf.ftp.username, conf.ftp.password,
                          session_factory=factory, use_list_a_option=False) as host:
