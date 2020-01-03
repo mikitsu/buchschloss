@@ -167,7 +167,10 @@ class Dummy:  # TODO: move this out to misc
     special attributes:
         _default: a default item to be returned when the requested one is not set
         _str: the string representation of self
-        _call: a callable to call (default: return self)"""
+        _call: a callable to call (default: return self)
+        _bool: value to return when __bool__ is called
+        _items: mapping or sequence to delegate __getitem__ to. _default will be returned on Key, Index or AttributeError
+    """
     def __init__(self, _bool=True, _call=lambda s, *a, **kw: s, **kwargs):
         """Set the attributes given in kwargs."""
         self._bool = _bool
@@ -190,15 +193,18 @@ class Dummy:  # TODO: move this out to misc
 
     def __getattr__(self, item):
         """return self._default if set, else self"""
-        if item in ['_default', '_str', '_bool', '_call']:
-            try:
-                return self.__dict__[item]
-            except KeyError as e:
-                raise AttributeError from e
-        try:
-            return self._default
-        except AttributeError:
+        if item == '_default':
             return self
+        elif item in ('_str', '_items'):  # _bool and _call are always set
+            raise AttributeError
+        else:
+            return self._default
+
+    def __getitem__(self, item):
+        try:
+            return self._items[item]
+        except (KeyError, IndexError, AttributeError):
+            return self._default
 
 
 class DummyErrorFile:

@@ -132,10 +132,12 @@ class App:
         """execute when the user exits the application"""
         if tk_msg.askokcancel(utils.get_name('exit_app'),
                               utils.get_name('really_exit_app')):
-            if sys.stderr.error_happened and tk_msg.askokcancel(
-                    None, utils.get_name('send_error_report')):
+            if (not config.debug
+                    and sys.stderr.error_happened
+                    and tk_msg.askokcancel(
+                    None, utils.get_name('send_error_report'))):
                 try:
-                    utils.send_mailgun('Error in Schuelerbuecherei', '\n\n\n'.join(sys.stderr.error_texts))
+                    utils.send_email(utils.get_name('error_in_buchschloss'), '\n\n\n'.join(sys.stderr.error_texts))
                 except utils.requests.RequestException as e:
                     tk_msg.showerror(None, '\n'.join((utils.get_name('error_while_sending_error_msg'), str(e))))
             self.root.destroy()
