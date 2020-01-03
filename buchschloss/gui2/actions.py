@@ -143,7 +143,7 @@ def show_results(results, view_func, master=None):
     rw.pack()
     main.app.queue.put(rw.set_scrollregion)
     q_binding = main.app.root.bind('<q>', lambda e: rw.set_scrollregion())
-    main.app.header.container.widgets[2].bind('<Click>', lambda e: main.app.root.unbind('<q>', q_binding))
+    main.app.on_next_reset.append(lambda: main.app.root.unbind('<q>', q_binding))
 
 
 def search(form_cls, namespace: core.ActionNamespace, view_func):

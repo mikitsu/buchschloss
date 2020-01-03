@@ -87,6 +87,7 @@ class App:
         if not config.debug:
             sys.stderr = core.DummyErrorFile()
         self.queue = queue.Queue()
+        self.on_next_reset = []
         self.greeter = tk.Label(self.root,
                                 text=config.gui2.intro.text,
                                 font=config.gui2.intro.font)
@@ -115,6 +116,9 @@ class App:
 
     def reset(self):
         """reset to initial view"""
+        for cmd in self.on_next_reset:
+            cmd()
+        self.on_next_reset = []
         self.clear_center()
         self.display_start()
 
