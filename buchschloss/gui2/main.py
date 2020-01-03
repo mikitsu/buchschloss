@@ -137,7 +137,7 @@ class App:
                     and tk_msg.askokcancel(
                     None, utils.get_name('send_error_report'))):
                 try:
-                    utils.send_mailgun('Error in Schuelerbuecherei', '\n\n\n'.join(sys.stderr.error_texts))
+                    utils.send_email('Error in Schuelerbuecherei', '\n\n\n'.join(sys.stderr.error_texts))
                 except utils.requests.RequestException as e:
                     tk_msg.showerror(None, '\n'.join((utils.get_name('error_while_sending_error_msg'), str(e))))
             self.root.destroy()

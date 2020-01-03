@@ -179,7 +179,7 @@ def start():
         if not config.debug and sys.stderr.error_happened:
             if input(utils.get_name('send_error_report')+'\n')[0] in 'yYjJ':
                 try:
-                    utils.send_mailgun('Error in Schuelerbuecherei', '\n\n\n'.join(sys.stderr.error_texts))
+                    utils.send_email('Error in Schuelerbuecherei', '\n\n\n'.join(sys.stderr.error_texts))
                 except utils.requests.RequestException as e:
                     print('\n'.join((utils.get_name('error_while_sending_error_msg'), str(e))))
             sys.exit()
