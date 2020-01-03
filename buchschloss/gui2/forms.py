@@ -85,6 +85,8 @@ class BookForm(SearchableForm):
         def clean_data(self):
             """separate series and series_number"""
             super().clean_data()
+            if 'series' not in self.data:  # search may remove things
+                return
             if self.data['series'] is None:
                 self.data['series_number'] = None
             else:

@@ -143,7 +143,7 @@ class FormWidget(mtk.ContainingWidget):
             for w in self.widgets:
                 w.bind('<Return>', self.submit_action)
         elif submit_on_return is FormWidget.SubmitOnReturn.NOT_FIRST:
-            for w in self.widegts[1:]:
+            for w in self.widgets[1:]:
                 w.bind('<Return>', self.submit_action)
         if take_focus:
             self.widgets[0].focus()

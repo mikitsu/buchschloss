@@ -36,6 +36,7 @@ NonEmptyREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.no
 ClassEntry = mtk.ValidatedWidget.new_cls(Entry, validation.class_validator)
 IntListEntry = mtk.ValidatedWidget.new_cls(ListEntry, validation.int_list)
 IntEntry = mtk.ValidatedWidget.new_cls(Entry, validation.type_int)
+NullIntEntry = mtk.ValidatedWidget.new_cls(Entry, validation.int_or_none)
 NullEntry = mtk.ValidatedWidget.new_cls(Entry, validation.none_on_empty)
 NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_on_empty)
 
@@ -43,7 +44,7 @@ NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_o
 class SeriesEntry(mtk.ContainingWidget):
     """Entry combining a name for the series and an integer input for the number"""
     def __init__(self, master, **kw):
-        self.number_dummy = core.Dummy(set=self.set_number, validate=lambda: (1, 0))
+        self.number_dummy = core.Dummy(set=self.set_number, get=lambda: 1, validate=lambda: (1, 0))
         widgets = [
             (NullREntry, {'rem_key': 'book-series'}),
             (NullEntry, {'width': 2}),
@@ -58,14 +59,11 @@ class SeriesEntry(mtk.ContainingWidget):
         """
         # Validation always succeeds
         _, series = self.widgets[0].validate()
-        _, series_number = self.widgets[1].validate()
+        number_valid, series_number = self.widgets[1].validate()
+        if not number_valid:
+            return False, utils.get_name('error_series_number_must_be_int')
         if series is None and series_number is not None:
             return False, utils.get_name('error_number_without_series')
-        if series_number is not None:
-            try:
-                series_number = int(series_number)
-            except ValueError:
-                return False, utils.get_name('error_series_number_must_be_int')
         return True, (series, series_number)
 
     def set_number(self, number):
@@ -73,6 +71,9 @@ class SeriesEntry(mtk.ContainingWidget):
 
     def set(self, value):
         mtk.get_setter(self.widgets[0])(value)
+
+    def get(self):
+        return mtk.get_getter(self.widgets[0])()
 
 
 class ActionChoiceWidget(mtk.ContainingWidget):
