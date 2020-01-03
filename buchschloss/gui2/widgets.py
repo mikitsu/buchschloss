@@ -43,7 +43,7 @@ NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_o
 class SeriesEntry(mtk.ContainingWidget):
     """Entry combining a name for the series and an integer input for the number"""
     def __init__(self, master, **kw):
-        self.number_dummy = core.Dummy(set=self.set_number)
+        self.number_dummy = core.Dummy(set=self.set_number, validate=lambda: (1, 0))
         widgets = [
             (NullREntry, {'rem_key': 'book-series'}),
             (NullEntry, {'width': 2}),
