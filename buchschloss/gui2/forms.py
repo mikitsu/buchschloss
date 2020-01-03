@@ -14,7 +14,7 @@ from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
                       IntEntry, NullREntry, ListEntry, ListREntry,
                       IntListEntry, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
-                      SeriesEntry, OptionsFromSearch)
+                      SeriesEntry, OptionsFromSearch, SearchMultiChoice)
 
 
 class ElementGroup(enum.Enum):
@@ -121,7 +121,7 @@ class BookForm(SearchableForm):
     genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
 
     library: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
-    groups: mtkf.Element = (ListREntry, {'rem_key': 'book-groups'})
+    groups: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Group})
     shelf: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-shelf'})
 
 
@@ -140,7 +140,7 @@ class PersonForm(SearchableForm):
     last_name: mtkf.Element = NonEmptyEntry
     class_: mtkf.Element = ClassEntry
     max_borrow: mtkf.Element = IntEntry
-    libraries: mtkf.Element = ListEntry
+    libraries: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
     pay: GroupElement.NO_SEARCH = CheckbuttonWithVar
 
 

@@ -82,8 +82,8 @@ class App:
         self.root.attributes('-fullscreen', True)
         self.root.title('Buchschloss')
         font_conf = {'family': config.gui2.font.family, 'size': config.gui2.font.size}
-        tk_font.nametofont('TkDefaultFont').config(**font_conf)
-        tk_font.nametofont('TkTextFont').config(**font_conf)
+        for font_name in ('Default', 'Text', 'Menu'):
+            tk_font.nametofont(font_name.join(('Tk', 'Font'))).config(**font_conf)
         if not config.debug:
             sys.stderr = core.DummyErrorFile()
         self.queue = queue.Queue()
