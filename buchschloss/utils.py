@@ -9,6 +9,8 @@ contents (for use):
 to add late handlers, append them to late_handlers. they will receive arguments as specified in late_books()
 """
 
+import base64
+import tempfile
 import email
 import smtplib
 import ssl
@@ -24,6 +26,11 @@ import logging
 import re
 import bs4
 import string
+
+try:
+    from cryptography import fernet
+except ImportError:
+    fernet = None
 
 from buchschloss import core, config
 
@@ -79,32 +86,51 @@ def late_books():
 def backup():
     """Local backups.
 
-    Run backup_shift and copy name.ext db to name1.ext"""
+    Run backup_shift and copy "name" db to "name.1", encrypting if a key is given in config
+    """
     backup_shift(os, config.utils.tasks.backup_depth)
-    while True:
-        try:
-            shutil.copyfile(config.core.database_name,
-                            config.core.database_name+'.1')
-        except FileNotFoundError:
-            pass
-        except PermissionError:  # currently accessing db
-            time.sleep(0.5)
-            continue
-        break
+    if config.utils.tasks.secret_key is None:
+        shutil.copyfile(config.core.database_name, config.core.database_name+'.1')
+    else:
+        data = get_encrypted_database()
+        with open(config.core.database_name+'.1', 'wb') as f:
+            f.write(data)
+
+
+def get_encrypted_database():
+    """get the encrypted contents of the database file"""
+    if fernet is None:
+        raise RuntimeError('encryption requested, but no cryptography available')
+    with open(config.utils.tasks.secret_key, 'rb') as f:
+        plain = f.read()
+    key = base64.urlsafe_b64encode(config.utils.tasks.secret_key)
+    cipher = fernet.Fernet(key).encrypt(plain)
+    return base64.urlsafe_b64decode(cipher)
 
 
 def web_backup():
     """Remote backups.
 
-    Run backup_shift and upload name.ext db as name1.ext
+    Run backup_shift and upload "name" DB as "name.1", encrypted if a key is given in config
     """
-    conf = config.utils.ftp
-    data = conf.host, conf.username, conf.password
+    conf = config.utils
+    if conf.tasks.secret_key is None:
+        upload_path = config.core.database_name
+        file = None
+    else:
+        file = tempfile.NamedTemporaryFile(delete=False)
+        file.write(get_encrypted_database())
+        file.close()
+        upload_path = file.name
+
     factory = ftplib.FTP_TLS if conf.tls else ftplib.FTP
     # noinspection PyDeprecation
-    with ftputil.FTPHost(*data, session_factory=factory, use_list_a_option=False) as host:
-        backup_shift(host, config.utils.tasks.web_backup_depth)
-        host.upload(config.core.database_name, config.core.database_name+'.1')
+    with ftputil.FTPHost(conf.ftp.host, conf.ftp.username, conf.ftp.password,
+                         session_factory=factory, use_list_a_option=False) as host:
+        backup_shift(host, conf.tasks.web_backup_depth)
+        host.upload(upload_path, config.core.database_name+'.1')
+    if file is not None:
+        os.unlink(file.name)
 
 
 def backup_shift(fs, depth):
