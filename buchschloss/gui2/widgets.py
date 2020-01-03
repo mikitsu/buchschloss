@@ -47,7 +47,7 @@ class SeriesEntry(mtk.ContainingWidget):
         self.number_dummy = core.Dummy(set=self.set_number, get=lambda: 1, validate=lambda: (1, 0))
         widgets = [
             (NullREntry, {'rem_key': 'book-series'}),
-            (NullEntry, {'width': 2}),
+            (NullIntEntry, {'width': 2}),
         ]
         super().__init__(master, *widgets, **kw)
 

@@ -86,11 +86,15 @@ class BookForm(SearchableForm):
             """separate series and series_number"""
             super().clean_data()
             if 'series' not in self.data:  # search may remove things
+                del self.data['series_number']
                 return
             if self.data['series'] is None:
                 self.data['series_number'] = None
             else:
                 self.data['series'], self.data['series_number'] = self.data['series']
+            # TODO: remove this ASAP
+            if 'search_mode' in self.widget_dict and self.data['series_number'] is None:
+                del self.data['series_number']
 
     id: GroupElement.ONLY_EDIT = IntEntry
 
