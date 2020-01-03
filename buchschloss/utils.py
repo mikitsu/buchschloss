@@ -2,7 +2,7 @@
 
 contents (for use):
     - run() -- call once on startup. takes care of all automatic tasks
-    - send_mailgun() -- send an email
+    - send_email() -- send an email
     - get_name() -- get a pretty name
     - get_book_data() -- attempt to get data about a book based on the ISBN (first local DB, then DNB).
 
