@@ -82,6 +82,13 @@ class ActionChoiceWidget(mtk.ContainingWidget):
         super().__init__(master, *widgets, **kw)
 
 
+class OptionsFromSearch(mtk.OptionChoiceWidget):
+    """an option widget that gets its options from search results"""
+    def __init__(self, master, *, action_ns: core.ActionNamespace = None, attribute='name', **kwargs):
+        values = [(getattr(o, attribute), str(o)) for o in action_ns.search(())]
+        super().__init__(master, values=values, **kwargs)
+
+
 @mtk.ScrollableWidget(height=config.gui2.info_widget.height,
                       width=config.gui2.info_widget.width)
 class InfoWidget(mtk.ContainingWidget):
