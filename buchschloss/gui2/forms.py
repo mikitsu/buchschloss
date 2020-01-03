@@ -6,14 +6,15 @@ import enum
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import forms as mtkf
 
-from buchschloss import config
-from buchschloss.utils import get_name
+from .. import config
+from .. import core
+from ..utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
                       IntEntry, NullREntry, ListEntry, ListREntry,
                       IntListEntry, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
-                      SeriesEntry)
+                      SeriesEntry, OptionsFromSearch)
 
 
 class ElementGroup(enum.Enum):
@@ -119,7 +120,7 @@ class BookForm(SearchableForm):
     medium: mtkf.Element = NonEmptyEntry
     genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
 
-    library: mtkf.Element = NonEmptyEntry
+    library: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
     groups: mtkf.Element = (ListREntry, {'rem_key': 'book-groups'})
     shelf: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-shelf'})
 
