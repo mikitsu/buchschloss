@@ -157,7 +157,6 @@ class MultiChoicePopup(tk.Button):
                 will be used when .get is called
         """
         super().__init__(master, cnf, command=self.action, **kwargs)
-        self.value = ''
         if isinstance(options[0], str):
             self.codes = self.displays = options
         else:
@@ -187,7 +186,7 @@ class MultiChoicePopup(tk.Button):
 
 class SearchMultiChoice(MultiChoicePopup):
     """MultiChoicePopup that gets values from searches"""
-    def __init__(self, master, cnf={}, action_ns=None, attribute='name', **kwargs):
+    def __init__(self, master, cnf={}, *, action_ns=None, attribute='name', **kwargs):
         options = [(getattr(o, attribute), str(o)) for o in action_ns.search(())]
         super().__init__(master, cnf, options=options)
 
@@ -197,7 +196,7 @@ class SearchMultiChoice(MultiChoicePopup):
         self.set_text()
 
     def set(self, values):
-        """update text and split values on ";", allowing """
+        """update text. If ``values`` is a string, split it on ';' before passing to Super()"""
         if isinstance(values, str):
             values = values.split(';')
         super().set(values)
