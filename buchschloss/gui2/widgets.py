@@ -147,7 +147,7 @@ class ActivatingListbox(tk.Listbox):
             self.select_set(i)
 
 
-def get_scrolled_listbox(master, listbox=tk.Listbox, listbox_kwargs=None):
+def get_scrolled_listbox(master, listbox=tk.Listbox, **listbox_kwargs):
     """a Listbox that includes its Scrollbar"""
     if listbox_kwargs is None:
         listbox_kwargs = {}
@@ -156,6 +156,12 @@ def get_scrolled_listbox(master, listbox=tk.Listbox, listbox_kwargs=None):
     inst['yscrollcommand'] = inst.scrollbar.set
     inst.scrollbar['command'] = inst.yview
     return inst
+
+
+class ScrolledListbox(tk.Listbox):
+    """ActivatingListbox that has its own scrollbar"""
+    def __new__(cls, *args, **kwargs):
+        return get_scrolled_listbox(*args, **kwargs)
 
 
 class MultiChoicePopup(tk.Button):
@@ -186,13 +192,16 @@ class MultiChoicePopup(tk.Button):
 
     def action(self, event=None):
         """display the popup window, set self.value and update button text"""
+        options = {'values': self.displays, 'activate': self.active}
+        if len(self.displays) > 10:  # default height TODO: make this a config setting?
+            options.update(listbox=ActivatingListbox)
+            widget = ScrolledListbox
+        else:
+            options.update(height=len(self.displays))
+            widget = ActivatingListbox
         try:
-            self.active = mtkd.WidgetDialog.ask(self.master, ActivatingListbox,
-                                                {'values': self.displays,
-                                                 'activate': self.active,
-                                                 'height': len(self.displays),
-                                                 },
-                                                getter='curselection')
+            self.active = mtkd.WidgetDialog.ask(
+                self.master, widget, options, getter='curselection')
         except mtkd.UserExitedDialog:
             pass
 
