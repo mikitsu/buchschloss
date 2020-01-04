@@ -6,14 +6,15 @@ import enum
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import forms as mtkf
 
-from buchschloss import config
-from buchschloss.utils import get_name
+from .. import config
+from .. import core
+from ..utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
                       IntEntry, NullREntry, ListEntry, ListREntry,
                       IntListEntry, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
-                      SeriesEntry)
+                      SeriesEntry, OptionsFromSearch, SearchMultiChoice)
 
 
 class ElementGroup(enum.Enum):
@@ -43,6 +44,22 @@ class PasswordFormWidget(mtkf.FormWidget):
 
 
 class BaseForm(mtkf.Form, template=True):
+    def __init_subclass__(cls, *, template=None, **kwargs):
+        autocompletes = config.gui2.get('autocomplete').get(cls.__name__.replace('Form', ''))
+        for k, v in vars(cls).items():
+            if isinstance(v, tuple) and len(v) == 2:
+                c, o = v
+            else:
+                c = v
+                o = {}
+            if isinstance(c, type) and issubclass(c, tk.Entry):
+                values = autocompletes.get(k).mapping
+                if values:
+                    c = type('Autocompleted'+c.__name__, (mtk.AutocompleteEntry, c), {})
+                    o['autocompletes'] = values
+                    setattr(cls, k, (c, o))
+        super().__init_subclass__(template=template, **kwargs)
+
     class FormWidget:
         take_focus = True
         submit_on_return = mtkf.FormWidget.SubmitOnReturn.ALL
@@ -103,8 +120,8 @@ class BookForm(SearchableForm):
     medium: mtkf.Element = NonEmptyEntry
     genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
 
-    library: mtkf.Element = NonEmptyEntry
-    groups: mtkf.Element = (ListREntry, {'rem_key': 'book-groups'})
+    library: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
+    groups: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Group})
     shelf: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-shelf'})
 
 
@@ -123,7 +140,7 @@ class PersonForm(SearchableForm):
     last_name: mtkf.Element = NonEmptyEntry
     class_: mtkf.Element = ClassEntry
     max_borrow: mtkf.Element = IntEntry
-    libraries: mtkf.Element = ListEntry
+    libraries: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
     pay: GroupElement.NO_SEARCH = CheckbuttonWithVar
 
 

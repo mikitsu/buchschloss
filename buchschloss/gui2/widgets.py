@@ -7,6 +7,7 @@ from functools import partial
 from collections import abc
 
 from ..misc import tkstuff as mtk
+from ..misc.tkstuff import dialogs as mtkd
 from ..misc.tkstuff.blocks import PasswordEntry, CheckbuttonWithVar
 
 from . import validation
@@ -15,7 +16,7 @@ from .. import config
 from .. import core
 
 
-class ListEntryMixin(tk.Entry):
+class ListEntryMixin(Entry):
     def __init__(self, master, cnf={}, sep=';', **kw):
         self.sep = sep
         super().__init__(master, cnf, **kw)
@@ -82,6 +83,13 @@ class ActionChoiceWidget(mtk.ContainingWidget):
         super().__init__(master, *widgets, **kw)
 
 
+class OptionsFromSearch(mtk.OptionChoiceWidget):
+    """an option widget that gets its options from search results"""
+    def __init__(self, master, *, action_ns: core.ActionNamespace = None, attribute='name', **kwargs):
+        values = [(getattr(o, attribute), str(o)) for o in action_ns.search(())]
+        super().__init__(master, values=values, **kwargs)
+
+
 @mtk.ScrollableWidget(height=config.gui2.info_widget.height,
                       width=config.gui2.info_widget.width)
 class InfoWidget(mtk.ContainingWidget):
@@ -125,6 +133,80 @@ class OptionalCheckbuttonWithVar(CheckbuttonWithVar):
             self.is_alternate = True
         else:
             super().set(value)
+
+
+class ActivatingListbox(tk.Listbox):
+    """a Listbox that allows initial items, possibly already activated
+        additional options: exportselection=False, selectmode=tk.MULTIPLE"""
+    def __init__(self, master, cfg={}, values=(), activate=(), **kwargs):
+        super().__init__(master, cfg, exportselection=False, selectmode=tk.MULTIPLE, **kwargs)
+        self.insert(0, *values)
+        for i in activate:
+            self.select_set(i)
+
+
+class MultiChoicePopup(tk.Button):
+    """Button that displays a multi-choice listbox popup dialog on click"""
+    # TODO: move to misc
+    def __init__(self, master, cnf={}, options=(), **kwargs):
+        """create a new MultiChoicePopup
+
+            ``root`` is the master of the generated popup
+            ``options`` is a sequence of (<code>, <display>) tuples
+                <display> will be shown to the user, while <code>
+                will be used when .get is called
+        """
+        super().__init__(master, cnf, command=self.action, **kwargs)
+        if isinstance(options[0], str):
+            self.codes = self.displays = options
+        else:
+            self.codes, self.displays = zip(*options)
+        self.active = ()
+
+    def get(self):
+        """get the last selected items"""
+        return [self.codes[i] for i in self.active]
+
+    def set(self, values):
+        """set the items to be selected"""
+        self.active = [self.codes.index(x) for x in values]
+
+    def action(self, event=None):
+        """display the popup window, set self.value and update button text"""
+        try:
+            self.active = mtkd.WidgetDialog.ask(self.master, ActivatingListbox,
+                                                {'values': self.displays,
+                                                 'activate': self.active,
+                                                 'height': len(self.displays),
+                                                 },
+                                                getter='curselection')
+        except mtkd.UserExitedDialog:
+            pass
+
+
+class SearchMultiChoice(MultiChoicePopup):
+    """MultiChoicePopup that gets values from searches"""
+    def __init__(self, master, cnf={}, *, action_ns=None, attribute='name', **kwargs):
+        options = [(getattr(o, attribute), str(o)) for o in action_ns.search(())]
+        super().__init__(master, cnf, options=options)
+
+    def action(self, event=None):
+        """update the text"""
+        super().action(event)
+        self.set_text()
+
+    def set(self, values):
+        """update text. If ``values`` is a string, split it on ';' before passing to Super()"""
+        if isinstance(values, str):
+            values = values.split(';')
+        super().set(values)
+        self.set_text()
+
+    def set_text(self):
+        """set the text to the displays separated by semicolons"""
+        self['text'] = utils.break_string(
+            ';'.join(self.displays[i] for i in self.active),
+            30)  # 30 is default Label length
 
 
 class Header:
