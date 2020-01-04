@@ -55,7 +55,7 @@ nonempty = mval.Validator((misc.Instance().__call_bool,
                            utils.get_name('error_empty')))
 
 class_validator = mval.Validator(str.upper,  # v -- G9 is coming
-                                 (r'^(EF|Q1|Q2|10([A-Z\s])+|[5-9][A-Z\s]+)$',
+                                 (r'^(EF|Q1|Q2|10([A-Z\s])+|[5-9][A-Z\s]+)$',  # TODO: move class regex to config
                                   utils.get_name('error_invalid_class')))
 
 int_list = mval.Validator((lambda L: list(map(int, L)),
@@ -64,3 +64,5 @@ int_list = mval.Validator((lambda L: list(map(int, L)),
 type_int = mval.Validator((int, {ValueError: utils.get_name('must_be_int')}))
 
 none_on_empty = mval.Validator(lambda s: s or None)
+
+int_or_none = mval.Validator((lambda s: int(s) if s else None, {ValueError: utils.get_name('must_be_int')}))
