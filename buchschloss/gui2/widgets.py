@@ -197,9 +197,12 @@ class SearchMultiChoice(MultiChoicePopup):
         self.set_text()
 
     def set(self, values):
-        """update text. If ``values`` is a string, split it on ';' before passing to Super()"""
+        """update text. If ``values`` is a non-empty string, split it on ';' before passing to super()"""
         if isinstance(values, str):
-            values = values.split(';')
+            if values:
+                values = values.split(';')
+            else:
+                values = ()
         super().set(values)
         self.set_text()
 
