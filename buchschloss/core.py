@@ -1102,10 +1102,8 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
         if not cond:
             return q
         a, op, b = cond
-        if op == 'and':
-            return handle_condition(b, handle_condition(a, q).switch(o))
-        elif op == 'or':
-            return handle_condition(a, q) + handle_condition(b, q)
+        if op in ('and', 'or'):
+            return getattr(operator, op+'_')(handle_condition(a, q), handle_condition(b, q))
         else:
             a, q = follow_path(a, q)
             if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
