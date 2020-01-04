@@ -193,8 +193,8 @@ class MultiChoicePopup(tk.Button):
     def action(self, event=None):
         """display the popup window, set self.value and update button text"""
         options = {'values': self.displays, 'activate': self.active}
-        if len(self.displays) > 10:  # default height TODO: make this a config setting?
-            options.update(listbox=ActivatingListbox)
+        if len(self.displays) > config.gui2.popup_height:
+            options.update(listbox=ActivatingListbox, height=config.gui2.popup_height)
             widget = ScrolledListbox
         else:
             options.update(height=len(self.displays))
