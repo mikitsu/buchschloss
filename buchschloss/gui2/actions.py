@@ -1,5 +1,6 @@
 """translate GUI actions to core-provided functions"""
 
+import collections
 import tkinter as tk
 import tkinter.messagebox as tk_msg
 from functools import partial
@@ -156,10 +157,13 @@ def search(form_cls, namespace: core.ActionNamespace, view_func):
     def search_callback(*, search_mode, exact_match, **kwargs):
         q = ()
         for k, v in kwargs.items():
-            if exact_match or isinstance(v, str):
-                q = ((k, 'eq', v), search_mode, q)
-            else:
-                q = ((k, 'contains', v), search_mode, q)
+            if isinstance(v, collections.abc.Sequence) and not isinstance(v, str):
+                v_ = v
+                for v in v_:
+                    if exact_match or isinstance(v, str):
+                        q = ((k, 'eq', v), search_mode, q)
+                    else:
+                        q = ((k, 'contains', v), search_mode, q)
 
         results = namespace.search(q)
         show_results(results, view_func)
