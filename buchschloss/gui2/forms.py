@@ -95,7 +95,7 @@ class BookForm(SearchableForm):
     isbn: mtkf.Element = ISBNEntry
     author: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-author'})
     title: mtkf.Element = NonEmptyEntry
-    # series: mtkf.Element = SeriesEntry
+    series: mtkf.Element = SeriesEntry
     language: mtkf.Element = NonEmptyEntry
     publisher: mtkf.Element = NonEmptyEntry
     concerned_people: mtkf.Element = (NullREntry, {'rem_key': 'book-cpeople'})
