@@ -5,6 +5,7 @@ from tkinter import Entry, Label
 from tkinter.ttk import Button
 from functools import partial
 from collections import abc
+import typing as T
 
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import dialogs as mtkd
@@ -144,6 +145,17 @@ class ActivatingListbox(tk.Listbox):
         self.insert(0, *values)
         for i in activate:
             self.select_set(i)
+
+
+def get_scrolled_listbox(master, listbox=tk.Listbox, listbox_kwargs=None):
+    """a Listbox that includes its Scrollbar"""
+    if listbox_kwargs is None:
+        listbox_kwargs = {}
+    inst: T.Union[listbox, mtk.WrappedWidget] = mtk.WrappedWidget(master, (listbox, listbox_kwargs), (tk.Scrollbar, {}))
+    inst.scrollbar = inst.container.widgets[1]
+    inst['yscrollcommand'] = inst.scrollbar.set
+    inst.scrollbar['command'] = inst.yview
+    return inst
 
 
 class MultiChoicePopup(tk.Button):
