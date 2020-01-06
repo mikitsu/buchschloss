@@ -5,6 +5,7 @@ from tkinter import Entry, Label
 from tkinter.ttk import Button
 from functools import partial
 from collections import abc
+import typing as T
 
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import dialogs as mtkd
@@ -146,6 +147,21 @@ class ActivatingListbox(tk.Listbox):
             self.select_set(i)
 
 
+def get_scrolled_listbox(master, listbox=tk.Listbox, **listbox_kwargs):
+    """a Listbox that includes its Scrollbar"""
+    inst: T.Union[listbox, mtk.WrappedWidget] = mtk.WrappedWidget(master, (listbox, listbox_kwargs), (tk.Scrollbar, {}))
+    inst.scrollbar = inst.container.widgets[1]
+    inst['yscrollcommand'] = inst.scrollbar.set
+    inst.scrollbar['command'] = inst.yview
+    return inst
+
+
+class ScrolledListbox(tk.Listbox):
+    """wrapper around get_scrolled_listbox for functions needing a class"""
+    def __new__(cls, *args, **kwargs):
+        return get_scrolled_listbox(*args, **kwargs)
+
+
 class MultiChoicePopup(tk.Button):
     """Button that displays a multi-choice listbox popup dialog on click"""
     # TODO: move to misc
@@ -174,13 +190,16 @@ class MultiChoicePopup(tk.Button):
 
     def action(self, event=None):
         """display the popup window, set self.value and update button text"""
+        options = {'values': self.displays, 'activate': self.active}
+        if len(self.displays) > config.gui2.popup_height:
+            options.update(listbox=ActivatingListbox, height=config.gui2.popup_height)
+            widget = ScrolledListbox
+        else:
+            options.update(height=len(self.displays))
+            widget = ActivatingListbox
         try:
-            self.active = mtkd.WidgetDialog.ask(self.master, ActivatingListbox,
-                                                {'values': self.displays,
-                                                 'activate': self.active,
-                                                 'height': len(self.displays),
-                                                 },
-                                                getter='curselection')
+            self.active = mtkd.WidgetDialog.ask(
+                self.master, widget, options, getter='curselection')
         except mtkd.UserExitedDialog:
             pass
 

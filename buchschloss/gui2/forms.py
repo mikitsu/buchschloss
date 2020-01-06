@@ -11,7 +11,7 @@ from .. import core
 from ..utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
-                      IntEntry, NullREntry, ListEntry, ListREntry,
+                      IntEntry, NullREntry, ListEntry,
                       IntListEntry, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
                       SeriesEntry, OptionsFromSearch, SearchMultiChoice)
