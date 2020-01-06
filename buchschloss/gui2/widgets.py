@@ -149,8 +149,6 @@ class ActivatingListbox(tk.Listbox):
 
 def get_scrolled_listbox(master, listbox=tk.Listbox, **listbox_kwargs):
     """a Listbox that includes its Scrollbar"""
-    if listbox_kwargs is None:
-        listbox_kwargs = {}
     inst: T.Union[listbox, mtk.WrappedWidget] = mtk.WrappedWidget(master, (listbox, listbox_kwargs), (tk.Scrollbar, {}))
     inst.scrollbar = inst.container.widgets[1]
     inst['yscrollcommand'] = inst.scrollbar.set
@@ -159,7 +157,7 @@ def get_scrolled_listbox(master, listbox=tk.Listbox, **listbox_kwargs):
 
 
 class ScrolledListbox(tk.Listbox):
-    """ActivatingListbox that has its own scrollbar"""
+    """wrapper around get_scrolled_listbox for functions needing a class"""
     def __new__(cls, *args, **kwargs):
         return get_scrolled_listbox(*args, **kwargs)
 
