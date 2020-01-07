@@ -226,7 +226,7 @@ class Borrow(Model):
     def __str__(self):
         return '{}: {} {}'.format(self.person, self.book, utils.get_name('is_back')
                                   if self.is_back else
-                                  utils.get_name('until_{}'.format(self.return_date)))
+                                  utils.get_name('until_{}').format(self.return_date.strftime(config.core.date_format)))
 
 
 class Member(Model):
