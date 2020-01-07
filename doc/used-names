@@ -40,3 +40,10 @@ not_borrowed
 {}_not_borrowed
 {}_not_borrowed_by_{}
 must_be_level_4_or_editee
+current_password
+password
+password2
+unexpected_error
+send_error_report
+error_in_buchschloss
+error_while_sending_error_msg
