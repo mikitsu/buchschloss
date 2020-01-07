@@ -1,0 +1,42 @@
+### This is a hopefully complete list of strings passed to utils.get_name
+# the namefile specified in the configuration settings should, ideally, map each one
+# of them to another representation
+
+no_permission
+must_be_{}
+level_0
+level_1
+level_2
+level_3
+level_4
+Book_not_found
+Person_not_found
+Library_not_found
+Group_not_found
+Member_not_found
+no_Book_with_id_{}
+no_Person_with_id_{}
+no_Library_with_id_{}
+no_Group_with_id_{}
+no_Member_with_id_{}
+auth_failed
+login
+wrong_password
+Person_exists
+Person_{}_exists
+Library_exists
+Library_{}_exists
+Group_exists
+Group_{}_exists
+member_exists
+Member_{}_exists
+Borrow
+borrow_length_not_positive
+Book_{}_not_available
+{}_not_in_Library_{}
+Library_{}_needs_payment
+{}_has_reached_max_borrow
+not_borrowed
+{}_not_borrowed
+{}_not_borrowed_by_{}
+must_be_level_4_or_editee
