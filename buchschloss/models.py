@@ -97,7 +97,8 @@ class Person(Model):
 
     @property
     def borrows(self):
-        return Borrow.select().where(Borrow.person == self, Borrow.is_back == False)
+        return Borrow.select().where(Borrow.person == self,
+                                     Borrow.is_back == False)
 
     repr_data = {
         'ein': 'eine',
@@ -227,9 +228,11 @@ class Borrow(Model):
     str_fields = (id, person, book, return_date, is_back)  # keep ID in, needed for further info
 
     def __str__(self):
-        return '{}: {} {}'.format(self.person, self.book, utils.get_name('is_back')
-                                  if self.is_back else
-                                  utils.get_name('until_{}').format(self.return_date.strftime(config.core.date_format)))
+        if self.is_back:
+            is_back = utils.get_name('is_back')
+        else:
+            is_back = utils.get_name('until_{}').format(self.return_date)
+        return '{}: {} {}'.format(self.person, self.book, is_back)
 
 
 class Member(Model):
