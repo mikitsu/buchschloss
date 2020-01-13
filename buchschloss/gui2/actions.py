@@ -166,7 +166,6 @@ def search(form_cls, namespace: core.ActionNamespace, view_func):
                     q = ((k, 'contains', v), search_mode, q)
 
         results = namespace.search(q)
-        print(q, kwargs)
         show_results(results, view_func)
 
     return generic_formbased_action('search', form_cls, search_callback, do_reset=False)

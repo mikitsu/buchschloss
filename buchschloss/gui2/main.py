@@ -222,8 +222,8 @@ action_tree = ActionTree.from_map({
         'borrow_search': (core.Borrow, ShowInfoNS.borrow),
         }.items()
     },
-    'borrow': actions.borrow_restitute(forms.BorrowForm, core.Borrow.new),
-    'restitute': actions.borrow_restitute(forms.RestituteForm, core.Borrow.restitute),
+    'borrow': actions.borrow_restitute(forms.BorrowForm, lambda book, person, borrow_time: core.Borrow.new(book, person, borrow_time)),
+    'restitute': actions.borrow_restitute(forms.RestituteForm, lambda book, person: core.Borrow.restitute(book, person)),
 })
 action_tree.new.book = generic_formbased_action(
     'new', FORMS['book'], actions.new_book, post_init=new_book_autofill)
