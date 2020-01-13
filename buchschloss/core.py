@@ -13,6 +13,7 @@ __all__ exports:
     - ComplexSearch: for very complex search queries
 """
 
+import inspect
 from hashlib import pbkdf2_hmac
 from functools import wraps, reduce, partial
 from datetime import datetime, timedelta, date
@@ -246,29 +247,33 @@ def pbkdf(pw, salt, iterations=config.core.hash_iterations[0]):
     return pbkdf2_hmac('sha256', pw, salt, iterations)
 
 
-def from_db(*arguments: T.Type[models.Model]):
+def from_db(*arguments: T.Type[models.Model], **keyword_arguments: T.Type[models.Model]):
     """Wrap functions taking IDs of database objects.
 
-    convert all arguments at their given position to wrapper_arg.get_by_id(func_arg)
-    ignore wrapper arguments of None
-    raise a BuchSchlossBaseError with an explanation if the object does not exist"""
+    convert all arguments to wrapper_arg.get_by_id(func_arg)
+    arguments may be given be position or by keyword;
+    they are converted independently of how they were passed to the wrapper
+    raise a BuchSchlossBaseError with an explanation if the object does not exist
+    """
     def wrapper_maker(f):
+        signature = inspect.signature(f)
+        pos_names = signature.parameters.keys()
+        for name, model in zip(pos_names, arguments):
+            keyword_arguments[name] = model
+
         @wraps(f)
         def wrapper(*args: T.Any, **kwargs):
-            args = list(args)
+            bound = signature.bind(*args, **kwargs)
             with models.db:
-                for p, m in enumerate(arguments):
-                    try:
-                        arg = args[p]
-                    except IndexError:
-                        raise TypeError('{!r} missing a positional parameter'.format(f))
-                    if m is not None and not isinstance(arg, m):  # allow direct passing
+                for k, m in keyword_arguments.items():
+                    arg = bound.arguments[k]
+                    if not isinstance(arg, m):  # allow direct passing
                         try:
-                            args[p] = m.get_by_id(arg)
+                            bound.arguments[k] = m.get_by_id(arg)
                         except m.DoesNotExist:
                             raise BuchSchlossNotFoundError(m.__name__, arg)
             with models.db.atomic():
-                return f(*args, **kwargs)
+                return f(*bound.args, **bound.kwargs)
         return wrapper
     return wrapper_maker
 
@@ -876,7 +881,7 @@ class Borrow(ActionNamespace):
                                    person, book.library.name)
         if (book.library.pay_required and (person.pay_date or date.min)
                 + timedelta(weeks=52) < date.today()):
-            raise BuchSchlossError('Borrow', 'Library_{}_needs_payment')
+            raise BuchSchlossError('Borrow', 'Library_{}_needs_payment', book.library)
         if len(person.borrows) >= person.max_borrow:
             raise BuchSchlossError('Borrow', '{}_has_reached_max_borrow', person)
         rdate = date.today() + timedelta(weeks=weeks)
