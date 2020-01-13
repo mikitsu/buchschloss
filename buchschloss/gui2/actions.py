@@ -156,14 +156,15 @@ def search(form_cls, namespace: core.ActionNamespace, view_func):
     """
     def search_callback(*, search_mode, exact_match, **kwargs):
         q = ()
-        for k, v in kwargs.items():
-            if isinstance(v, collections.abc.Sequence) and not isinstance(v, str):
-                v_ = v
-                for v in v_:
-                    if exact_match or isinstance(v, str):
-                        q = ((k, 'eq', v), search_mode, q)
-                    else:
-                        q = ((k, 'contains', v), search_mode, q)
+        for k, val_seq in kwargs.items():
+            if (isinstance(val_seq, str)
+                    or not isinstance(val_seq, collections.abc.Sequence)):
+                val_seq = [val_seq]
+            for v in val_seq:
+                if exact_match or not isinstance(v, str):
+                    q = ((k, 'eq', v), search_mode, q)
+                else:
+                    q = ((k, 'contains', v), search_mode, q)
 
         results = namespace.search(q)
         show_results(results, view_func)

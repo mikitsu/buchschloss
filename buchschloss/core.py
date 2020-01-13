@@ -629,8 +629,7 @@ class Person(ActionNamespace):
             in the same order their representations appear in 'borrows'"""
         r = {k: str(getattr(person, k) or '') for k in
              'id first_name last_name class_ max_borrow pay_date'.split()}
-        borrows = search(models.Borrow, (('person', 'eq', person.id),
-                                         'and', ('is_back', 'eq', False)))
+        borrows = person.borrows
         r['borrows'] = tuple(map(str, borrows))
         r['borrow_book_ids'] = [b.book.id for b in borrows]
         r['libraries'] = ';'.join(L.name for L in person.libraries)
