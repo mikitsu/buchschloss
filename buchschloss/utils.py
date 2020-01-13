@@ -101,7 +101,7 @@ def get_encrypted_database():
     """get the encrypted contents of the database file"""
     if fernet is None:
         raise RuntimeError('encryption requested, but no cryptography available')
-    with open(config.utils.tasks.secret_key, 'rb') as f:
+    with open(config.core.database_name, 'rb') as f:
         plain = f.read()
     key = base64.urlsafe_b64encode(config.utils.tasks.secret_key)
     cipher = fernet.Fernet(key).encrypt(plain)

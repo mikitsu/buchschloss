@@ -174,7 +174,7 @@ class MultiChoicePopup(tk.Button):
                 will be used when .get is called
         """
         super().__init__(master, cnf, command=self.action, **kwargs)
-        if isinstance(options[0], str):
+        if not options or isinstance(options[0], str):
             self.codes = self.displays = options
         else:
             self.codes, self.displays = zip(*options)

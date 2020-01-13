@@ -64,6 +64,8 @@ def is_base64bytes(value, length=None):
 
         if ``length`` is not given, allow any length
     """
+    if length is not None:
+        length = int(length)
     if not isinstance(value, str):
         raise validate.VdtTypeError(value)
     try:
