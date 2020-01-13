@@ -94,7 +94,10 @@ class Person(Model):
     max_borrow: T.Union[int, IntegerField] = IntegerField()
     pay_date: T.Union[datetime.date, DateField] = FormattedDateField(null=True)
     libraries: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # libraries as backref
-    borrows: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # borrows as backref
+
+    @property
+    def borrows(self):
+        return Borrow.select().where(Borrow.person == self, Borrow.is_back == False)
 
     repr_data = {
         'ein': 'eine',
