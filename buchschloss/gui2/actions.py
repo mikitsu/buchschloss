@@ -160,12 +160,13 @@ def search(form_cls, namespace: core.ActionNamespace, view_func):
             if isinstance(val_seq, str) or not isinstance(val_seq, collections.abc.Sequence):
                 val_seq = [val_seq]
             for v in val_seq:
-                if exact_match or isinstance(v, str):
+                if exact_match or not isinstance(v, str):
                     q = ((k, 'eq', v), search_mode, q)
                 else:
                     q = ((k, 'contains', v), search_mode, q)
 
         results = namespace.search(q)
+        print(q, kwargs)
         show_results(results, view_func)
 
     return generic_formbased_action('search', form_cls, search_callback, do_reset=False)
