@@ -31,16 +31,17 @@ def with_current_login():
     return inner
 
 
-def create_book(lib='main'):
+def create_book(library='main', **options):
     """create a Book with falsey values. The Library can be specified"""
-    return models.Book.create(isbn=0, author='', title='', language='', publisher='',
-                              year=0, medium='', shelf='', library=lib)
+    kwargs = dict(isbn=0, author='', title='', language='', publisher='',
+                  year=0, medium='', shelf='', library=library)
+    return models.Book.create(**{**kwargs, **options})
 
 
-def create_person(id_):
+def create_person(id_, **options):
     """create a Person with falsey values"""
-    return models.Person.create(id=id_, first_name='', last_name='',
-                                class_='', max_borrow=0)
+    kwargs = dict(id=id_, first_name='', last_name='', class_='', max_borrow=0)
+    return models.Person.create(**{**kwargs, **options})
 
 
 def for_levels(func, perm_level):
@@ -637,3 +638,52 @@ def test_member_view_str(db):
         'name': 'name',
         'level': utils.get_name('level_0'),
     }
+
+
+def test_borrow_new(db):
+    """test Borrow.new"""
+    def restitute(borrow_id):
+        b = models.Borrow.get_by_id(borrow_id)
+        b.is_back = True
+        b.save()
+
+    models.Misc.create(pk='latest_borrowers', data=[])
+    models.Library.create(name='main')
+    test_lib = models.Library.create(name='test-lib')
+    models.Library.create(name='no-pay', pay_required=False)
+    create_book()
+    create_book()
+    create_book('test-lib')
+    create_book('no-pay')
+    p = create_person(123, max_borrow=1, pay_date=datetime.date.today() - datetime.timedelta(weeks=52, days=-1),
+                      libraries=['main', 'no-pay'])
+    # follows config settings
+    for i in range(5):
+        core.current_login.level = i
+        with pytest.raises(core.BuchSchlossBaseError):
+            core.Borrow.new(1, 123, config.core.borrow_time_limit[i]+1)
+    weeks = config.core.borrow_time_limit[i]
+    core.Borrow.new(1, 123, weeks)
+    # correct data
+    assert len(models.Borrow.select()) == 1
+    assert models.Misc.get_by_id('latest_borrowers').data == [123]
+    b = models.Borrow.get_by_id(1)
+    assert b.person.id == 123
+    assert b.book.id == 1
+    assert b.return_date == datetime.date.today() + datetime.timedelta(weeks=weeks)
+    # respects Person.max_borrow
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Borrow.new(2, 123, weeks)
+    # respects libraries
+    restitute(1)
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Borrow.new(3, 123, weeks)
+    p.libraries.add(test_lib)
+    core.Borrow.new(3, 123, weeks)
+    restitute(2)
+    # respects pay_required and accepts keyword arguments
+    p.pay_date = datetime.date.today() - datetime.timedelta(weeks=52, days=1)
+    p.save()
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Borrow.new(person=123, book=2, weeks=weeks)
+    core.Borrow.new(person=123, book=4, weeks=weeks)
