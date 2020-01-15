@@ -226,9 +226,9 @@ class BorrowRestCommonForm(BaseForm, template=True):
 
 class BorrowForm(BorrowRestCommonForm):
     class FormWidget:
-        default_content = {'borrow_time': '4'}
+        default_content = {'weeks': '4'}
 
-    borrow_time: mtkf.Element = IntEntry
+    weeks: mtkf.Element = IntEntry
 
 
 class RestituteForm(BorrowRestCommonForm):
