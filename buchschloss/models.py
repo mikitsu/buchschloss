@@ -215,7 +215,7 @@ class Borrow(Model):
         - return_date: date by which the Book must de returned; Datum bis zu dem das Buch zurckgegeben sein muss
     """
     id: T.Union[int, IntegerField] = AutoField(primary_key=True)
-    person: Person = ForeignKeyField(Person, backref='borrows')
+    person: Person = ForeignKeyField(Person)
     book: Book = ForeignKeyField(Book)
     is_back: T.Union[bool, BooleanField] = BooleanField(default=False)
     return_date: T.Union[datetime.date, DateField] = FormattedDateField()
