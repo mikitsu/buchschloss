@@ -2,22 +2,21 @@
 
 import datetime
 import pytest
-import peewee
 
-from buchschloss import core, models, utils, config
+from buchschloss import config
 
-temp_test_db = peewee.SqliteDatabase(':memory:')
+config.core.mapping['database name'] = ':memory:'
+
+from buchschloss import core, models, utils
 
 
 @pytest.fixture  # adapted from http://docs.peewee-orm.com/en/3.1.0/peewee/api.html#Database.bind_ctx
 def db():
     """bind the models to the test database"""
-    with temp_test_db.bind_ctx(models.models):
-        temp_test_db.create_tables(models.models)
-        try:
-            yield
-        finally:
-            temp_test_db.drop_tables(models.models)
+    # since in-memory databases clear data when closing, we don't need an explicit drop_tables
+    models.db.create_tables(models.models)
+    with models.db:
+        yield
 
 
 @pytest.fixture
@@ -104,13 +103,9 @@ def test_misc_data(db):
     assert core.misc_data.test_pk_1 == [1, 2, 3]
     core.misc_data.test_pk_2 = 'test_string'
     assert models.Misc.get_by_id('test_pk_2').data == 'test_string'
-    models.db.connect()
     assert core.misc_data.test_pk_1 == [1, 2, 3]
-    assert models.db.close()
-    models.db.connect()
     core.misc_data.test_pk_1 += [4]
     assert core.misc_data.test_pk_1 == [1, 2, 3, 4]
-    assert models.db.close()
     with pytest.raises(AttributeError):
         core.misc_data.does_not_exist
     with pytest.raises(AttributeError):
