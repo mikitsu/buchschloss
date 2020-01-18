@@ -7,13 +7,14 @@ from buchschloss import config
 
 config.core.mapping['database name'] = ':memory:'
 
-from buchschloss import core, models, utils
+from buchschloss import core, models, utils  # noqa
 
 
-@pytest.fixture  # adapted from http://docs.peewee-orm.com/en/3.1.0/peewee/api.html#Database.bind_ctx
+@pytest.fixture
 def db():
     """bind the models to the test database"""
-    # since in-memory databases clear data when closing, we don't need an explicit drop_tables
+    # since in-memory databases clear data when closing,
+    # we don't need an explicit drop_tables
     models.db.create_tables(models.models)
     with models.db:
         yield
@@ -650,7 +651,9 @@ def test_borrow_new(db):
     create_book()
     create_book('test-lib')
     create_book('no-pay')
-    p = create_person(123, max_borrow=1, pay_date=datetime.date.today() - datetime.timedelta(weeks=52, days=-1),
+    p = create_person(123, max_borrow=1,
+                      pay_date=(datetime.date.today()
+                                - datetime.timedelta(weeks=52, days=-1)),
                       libraries=['main', 'no-pay'])
     # follows config settings
     for i in range(5):
