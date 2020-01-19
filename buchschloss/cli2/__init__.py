@@ -19,9 +19,12 @@ def restrict_runtime(runtime, whitelist):
             'table_2.nested.value':
             {'var_1': None, 'var_2': None, 'table_1': '*',
             'table_2': {'x': None, 'y': None, 'nested': ['value']}}
+
+            _G and _VERSION are implicit
     """
     gv = runtime.globals()
     lua_type = gv['type']
+    lua_version = gv['_VERSION']
 
     def allow_values(table, allowed):
         if allowed == '*':
@@ -33,4 +36,6 @@ def restrict_runtime(runtime, whitelist):
                 allow_values(v, allowed[k])
 
     allow_values(gv, whitelist)
+    gv['_G'] = gv
+    gv['_VERSION'] = lua_version
     return runtime
