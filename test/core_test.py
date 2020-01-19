@@ -25,6 +25,7 @@ def with_current_login():
     """work with functions needing the currently logged in members password"""
     def inner(func):
         core.current_login.password = core.pbkdf(b'current', b'')
+
         def wrapper(*args, **kwargs):
             return func(*args, current_password='current', **kwargs)
         return wrapper
@@ -395,15 +396,15 @@ def test_library_new(db):
     assert models.Library.get_by_id('testlib').pay_required
     core.Library.new('test-1', books=[1], people=[123])
     assert models.Book.get_by_id(1).library.name == 'test-1'
-    assert (tuple(models.Person.get_by_id(123).libraries)
-            == (models.Library.get_by_id('test-1'),))
+    assert (tuple(models.Person.get_by_id(123).libraries) ==
+            (models.Library.get_by_id('test-1'),))
     core.Library.new('test-2', books=(1, 2), people=[123, 456])
     assert models.Book.get_by_id(1).library.name == 'test-2'
     assert models.Book.get_by_id(1).library.name == 'test-2'
     assert (set(models.Person.get_by_id(123).libraries) ==
             {models.Library.get_by_id('test-1'), models.Library.get_by_id('test-2')})
-    assert (tuple(models.Person.get_by_id(456).libraries)
-            == (models.Library.get_by_id('test-2'),))
+    assert (tuple(models.Person.get_by_id(456).libraries) ==
+            (models.Library.get_by_id('test-2'),))
 
 
 def test_library_edit(db):
@@ -524,8 +525,8 @@ def test_group_edit(db):
     core.Group.edit(core.LibraryGroupAction.DELETE, 'group-1', ())
     assert not models.Book.get_by_id(1).groups
     assert not models.Book.get_by_id(2).groups
-    assert set() == {'group-1', 'group-2'} & set(models.Book.get_by_id(1).groups
-                                                 + models.Book.get_by_id(2).groups)
+    assert set() == {'group-1', 'group-2'} & set(models.Book.get_by_id(1).groups +
+                                                 models.Book.get_by_id(2).groups)
 
 
 def test_group_activate(db):
@@ -652,14 +653,14 @@ def test_borrow_new(db):
     create_book('test-lib')
     create_book('no-pay')
     p = create_person(123, max_borrow=1,
-                      pay_date=(datetime.date.today()
-                                - datetime.timedelta(weeks=52, days=-1)),
+                      pay_date=(datetime.date.today() -
+                                datetime.timedelta(weeks=52, days=-1)),
                       libraries=['main', 'no-pay'])
     # follows config settings
     for i in range(5):
         core.current_login.level = i
         with pytest.raises(core.BuchSchlossBaseError):
-            core.Borrow.new(1, 123, config.core.borrow_time_limit[i]+1)
+            core.Borrow.new(1, 123, config.core.borrow_time_limit[i] + 1)
     weeks = config.core.borrow_time_limit[i]
     core.Borrow.new(1, 123, weeks)
     # correct data
