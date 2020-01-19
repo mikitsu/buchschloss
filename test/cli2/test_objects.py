@@ -63,10 +63,26 @@ def test_action_ns():
             raise core.BuchSchlossBaseError('', '')
 
     rt = lupa.LuaRuntime()
-    ns_book = objects.LuaActionNS(Dummy(view_ns=view_ns), runtime=rt)
+    dummy = Dummy(view_ns=view_ns)
+    objects.LuaDataNS.specific_class[dummy] = None
+    ns_book = objects.LuaActionNS(dummy, runtime=rt)
     rt.globals()['book'] = ns_book
     with pytest.raises(AttributeError):
         rt.eval('book.view_str')
     assert rt.eval('book.view_ns') is not None
     assert rt.eval('book.view_ns(1)').data_ns is FLAG
     assert rt.eval('book.view_ns(2)') is None
+
+
+def test_data_ns():
+    rt = lupa.LuaRuntime()
+    dummy = Dummy(a=1, b=[1, 2, 3], c=Dummy(a='1', d=5), e=7)
+    objects.LuaDataNS.add_specific(Dummy, 'ad', 'b', {'c': Dummy})
+    ldn = objects.LuaDataNS.specific_class[Dummy](dummy, runtime=rt)
+    assert ldn.lua_get('a') == 1
+    assert list(ldn.lua_get('b')) == [1, 2, 3]
+    assert isinstance(ldn.lua_get('c'), objects.LuaDataNS)
+    assert ldn.lua_get('c').lua_get('d') == 5
+    assert ldn.lua_get('c').lua_get('a') == '1'
+    with pytest.raises(AttributeError):
+        ldn.lua_get('e')
