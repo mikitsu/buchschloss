@@ -24,6 +24,7 @@ from . import config
 
 class MyArgumentParser(argparse.ArgumentParser):
     """Raise a ParsingError when parsing fails"""
+
     def error(self, message):
         raise ParsingError(message)
 
@@ -124,6 +125,8 @@ def eval_val(val):
             return ast.literal_eval(val)
         except Exception:
             return val
+
+
 eval_val.last_result = None  # noqa
 
 
@@ -210,7 +213,7 @@ def help(name=None):
     elif name == 'commands':
         print('\n\n'.join('{}{}: {}'.format(
             n, getsig(f), (inspect.getdoc(f) or 'No docstring').split('\n\n')[0])
-                          for n, f in COMMANDS.items() if callable(f)))
+            for n, f in COMMANDS.items() if callable(f)))
         return
     elif name in COMMANDS:
         obj = COMMANDS[name]
