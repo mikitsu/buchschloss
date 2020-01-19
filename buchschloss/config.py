@@ -139,8 +139,8 @@ def start(noisy_success=True):
             """display errors"""
             for k, v in errors.items():
                 if isinstance(v, dict):
-                    print(nesting+'\\_', k)
-                    pprint_errors(v, nesting+' |')
+                    print(nesting + '\\_', k)
+                    pprint_errors(v, nesting + ' |')
                 else:
                     print(nesting, k, 'OK' if v else 'INVALID')
 
@@ -167,8 +167,8 @@ def start(noisy_success=True):
             config['gui2']['intro']['text'] = \
                 'Buchschloss\n\nhttps://github.com/mik2k2/buchschloss'
 
-        if ((config['utils']['email']['smtp']['username'] is None)
-                ^ (config['utils']['email']['smtp']['password'] is None)):
+        if ((config['utils']['email']['smtp']['username'] is None) ^
+                (config['utils']['email']['smtp']['password'] is None)):
             raise Exception('smtp.username and smtp.password must both be given or omitted')
         if noisy_success:
             print('YAY, no configuration errors found')
