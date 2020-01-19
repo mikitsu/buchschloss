@@ -2,22 +2,22 @@
 
 import datetime
 import pytest
-import peewee
 
-from buchschloss import core, models, utils, config
+from buchschloss import config
 
-temp_test_db = peewee.SqliteDatabase(':memory:')
+config.core.mapping['database name'] = ':memory:'
+
+from buchschloss import core, models, utils  # noqa
 
 
-@pytest.fixture  # adapted from http://docs.peewee-orm.com/en/3.1.0/peewee/api.html#Database.bind_ctx
+@pytest.fixture
 def db():
     """bind the models to the test database"""
-    with temp_test_db.bind_ctx(models.models):
-        temp_test_db.create_tables(models.models)
-        try:
-            yield
-        finally:
-            temp_test_db.drop_tables(models.models)
+    # since in-memory databases clear data when closing,
+    # we don't need an explicit drop_tables
+    models.db.create_tables(models.models)
+    with models.db:
+        yield
 
 
 @pytest.fixture
@@ -25,22 +25,23 @@ def with_current_login():
     """work with functions needing the currently logged in members password"""
     def inner(func):
         core.current_login.password = core.pbkdf(b'current', b'')
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs):  # noqa
             return func(*args, current_password='current', **kwargs)
         return wrapper
     return inner
 
 
-def create_book(lib='main'):
+def create_book(library='main', **options):
     """create a Book with falsey values. The Library can be specified"""
-    return models.Book.create(isbn=0, author='', title='', language='', publisher='',
-                              year=0, medium='', shelf='', library=lib)
+    kwargs = dict(isbn=0, author='', title='', language='', publisher='',
+                  year=0, medium='', shelf='', library=library)
+    return models.Book.create(**{**kwargs, **options})
 
 
-def create_person(id_):
+def create_person(id_, **options):
     """create a Person with falsey values"""
-    return models.Person.create(id=id_, first_name='', last_name='',
-                                class_='', max_borrow=0)
+    kwargs = dict(id=id_, first_name='', last_name='', class_='', max_borrow=0)
+    return models.Person.create(**{**kwargs, **options})
 
 
 def for_levels(func, perm_level):
@@ -103,13 +104,9 @@ def test_misc_data(db):
     assert core.misc_data.test_pk_1 == [1, 2, 3]
     core.misc_data.test_pk_2 = 'test_string'
     assert models.Misc.get_by_id('test_pk_2').data == 'test_string'
-    models.db.connect()
     assert core.misc_data.test_pk_1 == [1, 2, 3]
-    assert models.db.close()
-    models.db.connect()
     core.misc_data.test_pk_1 += [4]
     assert core.misc_data.test_pk_1 == [1, 2, 3, 4]
-    assert models.db.close()
     with pytest.raises(AttributeError):
         core.misc_data.does_not_exist
     with pytest.raises(AttributeError):
@@ -403,8 +400,8 @@ def test_library_new(db):
     core.Library.new('test-2', books=(1, 2), people=[123, 456])
     assert models.Book.get_by_id(1).library.name == 'test-2'
     assert models.Book.get_by_id(1).library.name == 'test-2'
-    assert (set(models.Person.get_by_id(123).libraries) ==
-            {models.Library.get_by_id('test-1'), models.Library.get_by_id('test-2')})
+    assert (set(models.Person.get_by_id(123).libraries)
+            == {models.Library.get_by_id('test-1'), models.Library.get_by_id('test-2')})
     assert (tuple(models.Person.get_by_id(456).libraries)
             == (models.Library.get_by_id('test-2'),))
 
@@ -635,5 +632,56 @@ def test_member_view_str(db):
     assert core.Member.view_str('name') == {
         '__str__': str(models.Member.get_by_id('name')),
         'name': 'name',
-        'level': utils.get_name('level_0'),
+        'level': utils.get_level(0),
     }
+
+
+def test_borrow_new(db):
+    """test Borrow.new"""
+    def restitute(borrow_id):
+        b = models.Borrow.get_by_id(borrow_id)
+        b.is_back = True
+        b.save()
+
+    models.Misc.create(pk='latest_borrowers', data=[])
+    models.Library.create(name='main')
+    test_lib = models.Library.create(name='test-lib')
+    models.Library.create(name='no-pay', pay_required=False)
+    create_book()
+    create_book()
+    create_book('test-lib')
+    create_book('no-pay')
+    p = create_person(123, max_borrow=1,
+                      pay_date=(datetime.date.today()
+                                - datetime.timedelta(weeks=52, days=-1)),
+                      libraries=['main', 'no-pay'])
+    # follows config settings
+    for i in range(5):
+        core.current_login.level = i
+        with pytest.raises(core.BuchSchlossBaseError):
+            core.Borrow.new(1, 123, config.core.borrow_time_limit[i] + 1)
+    weeks = config.core.borrow_time_limit[i]
+    core.Borrow.new(1, 123, weeks)
+    # correct data
+    assert len(models.Borrow.select()) == 1
+    assert models.Misc.get_by_id('latest_borrowers').data == [123]
+    b = models.Borrow.get_by_id(1)
+    assert b.person.id == 123
+    assert b.book.id == 1
+    assert b.return_date == datetime.date.today() + datetime.timedelta(weeks=weeks)
+    # respects Person.max_borrow
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Borrow.new(2, 123, weeks)
+    # respects libraries
+    restitute(1)
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Borrow.new(3, 123, weeks)
+    p.libraries.add(test_lib)
+    core.Borrow.new(3, 123, weeks)
+    restitute(2)
+    # respects pay_required and accepts keyword arguments
+    p.pay_date = datetime.date.today() - datetime.timedelta(weeks=52, days=1)
+    p.save()
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Borrow.new(person=123, book=2, weeks=weeks)
+    core.Borrow.new(person=123, book=4, weeks=weeks)

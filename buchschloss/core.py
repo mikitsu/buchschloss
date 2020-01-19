@@ -13,8 +13,9 @@ __all__ exports:
     - ComplexSearch: for very complex search queries
 """
 
+import inspect
 from hashlib import pbkdf2_hmac
-from functools import wraps, reduce, partial
+from functools import wraps, partial
 from datetime import datetime, timedelta, date
 from os import urandom
 import sys
@@ -27,6 +28,7 @@ import builtins
 import traceback
 import logging
 import logging.handlers
+
 try:
     # noinspection PyPep8Naming
     import typing as T
@@ -52,7 +54,7 @@ if log_conf.file:
     elif log_conf.rotate.how == 'size':
         handler = logging.handlers.RotatingFileHandler(
             log_conf.file,
-            maxBytes=2**10*log_conf.rotate.size,
+            maxBytes=2 ** 10 * log_conf.rotate.size,
             backupCount=log_conf.rotate.copy_count,
         )
     elif log_conf.rotate.how == 'time':
@@ -76,6 +78,7 @@ logging.basicConfig(level=getattr(logging, config.core.log.level),
 
 class MiscData:
     """Provide an easy interface for the Misc table."""
+
     def __getattr__(self, item):
         try:
             conn = models.db.connect(True)
@@ -103,6 +106,7 @@ class MiscData:
 
 class BuchSchlossBaseError(Exception):
     """Error raised in this module"""
+
     def __init__(self, title, message, *sink):
         if sink:
             warnings.warn('BuchSchlossBaseError.__init__ got unexpected arguments')
@@ -116,9 +120,11 @@ class BuchSchlossBaseError(Exception):
 
             *args are passed along, making this work well with BuchSchlossError
         """
+
         class BuchSchlossTemplateTitleError(cls):
             def __init__(self, title, message, *args):
                 super().__init__(template_title % title, message, *args)
+
         return BuchSchlossTemplateTitleError
 
     @classmethod
@@ -128,9 +134,11 @@ class BuchSchlossBaseError(Exception):
 
             *args are passed, making this work well with BuchSchlossError
         """
+
         class BuchSchlossTemplateMessageError(cls):
             def __init__(self, title, message, *args):
                 super().__init__(title, template_message % message, *args)
+
         return BuchSchlossTemplateMessageError
 
 
@@ -142,6 +150,7 @@ class BuchSchlossError(BuchSchlossBaseError):
         The message will be passed through utils.get_name and .format will
         be called with an optional tuple (unpacked) given
     """
+
     def __init__(self, title, message, *message_format):
         super().__init__(utils.get_name(title),
                          utils.get_name(message).format(*message_format))
@@ -149,10 +158,11 @@ class BuchSchlossError(BuchSchlossBaseError):
 
 class BuchSchlossPermError(BuchSchlossBaseError):
     """use utils.get_name for level and message name"""
+
     def __init__(self, level):
         super().__init__(utils.get_name('no_permission'),
                          utils.get_name('must_be_{}').format(
-                             utils.get_name('level_%i' % (level,))))
+                             utils.get_level(level)))
 
 
 class BuchSchlossNotFoundError(BuchSchlossError.template_title('%s_not_found')
@@ -169,8 +179,10 @@ class Dummy:  # TODO: move this out to misc
         _str: the string representation of self
         _call: a callable to call (default: return self)
         _bool: value to return when __bool__ is called
-        _items: mapping or sequence to delegate __getitem__ to. _default will be returned on Key, Index or AttributeError
+        _items: mapping or sequence to delegate __getitem__ to.
+            _default will be returned on Key, Index or AttributeError
     """
+
     def __init__(self, _bool=True, _call=lambda s, *a, **kw: s, **kwargs):
         """Set the attributes given in kwargs."""
         self._bool = _bool
@@ -213,13 +225,15 @@ class DummyErrorFile:
     Attributes:
         error_happened: True if write() was called
         error_file: the log file name
-        error_texts: list of the error messages wrote to the log file for later use (display, email, ...)"""
+        error_texts: list of the error messages wrote to the log file for later use
+            e.g. display, email, ..."""
+
     def __init__(self, error_file='error.log'):
         self.error_happened = False
         self.error_texts = []
         self.error_file = 'error.log'
         with open(error_file, 'a', encoding='UTF-8') as f:
-            f.write('\n\nSTART: '+str(datetime.now())+'\n')
+            f.write('\n\nSTART: ' + str(datetime.now()) + '\n')
 
     def write(self, msg):
         self.error_happened = True
@@ -232,8 +246,8 @@ class DummyErrorFile:
                 pass
             else:
                 break
-                
-                
+
+
 class LibraryGroupAction(enum.Enum):
     ADD = 'add'
     REMOVE = 'remove'
@@ -246,30 +260,37 @@ def pbkdf(pw, salt, iterations=config.core.hash_iterations[0]):
     return pbkdf2_hmac('sha256', pw, salt, iterations)
 
 
-def from_db(*arguments: T.Type[models.Model]):
+def from_db(*arguments: T.Type[models.Model], **keyword_arguments: T.Type[models.Model]):
     """Wrap functions taking IDs of database objects.
 
-    convert all arguments at their given position to wrapper_arg.get_by_id(func_arg)
-    ignore wrapper arguments of None
-    raise a BuchSchlossBaseError with an explanation if the object does not exist"""
+    convert all arguments to wrapper_arg.get_by_id(func_arg)
+    arguments may be given be position or by keyword;
+    they are converted independently of how they were passed to the wrapper
+    raise a BuchSchlossBaseError with an explanation if the object does not exist
+    """
+
     def wrapper_maker(f):
+        signature = inspect.signature(f)
+        pos_names = signature.parameters.keys()
+        for name, model in zip(pos_names, arguments):
+            keyword_arguments[name] = model
+
         @wraps(f)
         def wrapper(*args: T.Any, **kwargs):
-            args = list(args)
+            bound = signature.bind(*args, **kwargs)
             with models.db:
-                for p, m in enumerate(arguments):
-                    try:
-                        arg = args[p]
-                    except IndexError:
-                        raise TypeError('{!r} missing a positional parameter'.format(f))
-                    if m is not None and not isinstance(arg, m):  # allow direct passing
+                for k, m in keyword_arguments.items():
+                    arg = bound.arguments[k]
+                    if not isinstance(arg, m):  # allow direct passing
                         try:
-                            args[p] = m.get_by_id(arg)
+                            bound.arguments[k] = m.get_by_id(arg)
                         except m.DoesNotExist:
                             raise BuchSchlossNotFoundError(m.__name__, arg)
             with models.db.atomic():
-                return f(*args, **kwargs)
+                return f(*bound.args, **bound.kwargs)
+
         return wrapper
+
     return wrapper_maker
 
 
@@ -285,6 +306,7 @@ def check_level(level, resource):
 def level_required(level):
     """require the given level for executing the wrapped function.
     raise a BuchSchlossBaseError when requirement not met."""
+
     def wrapper_maker(f):
         checker = partial(check_level, level, f.__name__)
 
@@ -292,13 +314,16 @@ def level_required(level):
         def level_required_wrapper(*args, **kwargs):
             checker()
             return f(*args, **kwargs)
+
         return level_required_wrapper
+
     return wrapper_maker
 
 
 def auth_required(f):
     """require the currently logged member's password for executing the function
     raise a BuchSchlossBaseError if not given or wrong"""
+
     @wraps(f)
     def auth_required_wrapper(*args, current_password: str, **kwargs):
         if authenticate(current_login, current_password):
@@ -316,7 +341,7 @@ def auth_required(f):
         "logged in member's password\n")
     auth_required.functions.append(f.__name__)
     return auth_required_wrapper
-auth_required.functions = []
+auth_required.functions = []  # noqa
 
 
 def authenticate(m, password):
@@ -399,7 +424,7 @@ class ActionNamespace(abc.ABC):
     @classmethod
     def view_ns(cls, id_: T.Union[int, str]):
         """Return a namespace of information"""
-        check_level(cls.view_level, cls.__name__+'.view_ns')
+        check_level(cls.view_level, cls.__name__ + '.view_ns')
         try:
             return cls.model.get_by_id(id_)
         except cls.model.DoesNotExist:
@@ -408,7 +433,7 @@ class ActionNamespace(abc.ABC):
     @classmethod
     def view_repr(cls, id_: T.Union[str, int]) -> str:
         """Return a string representation"""
-        check_level(cls.view_level, cls.__name__+'.view_repr')
+        check_level(cls.view_level, cls.__name__ + '.view_repr')
         try:
             return str(next(iter(cls.model.select_str_fields().where(
                 getattr(cls.model, cls.model.pk_name) == id_))))
@@ -419,7 +444,7 @@ class ActionNamespace(abc.ABC):
     def view_attr(cls, id_: T.Union[str, int], name: str):
         """Return the value of a specific attribute"""
         # this is said to be faster...
-        check_level(cls.view_level, cls.__name__+'.view_attr')
+        check_level(cls.view_level, cls.__name__ + '.view_attr')
         try:
             return getattr(next(iter(cls.model.select(getattr(cls.model, name)).where(
                 getattr(cls.model, cls.model.pk_name) == id_))), name)
@@ -433,7 +458,7 @@ class ActionNamespace(abc.ABC):
                complex_action: str = None,
                ):
         """search for records. see search for details on arguments"""
-        check_level(cls.view_level, cls.__name__+'.search')
+        check_level(cls.view_level, cls.__name__ + '.search')
         return search(cls.model, condition, *complex_params,
                       complex_action=complex_action)
 
@@ -459,7 +484,7 @@ class Book(ActionNamespace):
         with models.db:
             try:
                 b = models.Book.create(
-                    isbn=isbn, author=author,title=title, language=language,
+                    isbn=isbn, author=author, title=title, language=language,
                     publisher=publisher, year=year, medium=medium,
                     shelf=shelf, series=series, series_number=series_number,
                     concerned_people=concerned_people, genres=genres,
@@ -498,7 +523,8 @@ class Book(ActionNamespace):
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', lib)
         for k, v in kwargs.items():
-            if isinstance(v, str) and not isinstance(getattr(models.Book, k), peewee.CharField):
+            if (isinstance(v, str)
+                    and not isinstance(getattr(models.Book, k), peewee.CharField)):
                 logging.warning('auto-type-conversion used')
                 v = type(getattr(book, k))(v)
             setattr(book, k, v)
@@ -526,7 +552,7 @@ class Book(ActionNamespace):
         r = {k: str(getattr(book, k) or '') for k in
              ('author', 'isbn', 'title', 'series', 'series_number', 'language',
               'publisher', 'concerned_people', 'year', 'medium', 'genres', 'shelf', 'id',
-             )}
+              )}
         r['library'] = book.library.name
         r['groups'] = ';'.join(g.name for g in book.groups)
         borrow = book.borrow or Dummy(id=None, _bool=False)
@@ -624,8 +650,7 @@ class Person(ActionNamespace):
             in the same order their representations appear in 'borrows'"""
         r = {k: str(getattr(person, k) or '') for k in
              'id first_name last_name class_ max_borrow pay_date'.split()}
-        borrows = search(models.Borrow, (('person', 'eq', person.id),
-                                         'and', ('is_back', 'eq', False)))
+        borrows = person.borrows
         r['borrows'] = tuple(map(str, borrows))
         r['borrow_book_ids'] = [b.book.id for b in borrows]
         r['libraries'] = ';'.join(L.name for L in person.libraries)
@@ -650,7 +675,7 @@ class Library(ActionNamespace):
 
             ``pay_required`` indicates whether people need to have paid
                 in order to borrow from the library
-            
+
             raise a BuchSchlossBaseError if the Library exists
         """
         with models.db:
@@ -734,7 +759,6 @@ class Library(ActionNamespace):
 
 
 class Group(ActionNamespace):
-
     """Namespace for Group-related functions"""
     model = models.Group
 
@@ -876,7 +900,7 @@ class Borrow(ActionNamespace):
                                    person, book.library.name)
         if (book.library.pay_required and (person.pay_date or date.min)
                 + timedelta(weeks=52) < date.today()):
-            raise BuchSchlossError('Borrow', 'Library_{}_needs_payment')
+            raise BuchSchlossError('Borrow', 'Library_{}_needs_payment', book.library)
         if len(person.borrows) >= person.max_borrow:
             raise BuchSchlossError('Borrow', '{}_has_reached_max_borrow', person)
         rdate = date.today() + timedelta(weeks=weeks)
@@ -1033,13 +1057,13 @@ class Member(ActionNamespace):
         return {
             '__str__': str(member),
             'name': member.name,
-            'level': utils.get_name('level_%s' % member.level),
+            'level': utils.get_level(member.level),
         }
 
 
 def search(o: T.Type[models.Model], condition: T.Tuple = None,
            *complex_params: 'ComplexSearch', complex_action: str = 'or',
-           _in_=None, _eq_=None):
+           ):
     """THIS IS AN INTERNAL FUNCTION -- for user searches, use *.search
 
         Search for objects.
@@ -1051,7 +1075,9 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
                 "lt" or "le")
                 in which case <a> is a (possibly dotted) string corresponding
                 to the attribute name and <b> is the model to compare to.
-            It may be empty, in which case it has no effect, i.e. always is True
+            It may be empty, in which case it has no effect, i.e. is True
+                when used with an 'and' and False when used with an 'or'
+            If the top-level condition is empty, all existing values are returned
         `complex_params` is a sequence of ComplexSearch instances to apply after
             executing the SQL SELECT
         `complex_action` is "and" or "or" and specifies how to handle multiple
@@ -1060,27 +1086,16 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
 
         Note: for `condition`, there is no "not" available.
             Use the inverse comparision operator instead
-
-        This function is compatible with its predecessor and will forward
-            `complex_params`, `_in_`, `_eq_` and `condition` (as `kind` argument)
-            to the old function.
     """
-    if isinstance(condition, str):
-        # call to old function
-        # noinspection PyDeprecation
-        return _search_old(o, condition, *complex_params, _in_=(_in_ or {}), _eq_=(_eq_ or {}))
-    if condition is None:
-        # call with default arg
-        # noinspection PyDeprecation
-        return _search_old(o, _eq_=(_eq_ or {}), _in_=(_in_ or {}))
 
     def follow_path(path, q):
         def handle_many_to_many():
             through = fv.through_model.alias()
-            return q.join(through, on=(getattr(fv.model, fv.model.pk_name)
-                                       == getattr(through, fv.model.__name__.lower() + '_id'))
-                          ).join(mod, on=(getattr(through, mod.__name__.lower() + '_id')
-                                          == getattr(mod, mod.pk_name)))
+            cond_1 = (getattr(fv.model, fv.model.pk_name)
+                      == getattr(through, fv.model.__name__.lower() + '_id'))
+            cond_2 = (getattr(through, mod.__name__.lower() + '_id')
+                      == getattr(mod, mod.pk_name))
+            return q.join(through, on=cond_1).join(mod, on=cond_2)
 
         *path, end = path.split('.')
         mod = o
@@ -1103,7 +1118,13 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
             return q
         a, op, b = cond
         if op in ('and', 'or'):
-            return getattr(operator, op+'_')(handle_condition(a, q), handle_condition(b, q))
+            if not a:
+                return handle_condition(b, q)
+            elif not b:
+                return handle_condition(a, q)
+            else:
+                return getattr(operator, op + '_')(handle_condition(a, q),
+                                                   handle_condition(b, q))
         else:
             a, q = follow_path(a, q)
             if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
@@ -1113,89 +1134,13 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
             else:
                 raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
                                  '"ge", "le" or "contains"')
+
     query = o.select(*o.str_fields)
     result = handle_condition(condition, query)
     if complex_params:
         return _do_complex_search(complex_action, result, complex_params)
     else:
         return result
-
-
-# noinspection PyDefaultArgument
-def _search_old(o: T.Type[models.Model], kind: str = 'or', *complex_params, _in_={}, _eq_={}):
-    """Search a model's objects.
-
-    `_in_` is a mapping of attribute name to model contained
-    `_eq_` is a mapping of attribute name to model equal
-    `complex_params` may be instances of ComplexSearch allowing complex queries.
-
-    While `_in_` and `_eq_` are processed at SQL level, the complex parameters
-    are handled after having made a query
-
-    The objects returned have enough data to be representable as strings.
-    If more data is needed, the appropriate view_* function may be called
-    """
-    warnings.warn('use the new *.search functions', DeprecationWarning, stacklevel=2)
-    req_level = next(i for i, mods in enumerate(
-        ((models.Book,), (models.Person, models.Borrow), (), models.Model.__subclasses__())) if o in mods)
-    if req_level > current_login.level:
-        raise BuchSchlossBaseError(utils.get_name('no_permission'),
-                                   utils.get_name('must_be_{}').format(
-                                   utils.get_level(req_level)))
-
-    def add_to_query(q):
-        nonlocal query
-        if kind == 'and':
-            query = q.switch(type(o))
-        elif kind == 'or':
-            query += q
-        else:
-            raise ValueError('`kind` must be "and" or "or"')
-
-    def handle_many_to_many(q, f):
-        # All I want to do is get the referenced
-        # instance. I couldn't find an easier way
-        # to do this, but I feel there should be one...
-        # there is: .rel_model
-        model = next(v_ for k_, v_ in f.through_model._meta.fields.items()
-                     if k_ not in ('id', k)).rel_field.model
-        q = q.join(f.through_model).join(model)
-        q = q.where(op(model._meta.primary_key, v))
-        add_to_query(q)
-
-    # INFO: this is not final
-    with models.db:
-        query = o.select(*o.str_fields)
-    conditions = []
-    for mapping, op in ((_in_, peewee.Field.contains), (_eq_, operator.eq)):
-        for k, v in mapping.items():
-            # django-filter-style, these keys might have been identifiers
-            k = k.replace('__', '.')
-            if '.' in k:
-                *path, end = k.split('.')
-                mod = o
-                q = query
-                for fk in path:
-                    mod = getattr(mod, fk).rel_model
-                    q = q.join(mod)
-                field = getattr(mod, end)
-                if isinstance(field, peewee.ManyToManyField):
-                    handle_many_to_many(q, field)
-                else:
-                    add_to_query(q.where(op(field, v)))
-            else:
-                f = getattr(o, k)
-                if isinstance(f, peewee.ManyToManyField):
-                    handle_many_to_many(query, f)
-                else:
-                    conditions.append(op(f, v))
-    if conditions:
-        query = query.where(reduce(
-            {'and': operator.and_, 'or': operator.or_}[kind], conditions))
-    if complex_params:
-        return _do_complex_search(kind, query, complex_params)
-    logging.info('{} performed a search for {}'.format(current_login, o))
-    return query
 
 
 def _do_complex_search(kind: str, objects: T.Iterable[models.Model], complex_params):
@@ -1220,10 +1165,11 @@ def _cs_lookup(name):
     def wrapper(self, other):
         self.lookups.append((name, other))
         return self
+
     return wrapper
 
 
-class ComplexSearch:
+class ComplexSearch:  # TODO: use misc.Instance for this
     """Allow complex lookups and comparisons when using search().
 
     To later perform attr and/or item lookups on objects when searching,
@@ -1234,20 +1180,27 @@ class ComplexSearch:
 
     to use iterations, call iter and perform the operations you would perform
         on the individual items on the return model
-    e.g.: [c['y'] for b in a for c in b.x] becomes iter(iter(ComplexSearch()).x)['y']  where `a` is the base instance
+    e.g.: [c['y'] for b in a for c in b.x] becomes iter(iter(ComplexSearch()).x)['y']
+    where `a` is the base instance
 
-    You can call a function on a lookup (or a sequence like above) by accessing the attribute ._call__<name>_
+    You can call a function on a lookup (or a sequence like above) by
+    accessing the attribute ._call__<name>_
         where name is a key in .CALLABLE_FUNCTIONS that maps to the desired function.
         Currently included by default are `min`, `max`, `all`, `any`, `len` and `sum`
-    e.g.: ``any(x in g.name for g in book.groups)`` becomes ``iter(ComplexSearch().groups).name._call__any_``;
-          ``sum(x == b.c for b in a) >= 3`` becomes ``(iter(ComplexSearch()).c == x)._call__sum_ >= 3``;
-          ``sum(any(a.b in x for a in c) for c in d) in y`` becomes ``(iter(c).b in x)._call__any_._call__sum_ in y``
+    e.g.: ``any(x in g.name for g in book.groups)`` becomes
+        ``iter(ComplexSearch().groups).name._call__any_``;
+          ``sum(x == b.c for b in a) >= 3`` becomes
+        ``(iter(ComplexSearch()).c == x)._call__sum_ >= 3``;
+          ``sum(any(a.b in x for a in c) for c in d) in y`` becomes
+          ``(iter(c).b in x)._call__any_._call__sum_ in y``
           bad-looking ~ complexity * use_of_functions ** 3
 
-    Comparisons also work if they are only supported by the known (not simulated) object **IF** the simulated one
+    Comparisons also work if they are only supported by the known (not simulated)
+    object **IF** the simulated one
         returns NotImplemented in the comparison function
     """
-    CALLABLE_FUNCTIONS = {k: getattr(builtins, k) for k in 'min max all any len sum'.split()}
+    CALLABLE_FUNCTIONS = {k: getattr(builtins, k) for k in
+                          'min max all any len sum'.split()}
 
     def __init__(self, return_first_item=True):
         """Initialise self.

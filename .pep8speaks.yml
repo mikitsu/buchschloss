@@ -1,0 +1,9 @@
+scanner:
+  diff_only: False
+  linter: flake8
+
+flake8:
+  max-line-length: 95
+  exclude: [misc]
+  ignore:
+    - W503  # line break before binary operator

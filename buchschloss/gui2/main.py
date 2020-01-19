@@ -10,11 +10,11 @@ import time
 import sys
 
 from ..misc import tkstuff as mtk
+
 try:
     from collections.abc import Mapping
 except ImportError:
     Mapping = dict
-
 
 from .. import core
 from .. import utils
@@ -53,7 +53,7 @@ class ActionTree:
         if self.action is None:
             widgets.ActionChoiceWidget(
                 app.center, ((k, CWFUR(v)) for k, v in self.subactions.items()),
-                horizontal=4+(len(self.subactions) < 6)).pack()
+                horizontal=4 + (len(self.subactions) < 6)).pack()
         else:
             return self.action(*args, **kwargs)
 
@@ -76,6 +76,7 @@ class App:
         .queue: actions to be executed separately from the tk event loop
         .root: the tk.Tk instance
     """
+
     def __init__(self):
         self.root = tk.Tk()
         self.root.protocol('WM_CLOSE_WINDOW', self.onexit)
@@ -139,16 +140,19 @@ class App:
             if (not config.debug
                     and sys.stderr.error_happened
                     and tk_msg.askokcancel(
-                    None, utils.get_name('send_error_report'))):
+                        None, utils.get_name('send_error_report'))):
                 try:
-                    utils.send_email(utils.get_name('error_in_buchschloss'), '\n\n\n'.join(sys.stderr.error_texts))
+                    utils.send_email(utils.get_name('error_in_buchschloss'),
+                                     '\n\n\n'.join(sys.stderr.error_texts))
                 except utils.requests.RequestException as e:
-                    tk_msg.showerror(None, '\n'.join((utils.get_name('error_while_sending_error_msg'), str(e))))
+                    tk_msg.showerror(None, '\n'.join((
+                        utils.get_name('error_while_sending_error_msg'), str(e))))
             self.root.destroy()
             sys.exit()
 
-    def my_event_handler(self):
-        """execute events outside of the tkinter event loop TODO: move this to a proper scheduler"""
+    def my_event_handler(self):  # TODO: move this to a proper scheduler
+        """execute events outside of the tkinter event loop"""
+
         # in theory, I shouldn't need this, but misc.ScrollableWidget
         # doesn't work without calling .set_scrollregion(),
         # which in turn can't be done from inside a tkinter callback
@@ -165,6 +169,7 @@ def late_hook(late, warn):
 
 def new_book_autofill(form):
     """automatically fill some information on a book"""
+
     def filler(event=None):
         if str(form) not in str(app.root.focus_get()):
             # going somewhere else
@@ -174,7 +179,8 @@ def new_book_autofill(form):
             tk_msg.showerror(message=isbn)
             isbn_field.focus()
             return
-        if not tk_msg.askyesno(utils.get_name('create_book'), utils.get_name('ask_isbn_autofill')):
+        if not tk_msg.askyesno(utils.get_name('create_book'),
+                               utils.get_name('ask_isbn_autofill')):
             return
         try:
             data = utils.get_book_data(isbn)
@@ -211,16 +217,16 @@ action_tree = ActionTree.from_map({
     },
     'edit': {k: generic_formbased_action('edit', FORMS[k], v.edit, fill_data=v.view_str)
              for k, v in {
-        'book': core.Book,
-        'person': core.Person,
-        'member': core.Member,
-        }.items()
-    },
+                 'book': core.Book,
+                 'person': core.Person,
+                 'member': core.Member,
+             }.items()
+    },  # noqa
     'search': {k: actions.search(FORMS[k], *v) for k, v in {
         'book': (core.Book, ShowInfoNS.book),
         'person': (core.Person, ShowInfoNS.person),
         'borrow_search': (core.Borrow, ShowInfoNS.borrow),
-        }.items()
+    }.items()
     },
     'borrow': actions.borrow_restitute(forms.BorrowForm, core.Borrow.new),
     'restitute': actions.borrow_restitute(forms.RestituteForm, core.Borrow.restitute),

@@ -27,9 +27,10 @@ def generic_formbased_action(form_type, form_cls, callback,
                              form_options={}, fill_data=None,
                              post_init=lambda f: None,
                              do_reset=True):
+    # TODO: make form_type an enum
     """perform a generic action
         Arguments:
-            form_type: 'new', 'edit' or 'search': used for the form group  TODO: make this an enum
+            form_type: 'new', 'edit' or 'search': used for the form group
             form_cls: the form class (subclass of misc.tkstuff.forms.Form)
             callback: the function to call on form submit with form data as keyword arguments
             form_options: optional dict of additional options for the form
@@ -156,14 +157,15 @@ def search(form_cls, namespace: core.ActionNamespace, view_func):
     """
     def search_callback(*, search_mode, exact_match, **kwargs):
         q = ()
-        for k, v in kwargs.items():
-            if isinstance(v, collections.abc.Sequence) and not isinstance(v, str):
-                v_ = v
-                for v in v_:
-                    if exact_match or isinstance(v, str):
-                        q = ((k, 'eq', v), search_mode, q)
-                    else:
-                        q = ((k, 'contains', v), search_mode, q)
+        for k, val_seq in kwargs.items():
+            if (isinstance(val_seq, str)
+                    or not isinstance(val_seq, collections.abc.Sequence)):
+                val_seq = [val_seq]
+            for v in val_seq:
+                if exact_match or not isinstance(v, str):
+                    q = ((k, 'eq', v), search_mode, q)
+                else:
+                    q = ((k, 'contains', v), search_mode, q)
 
         results = namespace.search(q)
         show_results(results, view_func)
@@ -265,8 +267,8 @@ class ShowInfoNS:
                 'text': utils.break_string(t, config.gui2.info_widget.item_length),
                 'command': partial(ShowInfoNS.book, i)})
              for t, i in zip(d['borrows'], d['borrow_book_ids'])],
-            )
-         },
+        )
+        },
         utils.get_name('view__person'),
         utils.get_name('id')
     )
@@ -316,7 +318,7 @@ def login():
 
 def view_late(late, warn):
     """show late books"""
-    show_results(warn+late, ShowInfoNS.borrow)
+    show_results(warn + late, ShowInfoNS.borrow)
 
 
 def borrow_restitute(form_cls, callback):
