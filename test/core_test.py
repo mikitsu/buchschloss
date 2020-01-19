@@ -632,7 +632,7 @@ def test_member_view_str(db):
     assert core.Member.view_str('name') == {
         '__str__': str(models.Member.get_by_id('name')),
         'name': 'name',
-        'level': utils.get_name('level_0'),
+        'level': utils.get_level(0),
     }
 
 

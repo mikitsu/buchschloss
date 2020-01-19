@@ -162,7 +162,7 @@ class BuchSchlossPermError(BuchSchlossBaseError):
     def __init__(self, level):
         super().__init__(utils.get_name('no_permission'),
                          utils.get_name('must_be_{}').format(
-                             utils.get_name('level_%i' % (level,))))
+                             utils.get_level(level)))
 
 
 class BuchSchlossNotFoundError(BuchSchlossError.template_title('%s_not_found')
@@ -1057,7 +1057,7 @@ class Member(ActionNamespace):
         return {
             '__str__': str(member),
             'name': member.name,
-            'level': utils.get_name('level_%s' % member.level),
+            'level': utils.get_level(member.level),
         }
 
 
@@ -1075,7 +1075,9 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
                 "lt" or "le")
                 in which case <a> is a (possibly dotted) string corresponding
                 to the attribute name and <b> is the model to compare to.
-            It may be empty, in which case it has no effect, i.e. always is True
+            It may be empty, in which case it has no effect, i.e. is True
+                when used with an 'and' and False when used with an 'or'
+            If the top-level condition is empty, all existing values are returned
         `complex_params` is a sequence of ComplexSearch instances to apply after
             executing the SQL SELECT
         `complex_action` is "and" or "or" and specifies how to handle multiple
@@ -1116,8 +1118,13 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
             return q
         a, op, b = cond
         if op in ('and', 'or'):
-            return getattr(operator, op + '_')(handle_condition(a, q),
-                                               handle_condition(b, q))
+            if not a:
+                return handle_condition(b, q)
+            elif not b:
+                return handle_condition(a, q)
+            else:
+                return getattr(operator, op + '_')(handle_condition(a, q),
+                                                   handle_condition(b, q))
         else:
             a, q = follow_path(a, q)
             if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):

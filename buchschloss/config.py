@@ -159,7 +159,7 @@ def start(noisy_success=True):
         except (OSError, json.JSONDecodeError):
             raise Exception('error reading name file')
         else:
-            config['utils']['names'] = name_data
+            config['utils']['names'].update(name_data)
 
         # multiline defaults aren't allowed (AFAIK)
         if config['gui2']['intro']['text'] is None:

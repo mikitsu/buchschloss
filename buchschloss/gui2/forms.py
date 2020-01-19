@@ -8,6 +8,7 @@ from ..misc.tkstuff import forms as mtkf
 
 from .. import config
 from .. import core
+from .. import utils
 from ..utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
@@ -120,11 +121,11 @@ class BookForm(SearchableForm):
     author: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-author'})
     title: mtkf.Element = NonEmptyEntry
     series: mtkf.Element = SeriesEntry
-    language: mtkf.Element = NonEmptyEntry
-    publisher: mtkf.Element = NonEmptyEntry
+    language: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-language'})
+    publisher: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-publisher'})
     concerned_people: mtkf.Element = (NullREntry, {'rem_key': 'book-cpeople'})
     year: mtkf.Element = IntEntry
-    medium: mtkf.Element = NonEmptyEntry
+    medium: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-medium'})
     genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
 
     library: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
@@ -163,7 +164,7 @@ class MemberForm(BaseForm):
 
     name: mtkf.Element = NonEmptyEntry
     level: mtkf.Element = (mtk.OptionChoiceWidget,
-                           {'values': get_name('level_list'),
+                           {'values': utils.get_level(),
                             'default': 1})
     current_password: mtkf.Element = NonEmptyPasswordEntry
     password: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
