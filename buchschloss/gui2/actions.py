@@ -158,8 +158,8 @@ def search(form_cls, namespace: core.ActionNamespace, view_func):
     def search_callback(*, search_mode, exact_match, **kwargs):
         q = ()
         for k, val_seq in kwargs.items():
-            if (isinstance(val_seq, str)
-                    or not isinstance(val_seq, collections.abc.Sequence)):
+            if (isinstance(val_seq, str) or
+                    not isinstance(val_seq, collections.abc.Sequence)):
                 val_seq = [val_seq]
             for v in val_seq:
                 if exact_match or not isinstance(v, str):
@@ -267,8 +267,8 @@ class ShowInfoNS:
                 'text': utils.break_string(t, config.gui2.info_widget.item_length),
                 'command': partial(ShowInfoNS.book, i)})
              for t, i in zip(d['borrows'], d['borrow_book_ids'])],
-            )
-         },
+        )
+        },
         utils.get_name('view__person'),
         utils.get_name('id')
     )
@@ -318,7 +318,7 @@ def login():
 
 def view_late(late, warn):
     """show late books"""
-    show_results(warn+late, ShowInfoNS.borrow)
+    show_results(warn + late, ShowInfoNS.borrow)
 
 
 def borrow_restitute(form_cls, callback):
