@@ -55,7 +55,7 @@ class BaseForm(mtkf.Form, template=True):
             if isinstance(c, type) and issubclass(c, tk.Entry):
                 values = autocompletes.get(k).mapping
                 if values:
-                    c = type('Autocompleted'+c.__name__, (mtk.AutocompleteEntry, c), {})
+                    c = type('Autocompleted' + c.__name__, (mtk.AutocompleteEntry, c), {})
                     o['autocompletes'] = values
                     setattr(cls, k, (c, o))
         super().__init_subclass__(template=template, **kwargs)
@@ -79,8 +79,8 @@ class SearchableForm(BaseForm, template=True):
                 w = list(self.widgets)
                 for k, v in self.widget_dict.copy().items():
                     value = mtk.get_getter(v)()
-                    if not (value or isinstance(value, bool)
-                            or k in ['exact_match', 'search_mode']):
+                    if not (value or isinstance(value, bool) or
+                            k in ['exact_match', 'search_mode']):
                         w.remove(self.widget_dict.pop(k))
                 self.widgets = tuple(w)
             super().submit_action(event)
