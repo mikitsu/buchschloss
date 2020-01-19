@@ -10,11 +10,11 @@ import time
 import sys
 
 from ..misc import tkstuff as mtk
+
 try:
     from collections.abc import Mapping
 except ImportError:
     Mapping = dict
-
 
 from .. import core
 from .. import utils
@@ -53,7 +53,7 @@ class ActionTree:
         if self.action is None:
             widgets.ActionChoiceWidget(
                 app.center, ((k, CWFUR(v)) for k, v in self.subactions.items()),
-                horizontal=4+(len(self.subactions) < 6)).pack()
+                horizontal=4 + (len(self.subactions) < 6)).pack()
         else:
             return self.action(*args, **kwargs)
 
@@ -140,7 +140,7 @@ class App:
             if (not config.debug
                     and sys.stderr.error_happened
                     and tk_msg.askokcancel(
-                    None, utils.get_name('send_error_report'))):
+                        None, utils.get_name('send_error_report'))):
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
@@ -169,6 +169,7 @@ def late_hook(late, warn):
 
 def new_book_autofill(form):
     """automatically fill some information on a book"""
+
     def filler(event=None):
         if str(form) not in str(app.root.focus_get()):
             # going somewhere else
@@ -216,17 +217,17 @@ action_tree = ActionTree.from_map({
     },
     'edit': {k: generic_formbased_action('edit', FORMS[k], v.edit, fill_data=v.view_str)
              for k, v in {
-        'book': core.Book,
-        'person': core.Person,
-        'member': core.Member,
-    }.items()
-    },
+                 'book': core.Book,
+                 'person': core.Person,
+                 'member': core.Member,
+             }.items()
+             },
     'search': {k: actions.search(FORMS[k], *v) for k, v in {
         'book': (core.Book, ShowInfoNS.book),
         'person': (core.Person, ShowInfoNS.person),
         'borrow_search': (core.Borrow, ShowInfoNS.borrow),
     }.items()
-    },
+               },
     'borrow': actions.borrow_restitute(forms.BorrowForm, core.Borrow.new),
     'restitute': actions.borrow_restitute(forms.RestituteForm, core.Borrow.restitute),
 })

@@ -122,7 +122,8 @@ def start(noisy_success=True):
         raise Exception('environment variable BUCHSCHLOSS_CONFIG not found') from None
     try:
         config = configobj.ConfigObj(filename,
-                                     configspec=os.path.join(MODULE_DIR, 'configspec.cfg'),
+                                     configspec=os.path.join(MODULE_DIR,
+                                                             'configspec.cfg'),
                                      file_error=True
                                      )
     except (configobj.ConfigObjError, IOError) as e:
@@ -139,8 +140,8 @@ def start(noisy_success=True):
             """display errors"""
             for k, v in errors.items():
                 if isinstance(v, dict):
-                    print(nesting+'\\_', k)
-                    pprint_errors(v, nesting+' |')
+                    print(nesting + '\\_', k)
+                    pprint_errors(v, nesting + ' |')
                 else:
                     print(nesting, k, 'OK' if v else 'INVALID')
 

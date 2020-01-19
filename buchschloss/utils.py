@@ -59,11 +59,11 @@ class FormattedDate(date):
 def run_checks():
     """Run stuff to do as specified by times set in config"""
     while True:
-        if datetime.now() > core.misc_data.check_date+timedelta(minutes=45):
+        if datetime.now() > core.misc_data.check_date + timedelta(minutes=45):
             for stuff in stuff_to_do:
                 threading.Thread(target=stuff).start()
             core.misc_data.check_date = datetime.now() + config.utils.tasks.repeat_every
-        time.sleep(5*60*60)
+        time.sleep(5 * 60 * 60)
 
 
 def late_books():
@@ -77,7 +77,7 @@ def late_books():
     today = date.today()
     for b in core.Borrow.search((
             ('is_back', 'eq', False),
-            'and', ('return_date', 'gt', today+config.utils.late_books_warn_time))):
+            'and', ('return_date', 'gt', today + config.utils.late_books_warn_time))):
         if b.return_date < today:
             late.append(b)
         else:
@@ -93,10 +93,10 @@ def backup():
     """
     backup_shift(os, config.utils.tasks.backup_depth)
     if config.utils.tasks.secret_key is None:
-        shutil.copyfile(config.core.database_name, config.core.database_name+'.1')
+        shutil.copyfile(config.core.database_name, config.core.database_name + '.1')
     else:
         data = get_encrypted_database()
-        with open(config.core.database_name+'.1', 'wb') as f:
+        with open(config.core.database_name + '.1', 'wb') as f:
             f.write(data)
 
 
@@ -131,7 +131,7 @@ def web_backup():
     with ftputil.FTPHost(conf.ftp.host, conf.ftp.username, conf.ftp.password,
                          session_factory=factory, use_list_a_option=False) as host:
         backup_shift(host, conf.tasks.web_backup_depth)
-        host.upload(upload_path, config.core.database_name+'.1')
+        host.upload(upload_path, config.core.database_name + '.1')
     if file is not None:
         os.unlink(file.name)
 
@@ -146,7 +146,7 @@ def backup_shift(fs, depth):
         pass
     for f in range(depth, 1, -1):
         try:
-            fs.rename(number_name(f-1), number_name(f))
+            fs.rename(number_name(f - 1), number_name(f))
         except FileNotFoundError:
             pass
 
@@ -205,8 +205,9 @@ def get_name(internal: str):
                 raise TypeError('{!r} is neither dict nor str'.format(val))
         except KeyError:
             pass
-    logging.warning('Name "{}" was not found in the namefile'.format('::'.join(path+[name])))
-    return '::'.join(path+[name])
+    logging.warning(
+        'Name "{}" was not found in the namefile'.format('::'.join(path + [name])))
+    return '::'.join(path + [name])
 
 
 def break_string(text, size, break_char=string.punctuation, cut_char=string.whitespace):
@@ -228,9 +229,9 @@ def break_string(text, size, break_char=string.punctuation, cut_char=string.whit
                 break
             i -= 1
         else:
-            i = size-1
+            i = size - 1
         i += 1
-        r.append(text[:i-cut])
+        r.append(text[:i - cut])
         text = text[i:]
     r.append(text)
     return '\n'.join(r)
@@ -267,7 +268,7 @@ def get_book_data(isbn: int):
         if link_to_first is None:
             raise core.BuchSchlossError(
                 'Book_not_found', 'Book_with_ISBN_{}_not_in_DNB', isbn)
-        r = requests.get('https://portal.dnb.de'+link_to_first['href'])
+        r = requests.get('https://portal.dnb.de' + link_to_first['href'])
         page = bs4.BeautifulSoup(r.text)
         table = page.select_one('#fullRecordTable')
 
@@ -285,7 +286,7 @@ def get_book_data(isbn: int):
                     if g[1] == 'Verfasser':
                         results['author'] = g[0]
                     else:
-                        results['concerned_people'].append(g[1]+': '+g[0])
+                        results['concerned_people'].append(g[1] + ': ' + g[0])
             elif td[0] == 'Verlag':
                 results['publisher'] = td[1].split(':')[1].strip()
             elif td[0] == 'Zeitliche Einordnung':
@@ -309,7 +310,7 @@ def _default_late_handler(late, warn):
     with open('late.txt', 'w') as f:
         f.write(head)
         f.write('\n'.join(str(L) for L in late))
-    with open('warn.txt',  'w') as f:
+    with open('warn.txt', 'w') as f:
         f.write(head)
         f.write('\n'.join(str(w) for w in warn))
 

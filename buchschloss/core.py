@@ -28,6 +28,7 @@ import builtins
 import traceback
 import logging
 import logging.handlers
+
 try:
     # noinspection PyPep8Naming
     import typing as T
@@ -53,7 +54,7 @@ if log_conf.file:
     elif log_conf.rotate.how == 'size':
         handler = logging.handlers.RotatingFileHandler(
             log_conf.file,
-            maxBytes=2**10*log_conf.rotate.size,
+            maxBytes=2 ** 10 * log_conf.rotate.size,
             backupCount=log_conf.rotate.copy_count,
         )
     elif log_conf.rotate.how == 'time':
@@ -119,9 +120,11 @@ class BuchSchlossBaseError(Exception):
 
             *args are passed along, making this work well with BuchSchlossError
         """
+
         class BuchSchlossTemplateTitleError(cls):
             def __init__(self, title, message, *args):
                 super().__init__(template_title % title, message, *args)
+
         return BuchSchlossTemplateTitleError
 
     @classmethod
@@ -131,9 +134,11 @@ class BuchSchlossBaseError(Exception):
 
             *args are passed, making this work well with BuchSchlossError
         """
+
         class BuchSchlossTemplateMessageError(cls):
             def __init__(self, title, message, *args):
                 super().__init__(title, template_message % message, *args)
+
         return BuchSchlossTemplateMessageError
 
 
@@ -228,7 +233,7 @@ class DummyErrorFile:
         self.error_texts = []
         self.error_file = 'error.log'
         with open(error_file, 'a', encoding='UTF-8') as f:
-            f.write('\n\nSTART: '+str(datetime.now())+'\n')
+            f.write('\n\nSTART: ' + str(datetime.now()) + '\n')
 
     def write(self, msg):
         self.error_happened = True
@@ -263,6 +268,7 @@ def from_db(*arguments: T.Type[models.Model], **keyword_arguments: T.Type[models
     they are converted independently of how they were passed to the wrapper
     raise a BuchSchlossBaseError with an explanation if the object does not exist
     """
+
     def wrapper_maker(f):
         signature = inspect.signature(f)
         pos_names = signature.parameters.keys()
@@ -282,7 +288,9 @@ def from_db(*arguments: T.Type[models.Model], **keyword_arguments: T.Type[models
                             raise BuchSchlossNotFoundError(m.__name__, arg)
             with models.db.atomic():
                 return f(*bound.args, **bound.kwargs)
+
         return wrapper
+
     return wrapper_maker
 
 
@@ -298,6 +306,7 @@ def check_level(level, resource):
 def level_required(level):
     """require the given level for executing the wrapped function.
     raise a BuchSchlossBaseError when requirement not met."""
+
     def wrapper_maker(f):
         checker = partial(check_level, level, f.__name__)
 
@@ -305,13 +314,16 @@ def level_required(level):
         def level_required_wrapper(*args, **kwargs):
             checker()
             return f(*args, **kwargs)
+
         return level_required_wrapper
+
     return wrapper_maker
 
 
 def auth_required(f):
     """require the currently logged member's password for executing the funcion
     raise a BuchSchlossBaseError if not given or wrong"""
+
     @wraps(f)
     def auth_required_wrapper(*args, current_password: str, **kwargs):
         if authenticate(current_login, current_password):
@@ -329,6 +341,8 @@ def auth_required(f):
         "logged in member's password\n")
     auth_required.functions.append(f.__name__)
     return auth_required_wrapper
+
+
 auth_required.functions = []  # noqa
 
 
@@ -412,7 +426,7 @@ class ActionNamespace(abc.ABC):
     @classmethod
     def view_ns(cls, id_: T.Union[int, str]):
         """Return a namespace of information"""
-        check_level(cls.view_level, cls.__name__+'.view_ns')
+        check_level(cls.view_level, cls.__name__ + '.view_ns')
         try:
             return cls.model.get_by_id(id_)
         except cls.model.DoesNotExist:
@@ -421,7 +435,7 @@ class ActionNamespace(abc.ABC):
     @classmethod
     def view_repr(cls, id_: T.Union[str, int]) -> str:
         """Return a string representation"""
-        check_level(cls.view_level, cls.__name__+'.view_repr')
+        check_level(cls.view_level, cls.__name__ + '.view_repr')
         try:
             return str(next(iter(cls.model.select_str_fields().where(
                 getattr(cls.model, cls.model.pk_name) == id_))))
@@ -432,7 +446,7 @@ class ActionNamespace(abc.ABC):
     def view_attr(cls, id_: T.Union[str, int], name: str):
         """Return the value of a specific attribute"""
         # this is said to be faster...
-        check_level(cls.view_level, cls.__name__+'.view_attr')
+        check_level(cls.view_level, cls.__name__ + '.view_attr')
         try:
             return getattr(next(iter(cls.model.select(getattr(cls.model, name)).where(
                 getattr(cls.model, cls.model.pk_name) == id_))), name)
@@ -446,7 +460,7 @@ class ActionNamespace(abc.ABC):
                complex_action: str = None,
                ):
         """search for records. see search for details on arguments"""
-        check_level(cls.view_level, cls.__name__+'.search')
+        check_level(cls.view_level, cls.__name__ + '.search')
         return search(cls.model, condition, *complex_params,
                       complex_action=complex_action)
 
@@ -747,7 +761,6 @@ class Library(ActionNamespace):
 
 
 class Group(ActionNamespace):
-
     """Namespace for Group-related functions"""
     model = models.Group
 
@@ -1079,7 +1092,8 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
         def handle_many_to_many():
             through = fv.through_model.alias()
             return q.join(through, on=(getattr(fv.model, fv.model.pk_name)
-                                       == getattr(through, fv.model.__name__.lower() + '_id'))
+                                       == getattr(through,
+                                                  fv.model.__name__.lower() + '_id'))
                           ).join(mod, on=(getattr(through, mod.__name__.lower() + '_id')
                                           == getattr(mod, mod.pk_name)))
 
@@ -1104,7 +1118,8 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
             return q
         a, op, b = cond
         if op in ('and', 'or'):
-            return getattr(operator, op+'_')(handle_condition(a, q), handle_condition(b, q))
+            return getattr(operator, op + '_')(handle_condition(a, q),
+                                               handle_condition(b, q))
         else:
             a, q = follow_path(a, q)
             if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
@@ -1114,6 +1129,7 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
             else:
                 raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
                                  '"ge", "le" or "contains"')
+
     query = o.select(*o.str_fields)
     result = handle_condition(condition, query)
     if complex_params:
@@ -1144,6 +1160,7 @@ def _cs_lookup(name):
     def wrapper(self, other):
         self.lookups.append((name, other))
         return self
+
     return wrapper
 
 
@@ -1177,7 +1194,8 @@ class ComplexSearch:  # TODO: use misc.Instance for this
     object **IF** the simulated one
         returns NotImplemented in the comparison function
     """
-    CALLABLE_FUNCTIONS = {k: getattr(builtins, k) for k in 'min max all any len sum'.split()}
+    CALLABLE_FUNCTIONS = {k: getattr(builtins, k) for k in
+                          'min max all any len sum'.split()}
 
     def __init__(self, return_first_item=True):
         """Initialise self.

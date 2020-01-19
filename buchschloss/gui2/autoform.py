@@ -51,5 +51,5 @@ if __name__ == '__main__':
         with open(args.output, 'w', encoding=args.encoding) as f:
             f.write(result)
     else:
-        with open(args.file+'.autogen') as f:
+        with open(args.file + '.autogen') as f:
             f.write(result)

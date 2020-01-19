@@ -18,7 +18,7 @@ parser.add_argument('--no-tasks', action='store_false', dest='do_tasks',
 args = parser.parse_args()
 
 try:
-    mod = import_module('.'+args.interface, __package__)
+    mod = import_module('.' + args.interface, __package__)
 except ImportError:
     raise ImportError("interface couldn't be located. Did you run with the -m flag?")
 

@@ -32,15 +32,15 @@ def clean_isbn(user_isbn: str) -> T.Sequence[int]:
 def check_isbn(isbn: T.Sequence[int]) -> int:
     weighted_isbn = functools.partial(zip, itertools.cycle((1, 3)))
     if len(isbn) == 10:
-        if (sum((10-i)*x for i, x in enumerate(isbn)) % 11
-                or sum(i*x for i, x in enumerate(isbn, 1)) % 11):
+        if (sum((10 - i) * x for i, x in enumerate(isbn)) % 11
+                or sum(i * x for i, x in enumerate(isbn, 1)) % 11):
             raise ValueError
         else:
             isbn = [9, 7, 8] + list(isbn[:-1])
-            isbn.append(-sum(w*d for w, d in weighted_isbn(isbn)) % 10)
+            isbn.append(-sum(w * d for w, d in weighted_isbn(isbn)) % 10)
             return int(''.join(map(str, isbn)))
     elif len(isbn) == 13:
-        if sum(w*d for w, d in weighted_isbn(isbn)) % 10:
+        if sum(w * d for w, d in weighted_isbn(isbn)) % 10:
             raise ValueError
         else:
             return int(''.join(map(str, isbn)))

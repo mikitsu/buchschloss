@@ -318,7 +318,7 @@ def login():
 
 def view_late(late, warn):
     """show late books"""
-    show_results(warn+late, ShowInfoNS.borrow)
+    show_results(warn + late, ShowInfoNS.borrow)
 
 
 def borrow_restitute(form_cls, callback):
