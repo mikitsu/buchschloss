@@ -45,8 +45,11 @@ NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_o
 
 class SeriesEntry(mtk.ContainingWidget):
     """Entry combining a name for the series and an integer input for the number"""
+
     def __init__(self, master, **kw):
-        self.number_dummy = core.Dummy(set=self.set_number, get=lambda: 1, validate=lambda: (1, 0))
+        self.number_dummy = core.Dummy(set=self.set_number,
+                                       get=lambda: 1,
+                                       validate=lambda: (1, 0))
         widgets = [
             (NullREntry, {'rem_key': 'book-series'}),
             (NullIntEntry, {'width': 2}),
@@ -87,7 +90,9 @@ class ActionChoiceWidget(mtk.ContainingWidget):
 
 class OptionsFromSearch(mtk.OptionChoiceWidget):
     """an option widget that gets its options from search results"""
-    def __init__(self, master, *, action_ns: core.ActionNamespace = None, attribute='name', **kwargs):
+
+    def __init__(self, master, *, action_ns: core.ActionNamespace = None,
+                 attribute='name', **kwargs):
         values = [(getattr(o, attribute), str(o)) for o in action_ns.search(())]
         super().__init__(master, values=values, **kwargs)
 
@@ -121,7 +126,7 @@ class OptionalCheckbuttonWithVar(CheckbuttonWithVar):
         super().__init__(*args, **kwargs)
         self.state(['alternate'])
         self.is_alternate = True
-        self.variable.trace('w', lambda *a, s=self:setattr(s, 'is_alternate', False))
+        self.variable.trace('w', lambda *a, s=self: setattr(s, 'is_alternate', False))
 
     def get(self):
         if self.is_alternate:
@@ -140,8 +145,10 @@ class OptionalCheckbuttonWithVar(CheckbuttonWithVar):
 class ActivatingListbox(tk.Listbox):
     """a Listbox that allows initial items, possibly already activated
         additional options: exportselection=False, selectmode=tk.MULTIPLE"""
+
     def __init__(self, master, cfg={}, values=(), activate=(), **kwargs):
-        super().__init__(master, cfg, exportselection=False, selectmode=tk.MULTIPLE, **kwargs)
+        super().__init__(master, cfg, exportselection=False,
+                         selectmode=tk.MULTIPLE, **kwargs)
         self.insert(0, *values)
         for i in activate:
             self.select_set(i)
@@ -149,7 +156,8 @@ class ActivatingListbox(tk.Listbox):
 
 def get_scrolled_listbox(master, listbox=tk.Listbox, **listbox_kwargs):
     """a Listbox that includes its Scrollbar"""
-    inst: T.Union[listbox, mtk.WrappedWidget] = mtk.WrappedWidget(master, (listbox, listbox_kwargs), (tk.Scrollbar, {}))
+    inst: T.Union[listbox, mtk.WrappedWidget] = \
+        mtk.WrappedWidget(master, (listbox, listbox_kwargs), (tk.Scrollbar, {}))
     inst.scrollbar = inst.container.widgets[1]
     inst['yscrollcommand'] = inst.scrollbar.set
     inst.scrollbar['command'] = inst.yview
@@ -165,6 +173,7 @@ class ScrolledListbox(tk.Listbox):
 class MultiChoicePopup(tk.Button):
     """Button that displays a multi-choice listbox popup dialog on click"""
     # TODO: move to misc
+
     def __init__(self, master, cnf={}, options=(), **kwargs):
         """create a new MultiChoicePopup
 
@@ -206,9 +215,10 @@ class MultiChoicePopup(tk.Button):
 
 class SearchMultiChoice(MultiChoicePopup):
     """MultiChoicePopup that gets values from searches"""
+
     def __init__(self, master, cnf={}, *, action_ns=None, attribute='name', **kwargs):
         options = [(getattr(o, attribute), str(o)) for o in action_ns.search(())]
-        super().__init__(master, cnf, options=options)
+        super().__init__(master, cnf, options=options, **kwargs)
 
     def action(self, event=None):
         """update the text"""
@@ -216,7 +226,11 @@ class SearchMultiChoice(MultiChoicePopup):
         self.set_text()
 
     def set(self, values):
-        """update text. If ``values`` is a non-empty string, split it on ';' before passing to super()"""
+        """update text.
+
+            If ``values`` is a non-empty string,
+            split it on ';' before passing to super()
+        """
         if isinstance(values, str):
             if values:
                 values = values.split(';')
@@ -259,7 +273,8 @@ class SearchResultWidget(mtk.ContainingWidget):
         widgets = [(Label, {'text': utils.get_name('{}_results').format(len(results))})]
         for r in results:
             widgets.append((Button, {
-                'text': utils.break_string(str(r), config.gui2.search_result_widget.item_length),
+                'text': utils.break_string(str(r),
+                                           config.gui2.search_result_widget.item_length),
                 'command': partial(view_func, r.id)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))
 

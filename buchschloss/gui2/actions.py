@@ -27,9 +27,10 @@ def generic_formbased_action(form_type, form_cls, callback,
                              form_options={}, fill_data=None,
                              post_init=lambda f: None,
                              do_reset=True):
+    # TODO: make form_type an enum
     """perform a generic action
         Arguments:
-            form_type: 'new', 'edit' or 'search': used for the form group  TODO: make this an enum
+            form_type: 'new', 'edit' or 'search': used for the form group
             form_cls: the form class (subclass of misc.tkstuff.forms.Form)
             callback: the function to call on form submit with form data as keyword arguments
             form_options: optional dict of additional options for the form
@@ -266,8 +267,8 @@ class ShowInfoNS:
                 'text': utils.break_string(t, config.gui2.info_widget.item_length),
                 'command': partial(ShowInfoNS.book, i)})
              for t, i in zip(d['borrows'], d['borrow_book_ids'])],
-            )
-         },
+        )
+        },
         utils.get_name('view__person'),
         utils.get_name('id')
     )
@@ -317,7 +318,7 @@ def login():
 
 def view_late(late, warn):
     """show late books"""
-    show_results(warn+late, ShowInfoNS.borrow)
+    show_results(warn + late, ShowInfoNS.borrow)
 
 
 def borrow_restitute(form_cls, callback):

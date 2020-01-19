@@ -121,10 +121,9 @@ def start(noisy_success=True):
     except KeyError:
         raise Exception('environment variable BUCHSCHLOSS_CONFIG not found') from None
     try:
-        config = configobj.ConfigObj(filename,
-                                     configspec=os.path.join(MODULE_DIR, 'configspec.cfg'),
-                                     file_error=True
-                                     )
+        config = configobj.ConfigObj(
+            filename, configspec=os.path.join(MODULE_DIR, 'configspec.cfg'),
+            file_error=True)
     except (configobj.ConfigObjError, IOError) as e:
         raise Exception('error reading {}: {}'.format(filename, e))
     # WORKAROUND: since configObj doesn't support optional sections / unspecified keys
@@ -139,8 +138,8 @@ def start(noisy_success=True):
             """display errors"""
             for k, v in errors.items():
                 if isinstance(v, dict):
-                    print(nesting+'\\_', k)
-                    pprint_errors(v, nesting+' |')
+                    print(nesting + '\\_', k)
+                    pprint_errors(v, nesting + ' |')
                 else:
                     print(nesting, k, 'OK' if v else 'INVALID')
 
@@ -164,7 +163,8 @@ def start(noisy_success=True):
 
         # multiline defaults aren't allowed (AFAIK)
         if config['gui2']['intro']['text'] is None:
-            config['gui2']['intro']['text'] = 'Buchschloss\n\nhttps://github.com/mik2k2/buchschloss'
+            config['gui2']['intro']['text'] = \
+                'Buchschloss\n\nhttps://github.com/mik2k2/buchschloss'
 
         if ((config['utils']['email']['smtp']['username'] is None)
                 ^ (config['utils']['email']['smtp']['password'] is None)):

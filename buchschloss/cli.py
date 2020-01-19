@@ -13,7 +13,7 @@ import operator
 import datetime
 try:
     # on linux (all? some?), importing will make arrow keys usable
-    import readline
+    import readline  # noqa
 except ImportError:
     pass
 
@@ -71,7 +71,7 @@ def execute(command, args, kwargs):
             kwargs['current_password'] = getpass.getpass(utils.get_name('current_password'))
         for i, name in enumerate(f_args):
             if 'password' in name:
-                passwd = getpass.getpass(utils.get_name(name)+': ')
+                passwd = getpass.getpass(utils.get_name(name) + ': ')
                 args.insert(i, passwd)
     try:
         return func(*args, **kwargs)
@@ -124,7 +124,7 @@ def eval_val(val):
             return ast.literal_eval(val)
         except Exception:
             return val
-eval_val.last_result = None
+eval_val.last_result = None  # noqa
 
 
 def read_input(prompt):
@@ -177,11 +177,13 @@ def start():
                 print(e.__class__.__name__, e)
     except ExitException:
         if not config.debug and sys.stderr.error_happened:
-            if input(utils.get_name('send_error_report')+'\n')[0] in 'yYjJ':
+            if input(utils.get_name('send_error_report') + '\n')[0] in 'yYjJ':
                 try:
-                    utils.send_email(utils.get_name('error_in_buchschloss'), '\n\n\n'.join(sys.stderr.error_texts))
+                    utils.send_email(utils.get_name('error_in_buchschloss'),
+                                     '\n\n\n'.join(sys.stderr.error_texts))
                 except utils.requests.RequestException as e:
-                    print('\n'.join((utils.get_name('error_while_sending_error_msg'), str(e))))
+                    print('\n'.join((utils.get_name('error_while_sending_error_msg'),
+                                     str(e))))
             sys.exit()
 
 
@@ -195,20 +197,20 @@ def help(name=None):
     If no action is given, display general help."""
     print('+++ Attention: passwords are *never* taken directly as parameters +++')
     print('+++ Achtung: Passwörter *nie* direkt als Parameter angeben +++\n\n')
-    
+
     def getsig(func):
         try:
             return str(inspect.signature(func))
         except (ValueError, TypeError):
             return '(<?>)'
-        
+
     if name is None:
         parser.print_help()
         return
     elif name == 'commands':
         print('\n\n'.join('{}{}: {}'.format(
-            n, getsig(f), (inspect.getdoc(f) or 'No docstring').split('\n\n')[0]
-            ) for n, f in COMMANDS.items() if callable(f)))
+            n, getsig(f), (inspect.getdoc(f) or 'No docstring').split('\n\n')[0])
+            for n, f in COMMANDS.items() if callable(f)))
         return
     elif name in COMMANDS:
         obj = COMMANDS[name]
