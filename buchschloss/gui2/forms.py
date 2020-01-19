@@ -45,7 +45,8 @@ class PasswordFormWidget(mtkf.FormWidget):
 
 class BaseForm(mtkf.Form, template=True):
     def __init_subclass__(cls, *, template=None, **kwargs):
-        autocompletes = config.gui2.get('autocomplete').get(cls.__name__.replace('Form', ''))
+        autocompletes = config.gui2.get('autocomplete').get(
+            cls.__name__.replace('Form', ''))
         for k, v in vars(cls).items():
             if isinstance(v, tuple) and len(v) == 2:
                 c, o = v
@@ -55,7 +56,7 @@ class BaseForm(mtkf.Form, template=True):
             if isinstance(c, type) and issubclass(c, tk.Entry):
                 values = autocompletes.get(k).mapping
                 if values:
-                    c = type('Autocompleted'+c.__name__, (mtk.AutocompleteEntry, c), {})
+                    c = type('Autocompleted' + c.__name__, (mtk.AutocompleteEntry, c), {})
                     o['autocompletes'] = values
                     setattr(cls, k, (c, o))
         super().__init_subclass__(template=template, **kwargs)
@@ -155,7 +156,7 @@ class MemberForm(BaseForm):
         def clean_data(self):
             try:
                 super().clean_data()
-            except KeyError as e:
+            except KeyError:
                 pass
             if 'edit_password_button' in self.data:
                 del self.data['edit_password_button']
@@ -226,9 +227,9 @@ class BorrowRestCommonForm(BaseForm, template=True):
 
 class BorrowForm(BorrowRestCommonForm):
     class FormWidget:
-        default_content = {'borrow_time': '4'}
+        default_content = {'weeks': '4'}
 
-    borrow_time: mtkf.Element = IntEntry
+    weeks: mtkf.Element = IntEntry
 
 
 class RestituteForm(BorrowRestCommonForm):
