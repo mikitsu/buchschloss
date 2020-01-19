@@ -221,13 +221,13 @@ action_tree = ActionTree.from_map({
                  'person': core.Person,
                  'member': core.Member,
              }.items()
-             },
+    },  # noqa
     'search': {k: actions.search(FORMS[k], *v) for k, v in {
         'book': (core.Book, ShowInfoNS.book),
         'person': (core.Person, ShowInfoNS.person),
         'borrow_search': (core.Borrow, ShowInfoNS.borrow),
     }.items()
-               },
+    },
     'borrow': actions.borrow_restitute(forms.BorrowForm, core.Borrow.new),
     'restitute': actions.borrow_restitute(forms.RestituteForm, core.Borrow.restitute),
 })

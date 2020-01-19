@@ -25,7 +25,7 @@ def with_current_login():
     """work with functions needing the currently logged in members password"""
     def inner(func):
         core.current_login.password = core.pbkdf(b'current', b'')
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs):  # noqa
             return func(*args, current_password='current', **kwargs)
         return wrapper
     return inner
@@ -400,8 +400,8 @@ def test_library_new(db):
     core.Library.new('test-2', books=(1, 2), people=[123, 456])
     assert models.Book.get_by_id(1).library.name == 'test-2'
     assert models.Book.get_by_id(1).library.name == 'test-2'
-    assert (set(models.Person.get_by_id(123).libraries) ==
-            {models.Library.get_by_id('test-1'), models.Library.get_by_id('test-2')})
+    assert (set(models.Person.get_by_id(123).libraries)
+            == {models.Library.get_by_id('test-1'), models.Library.get_by_id('test-2')})
     assert (tuple(models.Person.get_by_id(456).libraries)
             == (models.Library.get_by_id('test-2'),))
 
@@ -659,7 +659,7 @@ def test_borrow_new(db):
     for i in range(5):
         core.current_login.level = i
         with pytest.raises(core.BuchSchlossBaseError):
-            core.Borrow.new(1, 123, config.core.borrow_time_limit[i]+1)
+            core.Borrow.new(1, 123, config.core.borrow_time_limit[i] + 1)
     weeks = config.core.borrow_time_limit[i]
     core.Borrow.new(1, 123, weeks)
     # correct data
