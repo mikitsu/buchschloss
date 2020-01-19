@@ -187,8 +187,9 @@ def get_name(internal: str):
             current = current[k]
             look_in.append(current)
     except KeyError:
-        # noinspection PyUnboundLocalVariable
-        logging.warning('invalid namespace {!r} of {!r}'.format(k, internal))
+        if not config.debug:
+            # noinspection PyUnboundLocalVariable
+            logging.warning('invalid namespace {!r} of {!r}'.format(k, internal))
     look_in.reverse()
     for ns in look_in:
         try:
@@ -201,8 +202,18 @@ def get_name(internal: str):
                 raise TypeError('{!r} is neither dict nor str'.format(val))
         except KeyError:
             pass
-    logging.warning('Name "{}" was not found in the namefile'.format('::'.join(path+[name])))
+    if not config.debug:
+        logging.warning('Name "{}" was not found in the namefile'.format('::'.join(path+[name])))
     return '::'.join(path+[name])
+
+
+def get_level(number: int = None):
+    """get the level name corresponding to the given number
+        or a sequence of all level names"""
+    if number is None:
+        return config.utils.names.level_names
+    else:
+        return config.utils.names.level_names[number]
 
 
 def break_string(text, size, break_char=string.punctuation, cut_char=string.whitespace):

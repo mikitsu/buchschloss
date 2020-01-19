@@ -8,6 +8,7 @@ from ..misc.tkstuff import forms as mtkf
 
 from .. import config
 from .. import core
+from .. import utils
 from ..utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
@@ -162,7 +163,7 @@ class MemberForm(BaseForm):
 
     name: mtkf.Element = NonEmptyEntry
     level: mtkf.Element = (mtk.OptionChoiceWidget,
-                           {'values': get_name('level_list'),
+                           {'values': utils.get_level(),
                             'default': 1})
     current_password: mtkf.Element = NonEmptyPasswordEntry
     password: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
