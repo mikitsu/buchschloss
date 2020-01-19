@@ -121,11 +121,9 @@ def start(noisy_success=True):
     except KeyError:
         raise Exception('environment variable BUCHSCHLOSS_CONFIG not found') from None
     try:
-        config = configobj.ConfigObj(filename,
-                                     configspec=os.path.join(MODULE_DIR,
-                                                             'configspec.cfg'),
-                                     file_error=True
-                                     )
+        config = configobj.ConfigObj(
+            filename, configspec=os.path.join(MODULE_DIR, 'configspec.cfg'),
+            file_error=True)
     except (configobj.ConfigObjError, IOError) as e:
         raise Exception('error reading {}: {}'.format(filename, e))
     # WORKAROUND: since configObj doesn't support optional sections / unspecified keys

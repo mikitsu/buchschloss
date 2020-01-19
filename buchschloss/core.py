@@ -341,8 +341,6 @@ def auth_required(f):
         "logged in member's password\n")
     auth_required.functions.append(f.__name__)
     return auth_required_wrapper
-
-
 auth_required.functions = []  # noqa
 
 
@@ -1091,11 +1089,11 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
     def follow_path(path, q):
         def handle_many_to_many():
             through = fv.through_model.alias()
-            return q.join(through, on=(getattr(fv.model, fv.model.pk_name)
-                                       == getattr(through,
-                                                  fv.model.__name__.lower() + '_id'))
-                          ).join(mod, on=(getattr(through, mod.__name__.lower() + '_id')
-                                          == getattr(mod, mod.pk_name)))
+            cond_1 = (getattr(fv.model, fv.model.pk_name)
+                      == getattr(through, fv.model.__name__.lower() + '_id'))
+            cond_2 = (getattr(through, mod.__name__.lower() + '_id')
+                      == getattr(mod, mod.pk_name))
+            return q.join(through, on=cond_1).join(mod, on=cond_2)
 
         *path, end = path.split('.')
         mod = o
