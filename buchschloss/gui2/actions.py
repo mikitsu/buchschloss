@@ -267,8 +267,8 @@ class ShowInfoNS:
                 'text': utils.break_string(t, config.gui2.info_widget.item_length),
                 'command': partial(ShowInfoNS.book, i)})
              for t, i in zip(d['borrows'], d['borrow_book_ids'])],
-            )
-         },
+        )
+        },
         utils.get_name('view__person'),
         utils.get_name('id')
     )

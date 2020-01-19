@@ -210,7 +210,7 @@ def help(name=None):
     elif name == 'commands':
         print('\n\n'.join('{}{}: {}'.format(
             n, getsig(f), (inspect.getdoc(f) or 'No docstring').split('\n\n')[0])
-                          for n, f in COMMANDS.items() if callable(f)))
+            for n, f in COMMANDS.items() if callable(f)))
         return
     elif name in COMMANDS:
         obj = COMMANDS[name]

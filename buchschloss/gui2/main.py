@@ -76,6 +76,7 @@ class App:
         .queue: actions to be executed separately from the tk event loop
         .root: the tk.Tk instance
     """
+
     def __init__(self):
         self.root = tk.Tk()
         self.root.protocol('WM_CLOSE_WINDOW', self.onexit)
@@ -218,13 +219,13 @@ action_tree = ActionTree.from_map({
         'book': core.Book,
         'person': core.Person,
         'member': core.Member,
-        }.items()
+    }.items()
     },
     'search': {k: actions.search(FORMS[k], *v) for k, v in {
         'book': (core.Book, ShowInfoNS.book),
         'person': (core.Person, ShowInfoNS.person),
         'borrow_search': (core.Borrow, ShowInfoNS.borrow),
-        }.items()
+    }.items()
     },
     'borrow': actions.borrow_restitute(forms.BorrowForm, core.Borrow.new),
     'restitute': actions.borrow_restitute(forms.RestituteForm, core.Borrow.restitute),

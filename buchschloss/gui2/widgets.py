@@ -45,6 +45,7 @@ NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_o
 
 class SeriesEntry(mtk.ContainingWidget):
     """Entry combining a name for the series and an integer input for the number"""
+
     def __init__(self, master, **kw):
         self.number_dummy = core.Dummy(set=self.set_number,
                                        get=lambda: 1,
@@ -89,6 +90,7 @@ class ActionChoiceWidget(mtk.ContainingWidget):
 
 class OptionsFromSearch(mtk.OptionChoiceWidget):
     """an option widget that gets its options from search results"""
+
     def __init__(self, master, *, action_ns: core.ActionNamespace = None,
                  attribute='name', **kwargs):
         values = [(getattr(o, attribute), str(o)) for o in action_ns.search(())]
@@ -143,6 +145,7 @@ class OptionalCheckbuttonWithVar(CheckbuttonWithVar):
 class ActivatingListbox(tk.Listbox):
     """a Listbox that allows initial items, possibly already activated
         additional options: exportselection=False, selectmode=tk.MULTIPLE"""
+
     def __init__(self, master, cfg={}, values=(), activate=(), **kwargs):
         super().__init__(master, cfg, exportselection=False,
                          selectmode=tk.MULTIPLE, **kwargs)
@@ -170,6 +173,7 @@ class ScrolledListbox(tk.Listbox):
 class MultiChoicePopup(tk.Button):
     """Button that displays a multi-choice listbox popup dialog on click"""
     # TODO: move to misc
+
     def __init__(self, master, cnf={}, options=(), **kwargs):
         """create a new MultiChoicePopup
 
@@ -211,6 +215,7 @@ class MultiChoicePopup(tk.Button):
 
 class SearchMultiChoice(MultiChoicePopup):
     """MultiChoicePopup that gets values from searches"""
+
     def __init__(self, master, cnf={}, *, action_ns=None, attribute='name', **kwargs):
         options = [(getattr(o, attribute), str(o)) for o in action_ns.search(())]
         super().__init__(master, cnf, options=options, **kwargs)

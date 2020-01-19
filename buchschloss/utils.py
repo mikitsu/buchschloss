@@ -39,6 +39,7 @@ from buchschloss import core, config
 
 class FormattedDate(date):
     """print a datetime.date as specified in config.core.date_format"""
+
     def __str__(self):
         return self.strftime(config.core.date_format)
 

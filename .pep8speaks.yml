@@ -6,4 +6,4 @@ flake8:
   max-line-length: 95
   exclude: [misc]
   ignore:
-    - W503
+    - W503  # line break before binary operator

@@ -77,6 +77,7 @@ logging.basicConfig(level=getattr(logging, config.core.log.level),
 
 class MiscData:
     """Provide an easy interface for the Misc table."""
+
     def __getattr__(self, item):
         try:
             conn = models.db.connect(True)
@@ -104,6 +105,7 @@ class MiscData:
 
 class BuchSchlossBaseError(Exception):
     """Error raised in this module"""
+
     def __init__(self, title, message, *sink):
         if sink:
             warnings.warn('BuchSchlossBaseError.__init__ got unexpected arguments')
@@ -143,6 +145,7 @@ class BuchSchlossError(BuchSchlossBaseError):
         The message will be passed through utils.get_name and .format will
         be called with an optional tuple (unpacked) given
     """
+
     def __init__(self, title, message, *message_format):
         super().__init__(utils.get_name(title),
                          utils.get_name(message).format(*message_format))
@@ -150,6 +153,7 @@ class BuchSchlossError(BuchSchlossBaseError):
 
 class BuchSchlossPermError(BuchSchlossBaseError):
     """use utils.get_name for level and message name"""
+
     def __init__(self, level):
         super().__init__(utils.get_name('no_permission'),
                          utils.get_name('must_be_{}').format(
@@ -173,6 +177,7 @@ class Dummy:  # TODO: move this out to misc
         _items: mapping or sequence to delegate __getitem__ to.
             _default will be returned on Key, Index or AttributeError
     """
+
     def __init__(self, _bool=True, _call=lambda s, *a, **kw: s, **kwargs):
         """Set the attributes given in kwargs."""
         self._bool = _bool
@@ -217,6 +222,7 @@ class DummyErrorFile:
         error_file: the log file name
         error_texts: list of the error messages wrote to the log file for later use
             e.g. display, email, ..."""
+
     def __init__(self, error_file='error.log'):
         self.error_happened = False
         self.error_texts = []
