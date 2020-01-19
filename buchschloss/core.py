@@ -53,7 +53,7 @@ if log_conf.file:
     elif log_conf.rotate.how == 'size':
         handler = logging.handlers.RotatingFileHandler(
             log_conf.file,
-            maxBytes=2**10*log_conf.rotate.size,
+            maxBytes=2**10 * log_conf.rotate.size,
             backupCount=log_conf.rotate.copy_count,
         )
     elif log_conf.rotate.how == 'time':
@@ -77,6 +77,7 @@ logging.basicConfig(level=getattr(logging, config.core.log.level),
 
 class MiscData:
     """Provide an easy interface for the Misc table."""
+
     def __getattr__(self, item):
         try:
             conn = models.db.connect(True)
@@ -104,6 +105,7 @@ class MiscData:
 
 class BuchSchlossBaseError(Exception):
     """Error raised in this module"""
+
     def __init__(self, title, message, *sink):
         if sink:
             warnings.warn('BuchSchlossBaseError.__init__ got unexpected arguments')
@@ -143,6 +145,7 @@ class BuchSchlossError(BuchSchlossBaseError):
         The message will be passed through utils.get_name and .format will
         be called with an optional tuple (unpacked) given
     """
+
     def __init__(self, title, message, *message_format):
         super().__init__(utils.get_name(title),
                          utils.get_name(message).format(*message_format))
@@ -150,6 +153,7 @@ class BuchSchlossError(BuchSchlossBaseError):
 
 class BuchSchlossPermError(BuchSchlossBaseError):
     """use utils.get_name for level and message name"""
+
     def __init__(self, level):
         super().__init__(utils.get_name('no_permission'),
                          utils.get_name('must_be_{}').format(
@@ -173,6 +177,7 @@ class Dummy:  # TODO: move this out to misc
         _items: mapping or sequence to delegate __getitem__ to.
             _default will be returned on Key, Index or AttributeError
     """
+
     def __init__(self, _bool=True, _call=lambda s, *a, **kw: s, **kwargs):
         """Set the attributes given in kwargs."""
         self._bool = _bool
@@ -217,12 +222,13 @@ class DummyErrorFile:
         error_file: the log file name
         error_texts: list of the error messages wrote to the log file for later use
             e.g. display, email, ..."""
+
     def __init__(self, error_file='error.log'):
         self.error_happened = False
         self.error_texts = []
         self.error_file = 'error.log'
         with open(error_file, 'a', encoding='UTF-8') as f:
-            f.write('\n\nSTART: '+str(datetime.now())+'\n')
+            f.write('\n\nSTART: ' + str(datetime.now()) + '\n')
 
     def write(self, msg):
         self.error_happened = True
@@ -323,6 +329,8 @@ def auth_required(f):
         "logged in member's password\n")
     auth_required.functions.append(f.__name__)
     return auth_required_wrapper
+
+
 auth_required.functions = []  # noqa
 
 
@@ -406,7 +414,7 @@ class ActionNamespace(abc.ABC):
     @classmethod
     def view_ns(cls, id_: T.Union[int, str]):
         """Return a namespace of information"""
-        check_level(cls.view_level, cls.__name__+'.view_ns')
+        check_level(cls.view_level, cls.__name__ + '.view_ns')
         try:
             return cls.model.get_by_id(id_)
         except cls.model.DoesNotExist:
@@ -415,7 +423,7 @@ class ActionNamespace(abc.ABC):
     @classmethod
     def view_repr(cls, id_: T.Union[str, int]) -> str:
         """Return a string representation"""
-        check_level(cls.view_level, cls.__name__+'.view_repr')
+        check_level(cls.view_level, cls.__name__ + '.view_repr')
         try:
             return str(next(iter(cls.model.select_str_fields().where(
                 getattr(cls.model, cls.model.pk_name) == id_))))
@@ -426,7 +434,7 @@ class ActionNamespace(abc.ABC):
     def view_attr(cls, id_: T.Union[str, int], name: str):
         """Return the value of a specific attribute"""
         # this is said to be faster...
-        check_level(cls.view_level, cls.__name__+'.view_attr')
+        check_level(cls.view_level, cls.__name__ + '.view_attr')
         try:
             return getattr(next(iter(cls.model.select(getattr(cls.model, name)).where(
                 getattr(cls.model, cls.model.pk_name) == id_))), name)
@@ -440,7 +448,7 @@ class ActionNamespace(abc.ABC):
                complex_action: str = None,
                ):
         """search for records. see search for details on arguments"""
-        check_level(cls.view_level, cls.__name__+'.search')
+        check_level(cls.view_level, cls.__name__ + '.search')
         return search(cls.model, condition, *complex_params,
                       complex_action=complex_action)
 
@@ -493,8 +501,8 @@ class Book(ActionNamespace):
         """
         if ((not set(kwargs.keys()) <= {k for k in dir(models.Book)
                                         if isinstance(getattr(models.Book, k),
-                                                      peewee.Field)})
-                or 'id' in kwargs):
+                                                      peewee.Field)}) or
+                'id' in kwargs):
             raise TypeError('unexpected kwarg')
         groups = set(kwargs.pop('groups', ()))
         errors = _update_library_group(models.Group, book.groups, groups)
@@ -505,8 +513,8 @@ class Book(ActionNamespace):
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', lib)
         for k, v in kwargs.items():
-            if (isinstance(v, str)
-                    and not isinstance(getattr(models.Book, k), peewee.CharField)):
+            if (isinstance(v, str) and
+                    not isinstance(getattr(models.Book, k), peewee.CharField)):
                 logging.warning('auto-type-conversion used')
                 v = type(getattr(book, k))(v)
             setattr(book, k, v)
@@ -601,8 +609,8 @@ class Person(ActionNamespace):
         """
         if ((not set(kwargs.keys()) <= {k for k in dir(models.Person)
                                         if isinstance(getattr(models.Person, k),
-                                                      peewee.Field)} | {'pay'})
-                or 'id' in kwargs):
+                                                      peewee.Field)} | {'pay'}) or
+                'id' in kwargs):
             raise TypeError('unexpected kwarg')
         if kwargs.pop('pay', False):
             kwargs['pay_date'] = date.today()
@@ -612,9 +620,9 @@ class Person(ActionNamespace):
         for k, v in kwargs.items():
             setattr(person, k, v)
         person.save()
-        logging.info('{} edited {}'.format(current_login, person)
-                     + (' setting pay_date to {}'.format(kwargs['pay_date'])
-                        if 'pay_date' in kwargs else ''))
+        logging.info('{} edited {}'.format(current_login, person) +
+                     (' setting pay_date to {}'.format(kwargs['pay_date'])
+                      if 'pay_date' in kwargs else ''))
         return errors
 
     @staticmethod
@@ -713,8 +721,8 @@ class Library(ActionNamespace):
                     lib.people.add(p)
             elif action is LibraryGroupAction.REMOVE:
                 models.Book.update({models.Book.library: models.Library.get_by_id('main')}
-                                   ).where((models.Book.library == lib)
-                                           & (models.Book.id << books)).execute()
+                                   ).where((models.Book.library == lib) &
+                                           (models.Book.id << books)).execute()
                 for p in people:
                     lib.people.remove(p)
             if pay_required is not None:
@@ -805,8 +813,8 @@ class Group(ActionNamespace):
                 or a source Library does not exist
         """
         if src and (models.Library.select(None)
-                    .where(models.Library.name << src).count()
-                    != len(src)):
+                    .where(models.Library.name << src).count() !=
+                    len(src)):
             present_libraries = set(lib.name for lib in
                                     models.Library.select(models.Library.name)
                                     .where(models.Library.name << src))
@@ -881,8 +889,8 @@ class Borrow(ActionNamespace):
         if book.library not in person.libraries:
             raise BuchSchlossError('Borrow', '{}_not_in_Library_{}',
                                    person, book.library.name)
-        if (book.library.pay_required and (person.pay_date or date.min)
-                + timedelta(weeks=52) < date.today()):
+        if (book.library.pay_required and (person.pay_date or date.min) +
+                timedelta(weeks=52) < date.today()):
             raise BuchSchlossError('Borrow', 'Library_{}_needs_payment', book.library)
         if len(person.borrows) >= person.max_borrow:
             raise BuchSchlossError('Borrow', '{}_has_reached_max_borrow', person)
@@ -1072,10 +1080,10 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
     def follow_path(path, q):
         def handle_many_to_many():
             through = fv.through_model.alias()
-            return q.join(through, on=(getattr(fv.model, fv.model.pk_name)
-                                       == getattr(through, fv.model.__name__.lower() + '_id'))
-                          ).join(mod, on=(getattr(through, mod.__name__.lower() + '_id')
-                                          == getattr(mod, mod.pk_name)))
+            return q.join(through, on=(getattr(fv.model, fv.model.pk_name) ==
+                                       getattr(through, fv.model.__name__.lower() + '_id'))
+                          ).join(mod, on=(getattr(through, mod.__name__.lower() + '_id') ==
+                                          getattr(mod, mod.pk_name)))
 
         *path, end = path.split('.')
         mod = o
@@ -1098,7 +1106,7 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
             return q
         a, op, b = cond
         if op in ('and', 'or'):
-            return getattr(operator, op+'_')(handle_condition(a, q), handle_condition(b, q))
+            return getattr(operator, op + '_')(handle_condition(a, q), handle_condition(b, q))
         else:
             a, q = follow_path(a, q)
             if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
