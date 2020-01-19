@@ -155,7 +155,7 @@ class MemberForm(BaseForm):
         def clean_data(self):
             try:
                 super().clean_data()
-            except KeyError as e:
+            except KeyError:
                 pass
             if 'edit_password_button' in self.data:
                 del self.data['edit_password_button']

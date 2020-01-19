@@ -15,7 +15,7 @@ __all__ exports:
 
 import inspect
 from hashlib import pbkdf2_hmac
-from functools import wraps, reduce, partial
+from functools import wraps, partial
 from datetime import datetime, timedelta, date
 from os import urandom
 import sys
@@ -170,7 +170,8 @@ class Dummy:  # TODO: move this out to misc
         _str: the string representation of self
         _call: a callable to call (default: return self)
         _bool: value to return when __bool__ is called
-        _items: mapping or sequence to delegate __getitem__ to. _default will be returned on Key, Index or AttributeError
+        _items: mapping or sequence to delegate __getitem__ to.
+            _default will be returned on Key, Index or AttributeError
     """
     def __init__(self, _bool=True, _call=lambda s, *a, **kw: s, **kwargs):
         """Set the attributes given in kwargs."""
@@ -214,7 +215,8 @@ class DummyErrorFile:
     Attributes:
         error_happened: True if write() was called
         error_file: the log file name
-        error_texts: list of the error messages wrote to the log file for later use (display, email, ...)"""
+        error_texts: list of the error messages wrote to the log file for later use
+            e.g. display, email, ..."""
     def __init__(self, error_file='error.log'):
         self.error_happened = False
         self.error_texts = []
@@ -233,8 +235,8 @@ class DummyErrorFile:
                 pass
             else:
                 break
-                
-                
+
+
 class LibraryGroupAction(enum.Enum):
     ADD = 'add'
     REMOVE = 'remove'
@@ -321,7 +323,7 @@ def auth_required(f):
         "logged in member's password\n")
     auth_required.functions.append(f.__name__)
     return auth_required_wrapper
-auth_required.functions = []
+auth_required.functions = []  # noqa
 
 
 def authenticate(m, password):
@@ -464,7 +466,7 @@ class Book(ActionNamespace):
         with models.db:
             try:
                 b = models.Book.create(
-                    isbn=isbn, author=author,title=title, language=language,
+                    isbn=isbn, author=author, title=title, language=language,
                     publisher=publisher, year=year, medium=medium,
                     shelf=shelf, series=series, series_number=series_number,
                     concerned_people=concerned_people, genres=genres,
@@ -503,7 +505,8 @@ class Book(ActionNamespace):
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', lib)
         for k, v in kwargs.items():
-            if isinstance(v, str) and not isinstance(getattr(models.Book, k), peewee.CharField):
+            if (isinstance(v, str)
+                    and not isinstance(getattr(models.Book, k), peewee.CharField)):
                 logging.warning('auto-type-conversion used')
                 v = type(getattr(book, k))(v)
             setattr(book, k, v)
@@ -531,7 +534,7 @@ class Book(ActionNamespace):
         r = {k: str(getattr(book, k) or '') for k in
              ('author', 'isbn', 'title', 'series', 'series_number', 'language',
               'publisher', 'concerned_people', 'year', 'medium', 'genres', 'shelf', 'id',
-             )}
+              )}
         r['library'] = book.library.name
         r['groups'] = ';'.join(g.name for g in book.groups)
         borrow = book.borrow or Dummy(id=None, _bool=False)
@@ -654,7 +657,7 @@ class Library(ActionNamespace):
 
             ``pay_required`` indicates whether people need to have paid
                 in order to borrow from the library
-            
+
             raise a BuchSchlossBaseError if the Library exists
         """
         with models.db:
@@ -1043,7 +1046,7 @@ class Member(ActionNamespace):
 
 def search(o: T.Type[models.Model], condition: T.Tuple = None,
            *complex_params: 'ComplexSearch', complex_action: str = 'or',
-           _in_=None, _eq_=None):
+           ):
     """THIS IS AN INTERNAL FUNCTION -- for user searches, use *.search
 
         Search for objects.
@@ -1064,19 +1067,7 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
 
         Note: for `condition`, there is no "not" available.
             Use the inverse comparision operator instead
-
-        This function is compatible with its predecessor and will forward
-            `complex_params`, `_in_`, `_eq_` and `condition` (as `kind` argument)
-            to the old function.
     """
-    if isinstance(condition, str):
-        # call to old function
-        # noinspection PyDeprecation
-        return _search_old(o, condition, *complex_params, _in_=(_in_ or {}), _eq_=(_eq_ or {}))
-    if condition is None:
-        # call with default arg
-        # noinspection PyDeprecation
-        return _search_old(o, _eq_=(_eq_ or {}), _in_=(_in_ or {}))
 
     def follow_path(path, q):
         def handle_many_to_many():
@@ -1125,83 +1116,6 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
         return result
 
 
-# noinspection PyDefaultArgument
-def _search_old(o: T.Type[models.Model], kind: str = 'or', *complex_params, _in_={}, _eq_={}):
-    """Search a model's objects.
-
-    `_in_` is a mapping of attribute name to model contained
-    `_eq_` is a mapping of attribute name to model equal
-    `complex_params` may be instances of ComplexSearch allowing complex queries.
-
-    While `_in_` and `_eq_` are processed at SQL level, the complex parameters
-    are handled after having made a query
-
-    The objects returned have enough data to be representable as strings.
-    If more data is needed, the appropriate view_* function may be called
-    """
-    warnings.warn('use the new *.search functions', DeprecationWarning, stacklevel=2)
-    req_level = next(i for i, mods in enumerate(
-        ((models.Book,), (models.Person, models.Borrow), (), models.Model.__subclasses__())) if o in mods)
-    if req_level > current_login.level:
-        raise BuchSchlossBaseError(utils.get_name('no_permission'),
-                                   utils.get_name('must_be_{}').format(
-                                   utils.get_level(req_level)))
-
-    def add_to_query(q):
-        nonlocal query
-        if kind == 'and':
-            query = q.switch(type(o))
-        elif kind == 'or':
-            query += q
-        else:
-            raise ValueError('`kind` must be "and" or "or"')
-
-    def handle_many_to_many(q, f):
-        # All I want to do is get the referenced
-        # instance. I couldn't find an easier way
-        # to do this, but I feel there should be one...
-        # there is: .rel_model
-        model = next(v_ for k_, v_ in f.through_model._meta.fields.items()
-                     if k_ not in ('id', k)).rel_field.model
-        q = q.join(f.through_model).join(model)
-        q = q.where(op(model._meta.primary_key, v))
-        add_to_query(q)
-
-    # INFO: this is not final
-    with models.db:
-        query = o.select(*o.str_fields)
-    conditions = []
-    for mapping, op in ((_in_, peewee.Field.contains), (_eq_, operator.eq)):
-        for k, v in mapping.items():
-            # django-filter-style, these keys might have been identifiers
-            k = k.replace('__', '.')
-            if '.' in k:
-                *path, end = k.split('.')
-                mod = o
-                q = query
-                for fk in path:
-                    mod = getattr(mod, fk).rel_model
-                    q = q.join(mod)
-                field = getattr(mod, end)
-                if isinstance(field, peewee.ManyToManyField):
-                    handle_many_to_many(q, field)
-                else:
-                    add_to_query(q.where(op(field, v)))
-            else:
-                f = getattr(o, k)
-                if isinstance(f, peewee.ManyToManyField):
-                    handle_many_to_many(query, f)
-                else:
-                    conditions.append(op(f, v))
-    if conditions:
-        query = query.where(reduce(
-            {'and': operator.and_, 'or': operator.or_}[kind], conditions))
-    if complex_params:
-        return _do_complex_search(kind, query, complex_params)
-    logging.info('{} performed a search for {}'.format(current_login, o))
-    return query
-
-
 def _do_complex_search(kind: str, objects: T.Iterable[models.Model], complex_params):
     """Perform the ComplexSearch operations.
         Once __search_old is removed, this can be merged into search"""
@@ -1227,7 +1141,7 @@ def _cs_lookup(name):
     return wrapper
 
 
-class ComplexSearch:
+class ComplexSearch:  # TODO: use misc.Instance for this
     """Allow complex lookups and comparisons when using search().
 
     To later perform attr and/or item lookups on objects when searching,
@@ -1238,17 +1152,23 @@ class ComplexSearch:
 
     to use iterations, call iter and perform the operations you would perform
         on the individual items on the return model
-    e.g.: [c['y'] for b in a for c in b.x] becomes iter(iter(ComplexSearch()).x)['y']  where `a` is the base instance
+    e.g.: [c['y'] for b in a for c in b.x] becomes iter(iter(ComplexSearch()).x)['y']
+    where `a` is the base instance
 
-    You can call a function on a lookup (or a sequence like above) by accessing the attribute ._call__<name>_
+    You can call a function on a lookup (or a sequence like above) by
+    accessing the attribute ._call__<name>_
         where name is a key in .CALLABLE_FUNCTIONS that maps to the desired function.
         Currently included by default are `min`, `max`, `all`, `any`, `len` and `sum`
-    e.g.: ``any(x in g.name for g in book.groups)`` becomes ``iter(ComplexSearch().groups).name._call__any_``;
-          ``sum(x == b.c for b in a) >= 3`` becomes ``(iter(ComplexSearch()).c == x)._call__sum_ >= 3``;
-          ``sum(any(a.b in x for a in c) for c in d) in y`` becomes ``(iter(c).b in x)._call__any_._call__sum_ in y``
+    e.g.: ``any(x in g.name for g in book.groups)`` becomes
+        ``iter(ComplexSearch().groups).name._call__any_``;
+          ``sum(x == b.c for b in a) >= 3`` becomes
+        ``(iter(ComplexSearch()).c == x)._call__sum_ >= 3``;
+          ``sum(any(a.b in x for a in c) for c in d) in y`` becomes
+          ``(iter(c).b in x)._call__any_._call__sum_ in y``
           bad-looking ~ complexity * use_of_functions ** 3
 
-    Comparisons also work if they are only supported by the known (not simulated) object **IF** the simulated one
+    Comparisons also work if they are only supported by the known (not simulated)
+    object **IF** the simulated one
         returns NotImplemented in the comparison function
     """
     CALLABLE_FUNCTIONS = {k: getattr(builtins, k) for k in 'min max all any len sum'.split()}

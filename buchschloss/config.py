@@ -164,7 +164,8 @@ def start(noisy_success=True):
 
         # multiline defaults aren't allowed (AFAIK)
         if config['gui2']['intro']['text'] is None:
-            config['gui2']['intro']['text'] = 'Buchschloss\n\nhttps://github.com/mik2k2/buchschloss'
+            config['gui2']['intro']['text'] = \
+                'Buchschloss\n\nhttps://github.com/mik2k2/buchschloss'
 
         if ((config['utils']['email']['smtp']['username'] is None)
                 ^ (config['utils']['email']['smtp']['password'] is None)):

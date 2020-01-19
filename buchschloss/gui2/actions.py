@@ -27,9 +27,10 @@ def generic_formbased_action(form_type, form_cls, callback,
                              form_options={}, fill_data=None,
                              post_init=lambda f: None,
                              do_reset=True):
+    # TODO: make form_type an enum
     """perform a generic action
         Arguments:
-            form_type: 'new', 'edit' or 'search': used for the form group  TODO: make this an enum
+            form_type: 'new', 'edit' or 'search': used for the form group
             form_cls: the form class (subclass of misc.tkstuff.forms.Form)
             callback: the function to call on form submit with form data as keyword arguments
             form_options: optional dict of additional options for the form

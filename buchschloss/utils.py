@@ -4,9 +4,11 @@ contents (for use):
     - run() -- call once on startup. takes care of all automatic tasks
     - send_email() -- send an email
     - get_name() -- get a pretty name
-    - get_book_data() -- attempt to get data about a book based on the ISBN (first local DB, then DNB).
+    - get_book_data() -- attempt to get data about a book based on the ISBN
+        (first local DB, then DNB).
 
-to add late handlers, append them to late_handlers. they will receive arguments as specified in late_books()
+to add late handlers, append them to late_handlers.
+they will receive arguments as specified in late_books
 """
 
 import base64
@@ -136,7 +138,7 @@ def web_backup():
 def backup_shift(fs, depth):
     """shift all name.number up one number to the given depth
         in the given filesystem (os or remote FTP host)"""
-    number_name = lambda n: '.'.join((config.core.database_name, str(n)))
+    number_name = lambda n: '.'.join((config.core.database_name, str(n)))  # noqa
     try:
         fs.remove(number_name(depth))
     except FileNotFoundError:
@@ -172,7 +174,8 @@ def get_name(internal: str):
 
     Try lookup in config.utils.names.
     "__" is replaced by ": " with components looked up individually
-    If a name isn't found, a warning is logged and the internal name returned, potentially modified
+    If a name isn't found, a warning is logged and the internal name returned,
+        potentially modified
     "<namespace>::<name>" may specify a namespace in which lookups are performed first,
         falling back to the global names if nothing is found
     "__" takes precedence over "::"

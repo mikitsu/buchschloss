@@ -8,8 +8,9 @@ FIELD_MAP = {
     peewee.IntegerField: 'IntEntry',
     peewee.CharField: 'Entry',
     peewee.BooleanField: 'CheckbuttonWithVar',
-    peewee.Field: '...'  # since apping are orderen, this is a catch-all
+    peewee.Field: '...'  # since mappings are ordered, this is a catch-all
 }
+
 
 def create_form(model,
                 element='{name}: mtkf.Element = {field}',
@@ -27,7 +28,7 @@ def create_form(model,
                 suite.append(element.format(name=name, field=v))
                 break
     return '\n    '.join(suite)
-    
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

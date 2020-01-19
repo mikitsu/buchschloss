@@ -13,7 +13,7 @@ import operator
 import datetime
 try:
     # on linux (all? some?), importing will make arrow keys usable
-    import readline
+    import readline  # noqa
 except ImportError:
     pass
 
@@ -124,7 +124,7 @@ def eval_val(val):
             return ast.literal_eval(val)
         except Exception:
             return val
-eval_val.last_result = None
+eval_val.last_result = None  # noqa
 
 
 def read_input(prompt):
@@ -179,9 +179,11 @@ def start():
         if not config.debug and sys.stderr.error_happened:
             if input(utils.get_name('send_error_report')+'\n')[0] in 'yYjJ':
                 try:
-                    utils.send_email(utils.get_name('error_in_buchschloss'), '\n\n\n'.join(sys.stderr.error_texts))
+                    utils.send_email(utils.get_name('error_in_buchschloss'),
+                                     '\n\n\n'.join(sys.stderr.error_texts))
                 except utils.requests.RequestException as e:
-                    print('\n'.join((utils.get_name('error_while_sending_error_msg'), str(e))))
+                    print('\n'.join((utils.get_name('error_while_sending_error_msg'),
+                                     str(e))))
             sys.exit()
 
 
@@ -195,13 +197,13 @@ def help(name=None):
     If no action is given, display general help."""
     print('+++ Attention: passwords are *never* taken directly as parameters +++')
     print('+++ Achtung: Passwörter *nie* direkt als Parameter angeben +++\n\n')
-    
+
     def getsig(func):
         try:
             return str(inspect.signature(func))
         except (ValueError, TypeError):
             return '(<?>)'
-        
+
     if name is None:
         parser.print_help()
         return

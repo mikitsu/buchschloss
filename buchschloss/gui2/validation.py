@@ -37,7 +37,7 @@ def check_isbn(isbn: T.Sequence[int]) -> int:
             raise ValueError
         else:
             isbn = [9, 7, 8] + list(isbn[:-1])
-            isbn.append(-sum(w*d for w, d in weighted_isbn(isbn))%10)
+            isbn.append(-sum(w*d for w, d in weighted_isbn(isbn)) % 10)
             return int(''.join(map(str, isbn)))
     elif len(isbn) == 13:
         if sum(w*d for w, d in weighted_isbn(isbn)) % 10:
@@ -55,7 +55,8 @@ nonempty = mval.Validator((misc.Instance().__call_bool,
                            utils.get_name('error_empty')))
 
 class_validator = mval.Validator(str.upper,  # v -- G9 is coming
-                                 (r'^(EF|Q1|Q2|10([A-Z\s])+|[5-9][A-Z\s]+)$',  # TODO: move class regex to config
+                                 # TODO: move class regex to config
+                                 (r'^(EF|Q1|Q2|10([A-Z\s])+|[5-9][A-Z\s]+)$',
                                   utils.get_name('error_invalid_class')))
 
 int_list = mval.Validator((lambda L: list(map(int, L)),
@@ -65,4 +66,5 @@ type_int = mval.Validator((int, {ValueError: utils.get_name('must_be_int')}))
 
 none_on_empty = mval.Validator(lambda s: s or None)
 
-int_or_none = mval.Validator((lambda s: int(s) if s else None, {ValueError: utils.get_name('must_be_int')}))
+int_or_none = mval.Validator((lambda s: int(s) if s else None,
+                              {ValueError: utils.get_name('must_be_int')}))

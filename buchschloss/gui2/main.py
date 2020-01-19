@@ -141,14 +141,17 @@ class App:
                     and tk_msg.askokcancel(
                     None, utils.get_name('send_error_report'))):
                 try:
-                    utils.send_email(utils.get_name('error_in_buchschloss'), '\n\n\n'.join(sys.stderr.error_texts))
+                    utils.send_email(utils.get_name('error_in_buchschloss'),
+                                     '\n\n\n'.join(sys.stderr.error_texts))
                 except utils.requests.RequestException as e:
-                    tk_msg.showerror(None, '\n'.join((utils.get_name('error_while_sending_error_msg'), str(e))))
+                    tk_msg.showerror(None, '\n'.join((
+                        utils.get_name('error_while_sending_error_msg'), str(e))))
             self.root.destroy()
             sys.exit()
 
-    def my_event_handler(self):
-        """execute events outside of the tkinter event loop TODO: move this to a proper scheduler"""
+    def my_event_handler(self):  # TODO: move this to a proper scheduler
+        """execute events outside of the tkinter event loop"""
+
         # in theory, I shouldn't need this, but misc.ScrollableWidget
         # doesn't work without calling .set_scrollregion(),
         # which in turn can't be done from inside a tkinter callback
@@ -174,7 +177,8 @@ def new_book_autofill(form):
             tk_msg.showerror(message=isbn)
             isbn_field.focus()
             return
-        if not tk_msg.askyesno(utils.get_name('create_book'), utils.get_name('ask_isbn_autofill')):
+        if not tk_msg.askyesno(utils.get_name('create_book'),
+                               utils.get_name('ask_isbn_autofill')):
             return
         try:
             data = utils.get_book_data(isbn)
