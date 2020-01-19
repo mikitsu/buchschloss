@@ -125,7 +125,7 @@ class BookForm(SearchableForm):
     publisher: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-publisher'})
     concerned_people: mtkf.Element = (NullREntry, {'rem_key': 'book-cpeople'})
     year: mtkf.Element = IntEntry
-    medium: mtkf.Element = NonEmptyREntry
+    medium: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-medium'})
     genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
 
     library: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
