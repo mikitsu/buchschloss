@@ -53,7 +53,7 @@ class ActionTree:
         if self.action is None:
             widgets.ActionChoiceWidget(
                 app.center, ((k, CWFUR(v)) for k, v in self.subactions.items()),
-                horizontal=4+(len(self.subactions) < 6)).pack()
+                horizontal=4 + (len(self.subactions) < 6)).pack()
         else:
             return self.action(*args, **kwargs)
 
@@ -76,6 +76,7 @@ class App:
         .queue: actions to be executed separately from the tk event loop
         .root: the tk.Tk instance
     """
+
     def __init__(self):
         self.root = tk.Tk()
         self.root.protocol('WM_CLOSE_WINDOW', self.onexit)
@@ -136,9 +137,9 @@ class App:
         """execute when the user exits the application"""
         if tk_msg.askokcancel(utils.get_name('exit_app'),
                               utils.get_name('really_exit_app')):
-            if (not config.debug
-                    and sys.stderr.error_happened
-                    and tk_msg.askokcancel(
+            if (not config.debug and
+                    sys.stderr.error_happened and
+                    tk_msg.askokcancel(
                     None, utils.get_name('send_error_report'))):
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
@@ -218,13 +219,13 @@ action_tree = ActionTree.from_map({
         'book': core.Book,
         'person': core.Person,
         'member': core.Member,
-        }.items()
+    }.items()
     },
     'search': {k: actions.search(FORMS[k], *v) for k, v in {
         'book': (core.Book, ShowInfoNS.book),
         'person': (core.Person, ShowInfoNS.person),
         'borrow_search': (core.Borrow, ShowInfoNS.borrow),
-        }.items()
+    }.items()
     },
     'borrow': actions.borrow_restitute(forms.BorrowForm, core.Borrow.new),
     'restitute': actions.borrow_restitute(forms.RestituteForm, core.Borrow.restitute),
