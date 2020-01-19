@@ -206,7 +206,7 @@ def get_name(internal: str):
                 raise TypeError('{!r} is neither dict nor str'.format(val))
         except KeyError:
             pass
-    name = '::'.join(path+[name])
+    name = '::'.join(path + [name])
     if not config.debug:
         logging.warning('Name "{}" was not found in the namefile'.format(name))
     return name

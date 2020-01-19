@@ -1123,7 +1123,8 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
             elif not b:
                 return handle_condition(a, q)
             else:
-                return getattr(operator, op+'_')(handle_condition(a, q), handle_condition(b, q))
+                return getattr(operator, op + '_')(handle_condition(a, q),
+                                                   handle_condition(b, q))
         else:
             a, q = follow_path(a, q)
             if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
