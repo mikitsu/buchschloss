@@ -71,7 +71,7 @@ def execute(command, args, kwargs):
             kwargs['current_password'] = getpass.getpass(utils.get_name('current_password'))
         for i, name in enumerate(f_args):
             if 'password' in name:
-                passwd = getpass.getpass(utils.get_name(name)+': ')
+                passwd = getpass.getpass(utils.get_name(name) + ': ')
                 args.insert(i, passwd)
     try:
         return func(*args, **kwargs)
@@ -177,7 +177,7 @@ def start():
                 print(e.__class__.__name__, e)
     except ExitException:
         if not config.debug and sys.stderr.error_happened:
-            if input(utils.get_name('send_error_report')+'\n')[0] in 'yYjJ':
+            if input(utils.get_name('send_error_report') + '\n')[0] in 'yYjJ':
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
@@ -209,8 +209,8 @@ def help(name=None):
         return
     elif name == 'commands':
         print('\n\n'.join('{}{}: {}'.format(
-            n, getsig(f), (inspect.getdoc(f) or 'No docstring').split('\n\n')[0]
-            ) for n, f in COMMANDS.items() if callable(f)))
+            n, getsig(f), (inspect.getdoc(f) or 'No docstring').split('\n\n')[0])
+                          for n, f in COMMANDS.items() if callable(f)))
         return
     elif name in COMMANDS:
         obj = COMMANDS[name]

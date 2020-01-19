@@ -5,3 +5,5 @@ scanner:
 flake8:
   max-line-length: 95
   exclude: [misc]
+  ignore:
+    - W503
