@@ -138,12 +138,12 @@ class PersonForm(SearchableForm):
         default_content = config.gui2.get('entry defaults').get('Person').mapping
 
     def get_name(name: str):
-        if name == 'id':
+        if name == 'id_':
             return get_name('s_nr')
         else:
             return get_name(name)
 
-    id: GroupElement.NO_SEARCH = IntEntry
+    id_: GroupElement.NO_SEARCH = IntEntry
     first_name: mtkf.Element = NonEmptyEntry
     last_name: mtkf.Element = NonEmptyEntry
     class_: mtkf.Element = ClassEntry
