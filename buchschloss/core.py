@@ -321,7 +321,7 @@ def level_required(level):
 
 
 def auth_required(f):
-    """require the currently logged member's password for executing the funcion
+    """require the currently logged member's password for executing the function
     raise a BuchSchlossBaseError if not given or wrong"""
 
     @wraps(f)
@@ -333,7 +333,7 @@ def auth_required(f):
         else:
             logging.info('{} failed to authenticate for {}'.format(
                 current_login, f.__name__))
-            raise BuchSchlossError('auth_failed', 'wrong_password_for_{}', current_login)
+            raise BuchSchlossError('auth_failed', 'wrong_password')
 
     auth_required_wrapper.__doc__ += (
         '\n\nThis function requires authentication in form of\n'
@@ -493,7 +493,7 @@ class Book(ActionNamespace):
                 for g in groups:
                     b.groups.add(models.Group.get_or_create(name=g)[0])
             except models.Library.DoesNotExist:
-                raise BuchSchlossNotFoundError('Book', library)
+                raise BuchSchlossNotFoundError('Library', library)
             else:
                 logging.info('{} created {}'.format(current_login, b))
         return b.id

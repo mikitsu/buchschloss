@@ -158,6 +158,7 @@ def search(form_cls, namespace: core.ActionNamespace, view_func):
     def search_callback(*, search_mode, exact_match, **kwargs):
         q = ()
         for k, val_seq in kwargs.items():
+            k = k.replace('__', '.')
             if (isinstance(val_seq, str)
                     or not isinstance(val_seq, collections.abc.Sequence)):
                 val_seq = [val_seq]
