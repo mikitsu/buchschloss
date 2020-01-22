@@ -111,8 +111,8 @@ def get_encrypted_database():
     return base64.urlsafe_b64decode(cipher)
 
 
-def web_backup():
-    """Remote backups.
+def ftp_backup():
+    """Remote backups via FTP.
 
     Run backup_shift and upload "name" DB as "name.1", encrypted if a key is given in config
     """
@@ -126,7 +126,7 @@ def web_backup():
         file.close()
         upload_path = file.name
 
-    factory = ftplib.FTP_TLS if conf.tls else ftplib.FTP
+    factory = ftplib.FTP_TLS if conf.ftp.tls else ftplib.FTP
     # noinspection PyDeprecation
     with ftputil.FTPHost(conf.ftp.host, conf.ftp.username, conf.ftp.password,
                          session_factory=factory, use_list_a_option=False) as host:
