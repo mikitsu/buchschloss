@@ -1091,7 +1091,7 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
     def follow_path(path, q):
         def handle_many_to_many():
             through = fv.through_model.alias()
-            cond_1 = (getattr(fv.model, fv.model.pk_name)
+            cond_1 = (getattr(cur, cur.pk_name)
                       == getattr(through, fv.model.__name__.lower() + '_id'))
             cond_2 = (getattr(through, mod.__name__.lower() + '_id')
                       == getattr(mod, mod.pk_name))
@@ -1100,10 +1100,14 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
         *path, end = path.split('.')
         mod = o
         for fn in path:
+            cur = mod
             fv = getattr(mod, fn)
             mod = fv.rel_model.alias()
             if isinstance(fv, peewee.ManyToManyField):
                 q = handle_many_to_many()
+            elif isinstance(fv, peewee.BackrefAccessor):
+                q = q.join(mod, on=(getattr(cur, cur.pk_name)
+                                    == getattr(mod, fv.field.name)))
             else:
                 q = q.join(mod, on=(fv == getattr(mod, mod.pk_name)))
         fv = getattr(mod, end)

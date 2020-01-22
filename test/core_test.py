@@ -685,3 +685,26 @@ def test_borrow_new(db):
     with pytest.raises(core.BuchSchlossBaseError):
         core.Borrow.new(person=123, book=2, weeks=weeks)
     core.Borrow.new(person=123, book=4, weeks=weeks)
+
+
+def test_search(db):
+    """test searches"""
+    models.Library.create(name='main')
+    book_1 = create_book(author='author name')
+    book_2 = create_book(author='author 2', year=2000)
+    person = create_person(123, class_='cls', libraries=['main'])
+    assert tuple(core.Book.search(('author', 'eq', 'author name'))) == (book_1,)
+    assert set(core.Book.search(())) == {book_1, book_2}
+    assert (tuple(core.Book.search((('author', 'ne', 'author name'), 'or', ())))
+            == (book_2,))
+    assert (tuple(core.Book.search((('author', 'contains', 'name'), 'and', ())))
+            == (book_1,))
+    assert (tuple(core.Book.search((('library.people.class_', 'eq', 'cls'),
+                                    'and', ('id', 'lt', 2))))
+            == (book_1,))
+    assert (tuple(core.Person.search(('libraries.books.author', 'contains', '2')))
+            == (person,))
+    assert (set(core.Book.search(('library.people.libraries.books.year', 'gt', 1990)))
+            == {book_1, book_2})
+    assert tuple(core.Book.search(('year', 'ge', 2001))) == ()
+    assert tuple(core.Book.search(('year', 'ge', 2000))) == (book_2,)
