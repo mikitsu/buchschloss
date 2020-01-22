@@ -44,7 +44,7 @@ def is_optionlist(value, *options):
     return val
 
 
-def is_task_list(value, _tasks=('backup', 'ftp_backup', 'late_books')):
+def is_task_list(value, _tasks=('backup', 'ftp_backup', 'late_books', 'http_backup')):
     """check whether the value is a list of tasks"""
     # TODO: make ``_tasks`` a mapping directly to the functions
     return validator.check('optionlist{}'.format(_tasks), value)

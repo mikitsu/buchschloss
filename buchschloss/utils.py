@@ -136,6 +136,17 @@ def ftp_backup():
         os.unlink(file.name)
 
 
+def http_backup():
+    """remote backups via HTTP"""
+    conf = config.utils.http
+    data = get_database_bytes()
+    options = {}
+    if config.utils.http.authentication.username:
+        options['auth'] = (conf.authentication.username,
+                           conf.authentication.password)
+    requests.post(conf.url, files={conf.file_name: data}, **options)
+
+
 def backup_shift(fs, depth):
     """shift all name.number up one number to the given depth
         in the given filesystem (os or remote FTP host)"""
