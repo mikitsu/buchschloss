@@ -102,7 +102,7 @@ def get_database_bytes():
         encrypted if a key is specified in config"""
     with open(config.core.database_name, 'rb') as f:
         plain = f.read()
-    if config.utils.secret_key is None:
+    if config.utils.tasks.secret_key is None:
         return plain
     if fernet is None:
         raise RuntimeError('encryption requested, but no cryptography available')
@@ -141,10 +141,13 @@ def http_backup():
     conf = config.utils.http
     data = get_database_bytes()
     options = {}
-    if config.utils.http.authentication.username:
+    if conf.authentication.username:
         options['auth'] = (conf.authentication.username,
                            conf.authentication.password)
-    requests.post(conf.url, files={conf.file_name: data}, **options)
+    r = requests.post(conf.url, files={conf.file_name: data}, **options)
+    if r.status_code != 200:
+        logging.error('received unexpected status code {} during HTTP backup'
+                      .format(r.status_code))
 
 
 def backup_shift(fs, depth):
