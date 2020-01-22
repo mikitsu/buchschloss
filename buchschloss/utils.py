@@ -92,20 +92,20 @@ def backup():
     Run backup_shift and copy "name" db to "name.1", encrypting if a key is given in config
     """
     backup_shift(os, config.utils.tasks.backup_depth)
-    if config.utils.tasks.secret_key is None:
-        shutil.copyfile(config.core.database_name, config.core.database_name + '.1')
-    else:
-        data = get_encrypted_database()
-        with open(config.core.database_name + '.1', 'wb') as f:
-            f.write(data)
+    data = get_database_bytes()
+    with open(config.core.database_name + '.1', 'wb') as f:
+        f.write(data)
 
 
-def get_encrypted_database():
-    """get the encrypted contents of the database file"""
-    if fernet is None:
-        raise RuntimeError('encryption requested, but no cryptography available')
+def get_database_bytes():
+    """get the contents of the database file,
+        encrypted if a key is specified in config"""
     with open(config.core.database_name, 'rb') as f:
         plain = f.read()
+    if config.utils.secret_key is None:
+        return plain
+    if fernet is None:
+        raise RuntimeError('encryption requested, but no cryptography available')
     key = base64.urlsafe_b64encode(config.utils.tasks.secret_key)
     cipher = fernet.Fernet(key).encrypt(plain)
     return base64.urlsafe_b64decode(cipher)
@@ -122,7 +122,7 @@ def ftp_backup():
         file = None
     else:
         file = tempfile.NamedTemporaryFile(delete=False)
-        file.write(get_encrypted_database())
+        file.write(get_database_bytes())
         file.close()
         upload_path = file.name
 
