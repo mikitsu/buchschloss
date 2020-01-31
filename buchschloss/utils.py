@@ -19,7 +19,6 @@ import ssl
 from datetime import datetime, timedelta, date
 import time
 import threading
-import shutil
 import os
 import ftplib
 import ftputil
@@ -118,6 +117,8 @@ def ftp_backup():
     """
     conf = config.utils
     if conf.tasks.secret_key is None:
+        # get_database_bytes handles encryption,
+        # but this saves copying a file
         upload_path = config.core.database_name
         file = None
     else:
@@ -144,7 +145,11 @@ def http_backup():
     if conf.authentication.username:
         options['auth'] = (conf.authentication.username,
                            conf.authentication.password)
-    r = requests.post(conf.url, files={conf.file_name: data}, **options)
+    try:
+        r = requests.post(conf.url, files={conf.file_name: data}, **options)
+    except requests.RequestException as e:
+        logging.error('exception during HTTP request: ' + str(e))
+        return
     if r.status_code != 200:
         logging.error('received unexpected status code {} during HTTP backup'
                       .format(r.status_code))
