@@ -706,5 +706,8 @@ def test_search(db):
             == (person,))
     assert (set(core.Book.search(('library.people.libraries.books.year', 'gt', 1990)))
             == {book_1, book_2})
+    assert tuple(core.Person.search(('libraries', 'eq', 'main'))) == (person,)
+    assert (set(core.Book.search(('library.people.libraries', 'eq', 'main')))
+            == {book_2, book_1})
     assert tuple(core.Book.search(('year', 'ge', 2001))) == ()
     assert tuple(core.Book.search(('year', 'ge', 2000))) == (book_2,)
