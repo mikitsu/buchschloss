@@ -142,9 +142,10 @@ def http_backup():
     conf = config.utils.http
     data = get_database_bytes()
     options = {}
-    if conf.authentication.username:
-        options['auth'] = (conf.authentication.username,
-                           conf.authentication.password)
+    if conf.Basic_authentication.username:
+        options['auth'] = (conf.Basic_authentication.username,
+                           conf.Basic_authentication.password)
+    if conf.POST_authentication.username or conf
     try:
         r = requests.post(conf.url, files={conf.file_name: data}, **options)
     except requests.RequestException as e:
