@@ -166,18 +166,9 @@ def start(noisy_success=True):
             config['gui2']['intro']['text'] = \
                 'Buchschloss\n\nhttps://github.com/mik2k2/buchschloss'
 
-        # TODO: can these checks be somehow written into the validator?
         if ((config['utils']['email']['smtp']['username'] is None)
                 ^ (config['utils']['email']['smtp']['password'] is None)):
-            raise Exception(
-                'smtp.username and smtp.password must both be given or omitted')
-        if (
-                (config['utils']['http']['POST authentication']['username']
-                 or config['utils']['http']['POST authentication']['password'])
-                and (config['utils']['http']['Basic authentication']['username']
-                     or config['utils']['http']['Basic authentication']['password'])
-        ):
-            raise Exception('use either Basic ot POST authentication, not both.')
+            raise Exception('smtp.username and smtp.password must both be given or omitted')
         if noisy_success:
             print('YAY, no configuration errors found')
         return config
