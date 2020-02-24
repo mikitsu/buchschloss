@@ -1098,9 +1098,8 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
             return q.join(through, on=cond_1).join(mod, on=cond_2)
 
         *path, end = path.split('.')
-        mod = o
+        cur = mod = o
         for fn in path:
-            cur = mod
             fv = getattr(mod, fn)
             mod = fv.rel_model.alias()
             if isinstance(fv, peewee.ManyToManyField):
@@ -1110,6 +1109,7 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
                                     == getattr(mod, fv.field.name)))
             else:
                 q = q.join(mod, on=(fv == getattr(mod, mod.pk_name)))
+            cur = mod
         fv = getattr(mod, end)
         if isinstance(fv, peewee.ManyToManyField):
             mod = fv.rel_model
