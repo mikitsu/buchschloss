@@ -29,6 +29,7 @@ class GroupElement:
     ONLY_EDIT = mtkf.Element(groups=[ElementGroup.EDIT], opt='in')
     ONLY_NEW = mtkf.Element(groups=[ElementGroup.NEW], opt='in')
     NO_SEARCH = mtkf.Element(groups=[ElementGroup.SEARCH])
+    ONLY_SEARCH = mtkf.Element(groups=[ElementGroup.SEARCH], opt="in")
 
 
 class PasswordFormWidget(mtkf.FormWidget):
@@ -42,6 +43,14 @@ class PasswordFormWidget(mtkf.FormWidget):
             self.widget_dict[self.password_name].delete(0, tk.END)
             self.widget_dict[self.password2_name].delete(0, tk.END)
         del self.data[self.password2_name]
+
+
+def form_get_name(name):
+    """adapt utils.get_name to forms"""
+    if name.endswith('_search_alt'):
+        name = name[:-len('_search_alt')]
+    # put namespace lookup here
+    return get_name(name)
 
 
 class BaseForm(mtkf.Form, template=True):
@@ -69,7 +78,7 @@ class BaseForm(mtkf.Form, template=True):
         # workaround, this isn't needed if we decide to update misc
         error_display_options = {'popup_field_name_resolver': get_name}
 
-    get_name = get_name
+    get_name = form_get_name
 
 
 class SearchableForm(BaseForm, template=True):
@@ -84,12 +93,17 @@ class SearchableForm(BaseForm, template=True):
                     if not (value or isinstance(value, bool)
                             or k in ['exact_match', 'search_mode']):
                         w.remove(self.widget_dict.pop(k))
+                        continue
+                    if k.endswith('_search_alt'):
+                        del self.widget_dict[k]
+                        k = k[:-len('_search_alt')]
+                        self.widget_dict[k] = v
                 self.widgets = tuple(w)
             super().submit_action(event)
 
-    search_mode: mtkf.Element(groups=[ElementGroup.SEARCH], opt="in") = (
+    search_mode: GroupElement.ONLY_SEARCH = (
         mtk.RadioChoiceWidget, {'*args': [(c, get_name(c)) for c in ['and', 'or']]})
-    exact_match: mtkf.Element(groups=[ElementGroup.SEARCH], opt='in') = CheckbuttonWithVar
+    exact_match: GroupElement.ONLY_SEARCH = CheckbuttonWithVar
 
 
 class BookForm(SearchableForm):
@@ -128,7 +142,9 @@ class BookForm(SearchableForm):
     medium: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-medium'})
     genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
 
-    library: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
+    library: GroupElement.NO_SEARCH = (OptionsFromSearch, {'action_ns': core.Library})
+    library_search_alt: GroupElement.ONLY_SEARCH = (
+        OptionsFromSearch, {'action_ns': core.Library, 'allow_none': True})
     groups: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Group})
     shelf: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-shelf'})
 
