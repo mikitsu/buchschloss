@@ -7,6 +7,8 @@ import json
 import base64
 import binascii
 from collections.abc import Mapping
+import pprint
+
 import configobj
 from configobj import validate
 
@@ -126,10 +128,6 @@ def start(noisy_success=True):
             file_error=True)
     except (configobj.ConfigObjError, IOError) as e:
         raise Exception('error reading {}: {}'.format(filename, e))
-    # WORKAROUND: since configObj doesn't support optional sections / unspecified keys
-    # when validating, I have to remove them before and insert them after
-    entry_defaults = config.get('gui2', {}).get('entry_defaults', {})
-    autocomplete = config.get('gui2', {}).get('autocomplete', {})
     val = config.validate(validator)
     if isinstance(val, Mapping):  # True if successful, dict if not
         print('--- ERROR IN CONFIG FILE FORMAT ---\n')
@@ -147,9 +145,6 @@ def start(noisy_success=True):
         print('\n\nSee the confspec.cfg file for information on how the data has to be')
         raise Exception
     else:
-        # see workaround above
-        config['gui2']['entry_defaults'] = entry_defaults
-        config['gui2']['autocomplete'] = autocomplete
         # since this can get quite large, it is an external file
         name_format = config['utils']['names']['format']
         try:
@@ -171,6 +166,10 @@ def start(noisy_success=True):
             raise Exception('smtp.username and smtp.password must both be given or omitted')
         if noisy_success:
             print('YAY, no configuration errors found')
+            if (config['debug']
+                    and input('Do you want to see the current settings? ')
+                    .lower().startswith('y')):
+                pprint.pprint(config)
         return config
 
 
