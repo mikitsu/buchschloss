@@ -175,7 +175,10 @@ def start():
                 handle_user_input(ui)
             except Level8Error as e:
                 print(e.__class__.__name__, e)
-    except ExitException:
+    except (ExitException, EOFError) as e:
+        if isinstance(e, EOFError):
+            # make the terminal prompt go onto a new line
+            print()
         if not config.debug and sys.stderr.error_happened:
             if input(utils.get_name('send_error_report') + '\n')[0] in 'yYjJ':
                 try:
