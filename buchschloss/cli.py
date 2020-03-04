@@ -67,7 +67,7 @@ def execute(command, args, kwargs):
     except (TypeError, ValueError):
         pass
     else:
-        if func.__name__ in core.auth_required.functions:
+        if func.__qualname__ in core.auth_required.functions:
             kwargs['current_password'] = getpass.getpass(utils.get_name('current_password'))
         for i, name in enumerate(f_args):
             if 'password' in name:
