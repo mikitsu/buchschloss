@@ -1,5 +1,6 @@
 """Lua-based cli2"""
 
+import getpass
 try:
     import lupa
 except ImportError as e:
@@ -50,8 +51,30 @@ def prepare_runtime():
     runtime = lupa.LuaRuntime(attribute_handlers=(lambda o, n: o.lua_get(n),
                                                   lambda o, n, v: o.lua_set(n, v)))
     restrict_runtime(runtime, config.cli2.whitelist.mapping)
-    runtime.globals()['buchschloss'] = {
-        k: objects.LuaActionNS(getattr(core, k))
+    runtime.globals()['buchschloss'] = runtime.table(**{
+        k: objects.LuaActionNS(getattr(core, k), runtime=runtime)
         for k in 'Book Person Group Library Borrow Member'.split()
-    }
+    })
     return runtime
+
+
+def start():
+    """provide a REPL"""
+    rt = prepare_runtime()
+    for k, v in {
+        'login': lupa.unpacks_lua_table(core.login),
+        'getpass': getpass.getpass,
+        'logout': core.logout,
+    }.items():
+        rt.globals()[k] = v
+    while True:
+        try:
+            line = input(str(core.current_login)+'@buchschloss-cli2 ==> ')
+        except EOFError:
+            return
+        try:
+            val = rt.eval(line)
+        except lupa.LuaError as e:
+            print(str(e))
+        else:
+            print(val)
