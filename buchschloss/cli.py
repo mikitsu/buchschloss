@@ -67,7 +67,7 @@ def execute(command, args, kwargs):
     except (TypeError, ValueError):
         pass
     else:
-        if func.__name__ in core.auth_required.functions:
+        if func.__qualname__ in core.auth_required.functions:
             kwargs['current_password'] = getpass.getpass(utils.get_name('current_password'))
         for i, name in enumerate(f_args):
             if 'password' in name:
@@ -175,7 +175,10 @@ def start():
                 handle_user_input(ui)
             except Level8Error as e:
                 print(e.__class__.__name__, e)
-    except ExitException:
+    except (ExitException, EOFError) as e:
+        if isinstance(e, EOFError):
+            # make the terminal prompt go onto a new line
+            print()
         if not config.debug and sys.stderr.error_happened:
             if input(utils.get_name('send_error_report') + '\n')[0] in 'yYjJ':
                 try:

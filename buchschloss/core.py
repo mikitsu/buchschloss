@@ -339,7 +339,7 @@ def auth_required(f):
         '\n\nThis function requires authentication in form of\n'
         'a `current_password` argument containing the currently\n'
         "logged in member's password\n")
-    auth_required.functions.append(f.__name__)
+    auth_required.functions.append(f.__qualname__)
     return auth_required_wrapper
 auth_required.functions = []  # noqa
 
