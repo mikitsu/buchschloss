@@ -92,8 +92,10 @@ class OptionsFromSearch(mtk.OptionChoiceWidget):
     """an option widget that gets its options from search results"""
 
     def __init__(self, master, *, action_ns: core.ActionNamespace = None,
-                 attribute='name', **kwargs):
+                 attribute='name', allow_none=False, **kwargs):
         values = [(getattr(o, attribute), str(o)) for o in action_ns.search(())]
+        if allow_none:
+            values.insert(0, (None, ''))
         super().__init__(master, values=values, **kwargs)
 
 

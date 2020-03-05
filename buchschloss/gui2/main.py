@@ -171,9 +171,15 @@ def new_book_autofill(form):
     """automatically fill some information on a book"""
 
     def filler(event=None):
-        if str(form) not in str(app.root.focus_get()):
-            # going somewhere else
-            return
+        try:
+            if str(form) not in str(app.root.focus_get()):
+                # going somewhere else
+                return
+        except KeyError as e:
+            if str(e) == "'__tk__messagebox'":
+                return
+            else:
+                raise
         valid, isbn = isbn_field.validate()
         if not valid:
             tk_msg.showerror(message=isbn)
@@ -234,7 +240,7 @@ action_tree = ActionTree.from_map({
 action_tree.new.book = generic_formbased_action(
     'new', FORMS['book'], actions.new_book, post_init=new_book_autofill)
 action_tree.edit.change_password = generic_formbased_action(
-    'edit', FORMS['change_password'], core.Member.change_password, fill_data=lambda _: {})
+    'edit', FORMS['change_password'], core.Member.change_password)
 action_tree.edit.activate_group = generic_formbased_action(
     'edit', FORMS['activate_group'], core.Group.activate)
 action_tree.edit.library = generic_formbased_action(
