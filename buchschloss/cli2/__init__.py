@@ -4,6 +4,9 @@ try:
     import lupa
 except ImportError as e:
     raise ImportError('did you install cli2-requirements?') from e
+from .. import core
+from .. import config
+from . import objects
 
 
 def restrict_runtime(runtime, whitelist):
@@ -38,4 +41,17 @@ def restrict_runtime(runtime, whitelist):
     allow_values(gv, whitelist)
     gv['_G'] = gv
     gv['_VERSION'] = lua_version
+    return runtime
+
+
+def prepare_runtime():
+    """create and initialize a new Lua runtime"""
+    # noinspection PyArgumentList
+    runtime = lupa.LuaRuntime(attribute_handlers=(lambda o, n: o.lua_get(n),
+                                                  lambda o, n, v: o.lua_set(n, v)))
+    restrict_runtime(runtime, config.cli2.whitelist.mapping)
+    runtime.globals()['buchschloss'] = {
+        k: objects.LuaActionNS(getattr(core, k))
+        for k in 'Book Person Group Library Borrow Member'.split()
+    }
     return runtime
