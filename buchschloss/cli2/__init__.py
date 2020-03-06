@@ -1,12 +1,20 @@
 """Lua-based cli2"""
 
 import getpass
+import traceback
+
 try:
     import lupa
 except ImportError as e:
     raise ImportError('did you install cli2-requirements?') from e
+try:
+    # on linux (all? some?), importing will make arrow keys usable
+    import readline
+except ImportError:
+    pass
 from .. import core
 from .. import config
+from .. import utils
 from . import objects
 
 
@@ -51,7 +59,7 @@ def prepare_runtime():
     runtime = lupa.LuaRuntime(attribute_handlers=(lambda o, n: o.lua_get(n),
                                                   lambda o, n, v: o.lua_set(n, v)))
     restrict_runtime(runtime, config.cli2.whitelist.mapping)
-    runtime.globals()['buchschloss'] = runtime.table(**{
+    runtime.globals()['buchschloss'] = runtime.table_from({
         k: objects.LuaActionNS(getattr(core, k), runtime=runtime)
         for k in 'Book Person Group Library Borrow Member'.split()
     })
@@ -71,10 +79,27 @@ def start():
         try:
             line = input(str(core.current_login)+'@buchschloss-cli2 ==> ')
         except EOFError:
+            print()
             return
         try:
-            val = rt.eval(line)
-        except lupa.LuaError as e:
+            try:
+                val = rt.eval(line)
+            except lupa.LuaSyntaxError:
+                val = rt.execute(line)
+        except (lupa.LuaError,
+                objects.LuaAccessForbidden,
+                TypeError,
+                ) as e:
             print(str(e))
+        except core.BuchSchlossBaseError as e:
+            print(e.title, e.message, sep=': ')
+        except Exception:
+            traceback.print_exc()
+            print(utils.get_name('unexpected_error'))
         else:
+            if lupa.lua_type(val) == 'table':
+                if tuple(range(1, len(val)+1)) == tuple(dict(val).keys()):
+                    val = tuple(val)
+                else:
+                    val = dict(val)
             print(val)
