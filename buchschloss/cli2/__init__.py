@@ -2,6 +2,7 @@
 
 import getpass
 import traceback
+import os
 
 try:
     import lupa
@@ -16,6 +17,10 @@ from .. import core
 from .. import config
 from .. import utils
 from . import objects
+
+
+with open(os.path.join(os.path.dirname(__file__), 'stdlib.lua')) as f:
+    STDLIB_CODE = f.read()
 
 
 def restrict_runtime(runtime, whitelist):
@@ -63,6 +68,8 @@ def prepare_runtime():
         k: objects.LuaActionNS(getattr(core, k), runtime=runtime)
         for k in 'Book Person Group Library Borrow Member'.split()
     })
+    for k, v in dict(runtime.execute(STDLIB_CODE)).items():
+        runtime.globals()[k] = v
     return runtime
 
 
