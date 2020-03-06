@@ -110,6 +110,9 @@ class LuaDataNS(LuaObject):
         super().__init__(**kwargs)
         self.data_ns = data_ns
 
+    def __str__(self):
+        return str(self.data_ns)
+
     @classmethod
     def add_specific(cls,
                      is_for: T.Type[core.ActionNamespace],
