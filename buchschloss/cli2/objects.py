@@ -10,11 +10,13 @@ from .. import core
 
 
 class LuaAccessForbidden(AttributeError):
-    """Subclass of AttributeError for when Lua access to an Attribute is forbidden
-        can be used as a context manager to suppress
-        AttributeErrors except LuaAccessForbidden
-    """
-    # TODO: find a nice name and move the context manager somewhere else
+    """Subclass of AttributeError for when Lua access to an Attribute is forbidden"""
+    def __init__(self, obj, name):
+        super().__init__("access to {!r}.{} not possible".format(obj, name))
+
+
+class CheckLuaAccessForbidden:
+    """context manager to suppress AttributeErrors except LuaAccessForbidden"""
     def __enter__(self):
         pass
 
@@ -50,7 +52,7 @@ class LuaObject(abc.ABC):
             the name is present in self.get_allowed
         """
         if name not in self.get_allowed:
-            raise LuaAccessForbidden
+            raise LuaAccessForbidden(self, name)
         return getattr(self, name)
 
     def lua_set(self, name, value):
@@ -76,7 +78,7 @@ class LuaActionNS(LuaObject):
 
     def lua_get(self, name):
         """Allow access to names stored in self.data_ns"""
-        with LuaAccessForbidden():
+        with CheckLuaAccessForbidden():
             return super().lua_get(name)
         # noinspection PyUnreachableCode
         val = getattr(self.action_ns, name)
@@ -146,7 +148,7 @@ class LuaDataNS(LuaObject):
             else:
                 return None
         else:
-            with LuaAccessForbidden():
+            with CheckLuaAccessForbidden():
                 return super().lua_get(name)
             # noinspection PyUnreachableCode
             return getattr(self.data_ns, name)
