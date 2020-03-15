@@ -198,9 +198,9 @@ class Borrow(Model):
 
     def __str__(self):
         if self.is_back:
-            is_back = utils.get_name('is_back')
+            is_back = utils.get_name('Borrow::is_back')
         else:
-            is_back = utils.get_name('until_{}').format(self.return_date)
+            is_back = utils.get_name('Borrow::until_{}').format(self.return_date)
         return '{}: {} {}'.format(self.person, self.book, is_back)
 
 

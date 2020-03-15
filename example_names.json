@@ -1,6 +1,11 @@
 {
   "unexpected_error": "unexpected error",
   "error_in_buchschloss": "Error in BuchSchloss",
+  "Person[{}]\"{}, {}\"": "Person[{}]\"{}, {}\"",
+  "Library[{}]": "Library[{}]",
+  "Book[{}]\"{}\"": "Book[{}]\"{}\"",
+  "Group[{}]": "Group[{}]",
+  "Member[{}]({})": "Member[{}]({})",
   "error": {
     "no_permission": "permission denied",
     "must_be_{}": "For this action, you must be at least {}.",
@@ -53,6 +58,11 @@
     "borrowed": "borrowed",
     "available": "available",
     "inactive": "removed"
+  },
+  "Borrow": {
+    "*this*": "borrowing action",
+    "is_back": "is_back",
+    "until_{}": "borrowed until {}"
   },
   "interactive_question": {
     "current_password": "Please enter your password",
