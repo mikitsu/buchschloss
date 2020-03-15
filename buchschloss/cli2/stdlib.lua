@@ -7,12 +7,12 @@ local ActionNS = {}
 local DataNS = {}
 
 function ActionNS_meta.__index(tbl, key)
-    local val = ActionNS[name]
+    local val = ActionNS[key]
     if val ~= nil then
         return val
     end
     if type(key) == 'number' then
-        return DataNS:new(tbl.backend.view_ns(key))
+        return new_data_ns(tbl.backend.view_ns(key))
     end
 end
 
@@ -21,13 +21,14 @@ function ActionNS_meta.__call(tbl, query)
 end
 
 function ActionNS:new(options)
-    return DataNS:new(self.backend.new(options))
+    return new_data_ns(self.backend.new(options))
 end
 
-function DataNS:new(data_ns)
-    obj = {data_ns=data_ns}
-    self.__index = self
-    return setmetatable(obj, self)
+function new_data_ns(data_ns)
+    local meta = {
+        __index=function(tbl, key) return DataNS[key] or data_ns[key] end
+    }
+    return setmetatable({}, meta)
 end
 
 function DataNS:edit(options)
@@ -37,7 +38,7 @@ function DataNS:edit(options)
     print(options)
 end
 
-Book = {backend=buchschloss.Book}
+local Book = {backend=buchschloss.Book}
 setmetatable(Book, ActionNS_meta)
 
 return {Book=Book}
