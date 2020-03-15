@@ -293,6 +293,8 @@ class ShowInfoNS:
                  'text': utils.get_name(str(d['is_back']))
              }),),
          },
+        'not used',
+        'anyway',
     )
     to_destroy = None
 

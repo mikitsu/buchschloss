@@ -3,6 +3,7 @@
   "error_in_buchschloss": "Error in BuchSchloss",
   "errors_{}": "the following errors occurred:\n\n{}",
   "back_to_results": "back to search results",
+  "{}_results": "{} results",
   "info_regarding": "information regarding",
   "logged_in_as_{}": "logged in as {}",
   "logged_out": "logged out",
@@ -44,6 +45,10 @@
     "no_connection": "No internet connection",
     "error_while_sending_error_msg": "While sending the error message, an other error occurred",
     "no_password_match": "The passwords don't match.",
+    "gui2": {
+      "series_number_must_be_int": "The series number must be an integer",
+      "number_without_series": "If giving a series number, you must also specify a series name"
+    },
     "Borrow": {
       "*this*": "borrowing error",
       "borrow_length_not_positive": "OverflowError",
@@ -63,6 +68,13 @@
   "actions": {
     "new": "new",
     "view": "view",
+    "edit": "edit",
+    "search": "search",
+    "borrow": "borrow",
+    "restitute": "return",
+    "borrow_search": "borrowing action",
+    "change_password": "change password",
+    "activate_group": "activate a group",
     "login": "log in",
     "logout": "log out",
     "abort": "abort",

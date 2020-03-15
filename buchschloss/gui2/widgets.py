@@ -66,9 +66,9 @@ class SeriesEntry(mtk.ContainingWidget):
         _, series = self.widgets[0].validate()
         number_valid, series_number = self.widgets[1].validate()
         if not number_valid:
-            return False, utils.get_name('error_series_number_must_be_int')
+            return False, utils.get_name('error::gui2::series_number_must_be_int')
         if series is None and series_number is not None:
-            return False, utils.get_name('error_number_without_series')
+            return False, utils.get_name('error::gui2::number_without_series')
         return True, (series, series_number)
 
     def set_number(self, number):
@@ -83,7 +83,7 @@ class SeriesEntry(mtk.ContainingWidget):
 
 class ActionChoiceWidget(mtk.ContainingWidget):
     def __init__(self, master, actions, **kw):
-        widgets = [(Button, {'text': utils.get_name(txt), 'command': cmd})
+        widgets = [(Button, {'text': utils.get_name('actions::'+txt), 'command': cmd})
                    for txt, cmd in actions]
         super().__init__(master, *widgets, **kw)
 
