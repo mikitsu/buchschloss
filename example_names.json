@@ -42,6 +42,7 @@
     "{}_not_borrowed_by_{}": "{} isn't borrowed by {}.",
     "no_connection": "No internet connection",
     "error_while_sending_error_msg": "While sending the error message, an other error occurred",
+    "no_password_match": "The passwords don't match.",
     "Borrow": {
       "*this*": "borrowing error",
       "borrow_length_not_positive": "OverflowError",
@@ -63,6 +64,78 @@
     "view": "view",
     "login": "log in",
     "logout": "log out"
+  },
+  "form": {
+    "name": "name",
+    "current_password": "your password",
+    "password2": "repeat password",
+    "Search": {
+      "search_mode": "search mode",
+      "exact_match": "require exact match"
+    },
+    "Book": {
+      "id": "ID",
+      "isbn": "ISBN",
+      "author": "author",
+      "title": "title",
+      "series": "series",
+      "language": "language",
+      "publisher": "publisher",
+      "concerned_people": "other people",
+      "year": "year",
+      "medium": "medium",
+      "genres": "genres",
+      "library": "library",
+      "groups": "groups",
+      "shelf": "shelf"
+    },
+    "Person": {
+      "id_": "ID",
+      "first_name": "first name",
+      "last_name": "last name",
+      "class_": "class",
+      "max_borrow": "max. borrowed books",
+      "libraries": "libraries",
+      "pay": "has paid"
+    },
+    "Member": {
+      "level": "level",
+      "password": "new password"
+    },
+    "ChangePassword": {
+      "member": "name",
+      "new_password": "new password"
+    },
+    "Login": {
+      "name": "name",
+      "password": "password"
+    },
+    "LibraryGroupCommon": {
+      "books": "books"
+    },
+    "Group": {
+      "action": "action"
+    },
+    "Library": {
+      "action": "action",
+      "people": "people",
+      "pay_required": "payment required"
+    },
+    "GroupActivation": {
+      "name": "group",
+      "src": "source libraries",
+      "dest": "destination library"
+    },
+    "BorrowRestCommon": {
+      "person": "person",
+      "book": "book"
+    },
+    "Borrow": {
+      "weeks": "borrow time (weeks)"
+    },
+    "BorrowSearch": {
+      "is_back": "was returned"
+    }
   },
   "Book": {
     "*this*": "book",
