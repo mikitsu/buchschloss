@@ -1,5 +1,51 @@
 {
-  "level_0": "inactive",
-  "no_permission": "Permission denied",
-  "must_be_{}": "For this action, you must be at least {}."
+  "error": {
+    "no_permission": "permission denied",
+    "must_be_{}": "For this action, you must be at least {}.",
+    "must_be_level_4_or_editee": "",
+    "Book_not_found": "book not found",
+    "no_Book_with_id_{}": "There is no book with the ID {}.",
+    "Person_not_found": "person not found",
+    "no_Person_with_id_{}": "There is no person with the ID {}.",
+    "Member_not_found": "member not found",
+    "no_Member_with_id_{}": "There is no member with the name {}.",
+    "Library_not_found": "library not found",
+    "no_Library_with_id_{}": "There is no library with the name {}.",
+    "Libraries_not_found": "libraries not found",
+    "no_Libraries_with_id_{}": "There are no libraries with the names {}.",
+    "Group_not_found": "group not found",
+    "no_Group_with_id_{}": "There is no group with the name {}.",
+    "Person_exists": "the person already exists",
+    "Person_with_id_{}_exists": "There is already a person with the ID {}.",
+    "Library_exists": "the library already exists",
+    "Library_with_id_{}_exists": "There is already a library with the name {}.",
+    "Group_exists": "the group already exists",
+    "Group_with_id_{}_exists": "There is already a group with the name {}.",
+    "Member_exists": "the member already exists",
+    "Member_with_id_{}_exists": "There is already a member with the name {}.",
+    "auth_failed": "authentication failed",
+    "wrong_password": "The given password is wrong.",
+    "not_borrowed": "book not borrowed",
+    "{}_not_borrowed": "{} isn't borrowed.",
+    "{}_not_borrowed_by_{}": "{} isn't borrowed by {}.",
+    "Borrow": {
+      "*this*": "borrowing error",
+      "borrow_length_not_positive": "OverflowError",
+      "Book_{}_not_available": "The Book with the ID {} is currently not available.",
+      "{}_not_in_Library_{}": "{} is not allowed to borrow books from {}.",
+      "Library_{}_needs_payment": "Payment required to borrow books from {}.",
+      "{}_reached_max_borrow": "{} has reached their borrowing limit."
+    },
+    "Member": {
+      "must_be_level_4_or_editee": "To change someone else's password, you must be Superadmin"
+    }
+  },
+  "Book": {
+    "*this*": "book",
+    "borrowed": "borrowed",
+    "available": "available",
+    "inactive": "removed"
+  },
+  "login": "login",
+  "level_0": "inactive"
 }
