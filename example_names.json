@@ -1,4 +1,6 @@
 {
+  "unexpected_error": "unexpected error",
+  "error_in_buchschloss": "Error in BuchSchloss",
   "error": {
     "no_permission": "permission denied",
     "must_be_{}": "For this action, you must be at least {}.",
@@ -29,6 +31,7 @@
     "{}_not_borrowed": "{} isn't borrowed.",
     "{}_not_borrowed_by_{}": "{} isn't borrowed by {}.",
     "no_connection": "No internet connection",
+    "error_while_sending_error_msg": "While sending the error message, an other error occurred",
     "Borrow": {
       "*this*": "borrowing error",
       "borrow_length_not_positive": "OverflowError",
@@ -51,6 +54,20 @@
     "available": "available",
     "inactive": "removed"
   },
-  "login": "login",
-  "level_0": "inactive"
+  "interactive_question": {
+    "current_password": "Please enter your password",
+    "new_password": "Please enter the new password",
+    "password": "Please enter the password",
+    "send_error_report": "Do you want to send an error report?"
+  },
+  "cli": {
+    "{}_is_invalid_command": "The command '{}' does not exist.",
+    "dont_give_passwords": "Only type a password when specifically prompted",
+    "help": {
+      "action": "The name of the function to call",
+      "args": "The arguments to use. Will be evaluated as Python literals or, on failure, as strings. Stored values may be used by putting the name between <angle brackets>. Pass positional arguments at their position. Pass keyword arguments as `key`=`value`, where `key` is the argument name (string) and `value` its value (evaluated as Python literal or, if that fails, as string",
+      "store": "Store the result of this call in a variable with the name. The model may be retrieved by putting the name in <angle brackets>",
+      "cmd": "Invoke the given command with the result of the execution as sole positional argument."
+    }
+  }
 }
