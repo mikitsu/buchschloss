@@ -92,11 +92,8 @@ class LuaActionNS(LuaObject):
         return self.runtime.table(*(self.data_ns(o, runtime=self.runtime) for o in results))
 
     def view_ns(self, id_):
-        """wrap the result in LuaDataNS and return None on failure"""
-        try:
-            return self.data_ns(self.action_ns.view_ns(id_), runtime=self.runtime)
-        except core.BuchSchlossBaseError:
-            return None
+        """wrap the result in LuaDataNS"""
+        return self.data_ns(self.action_ns.view_ns(id_), runtime=self.runtime)
 
 
 class LuaDataNS(LuaObject):

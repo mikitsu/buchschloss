@@ -11,11 +11,7 @@ function ActionNS_meta.__index(tbl, key)
     if val ~= nil then
         return val
     end
-    val = tbl.backend.view_ns(key)
-    if val ~= nil then
-        return new_data_ns(val)
-    end
-    return nil
+    return new_data_ns(tbl.backend.view_ns(key))
 end
 
 function ActionNS_meta.__call(tbl, query)
