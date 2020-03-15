@@ -76,7 +76,7 @@ def late_books():
     today = date.today()
     for b in core.Borrow.search((
             ('is_back', 'eq', False),
-            'and', ('return_date', 'gt', today + config.utils.late_books_warn_time))):
+            'and', ('return_date', 'gt', today + config.utils.tasks.late_books_warn_time))):
         if b.return_date < today:
             late.append(b)
         else:

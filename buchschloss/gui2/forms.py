@@ -73,7 +73,7 @@ class BaseForm(mtkf.Form, template=True):
 
     class FormWidget:
         take_focus = True
-        submit_on_return = mtkf.FormWidget.SubmitOnReturn.ALL
+        submit_on_return = mtkf.FormWidget.SubmitOnReturn.NOT_FIRST
         submit_button = {'text': get_name('btn_do')}
         # workaround, this isn't needed if we decide to update misc
         error_display_options = {'popup_field_name_resolver': get_name}
