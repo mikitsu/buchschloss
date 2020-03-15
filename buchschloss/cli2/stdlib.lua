@@ -38,7 +38,11 @@ function DataNS:edit(options)
     print(options)
 end
 
-local Book = {backend=buchschloss.Book}
-setmetatable(Book, ActionNS_meta)
-
-return {Book=Book}
+return {
+    Book=setmetatable({backend=buchschloss.Book}, ActionNS_meta),
+    Borrow=setmetatable({backend=buchschloss.Borrow}, ActionNS_meta),
+    Person=setmetatable({backend=buchschloss.Person}, ActionNS_meta),
+    Library=setmetatable({backend=buchschloss.Library}, ActionNS_meta),
+    Group=setmetatable({backend=buchschloss.Group}, ActionNS_meta),
+    Member=setmetatable({backend=buchschloss.Member}, ActionNS_meta),
+}
