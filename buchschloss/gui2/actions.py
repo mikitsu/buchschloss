@@ -181,13 +181,14 @@ def func_from_static(static: staticmethod):
 
 class ShowInfoNS:
     """namespace for information viewing"""
-    # noinspection PyDefaultArgument,PyNestedDecorators
+
+    # noinspection PyNestedDecorators
     @func_from_static
     @staticmethod
     def _show_info_action(namespace: T.Type[core.ActionNamespace],
-                          special_keys={}, id_get_title='ID',
-                          id_get_text='ID:', id_type=int):
-        """prepare a fcuntion displaying information
+                          special_keys, id_get_title,
+                          id_get_text, id_type=int):
+        """prepare a function displaying information
 
         Arguments:
             - namespace: the namespace with the viewing function
@@ -198,7 +199,7 @@ class ShowInfoNS:
                 being second
             TODO -- move to a form-based question
             - id_get_title: the title of the popup window asking for the ID
-            - id_get_text: the text of the window askinf for the ID
+            - id_get_text: the text of the window asking for the ID
             - id_type: the type of the ID
         """
 
@@ -215,7 +216,7 @@ class ShowInfoNS:
                 try:
                     validator = mval.Validator((
                         id_type, {ValueError: utils.get_name(
-                            'must_be_{}'.format(id_type.__name__))}))
+                            'error::must_be_{}'.format(id_type.__name__))}))
                     id_ = mtkd.WidgetDialog.ask(
                         main.app.root, mtk.ValidatedWidget.new_cls(tk.Entry, validator),
                         title=id_get_title, text=id_get_text)
@@ -258,8 +259,8 @@ class ShowInfoNS:
                             if d['borrowed_by_id'] is not None else None)
             }))
          },
-        utils.get_name('view__book'),
-        utils.get_name('book_id')
+        utils.get_name('actions::view__Book'),
+        utils.get_name('Book::id')
     )
     person = _show_info_action(
         core.Person,
@@ -270,8 +271,8 @@ class ShowInfoNS:
              for t, i in zip(d['borrows'], d['borrow_book_ids'])],
         )
         },
-        utils.get_name('view__person'),
-        utils.get_name('id')
+        utils.get_name('actions::view__Person'),
+        utils.get_name('Person::id')
     )
     borrow = _show_info_action(
         core.Borrow,
@@ -310,11 +311,11 @@ def login():
             return
         main.app.header.set_info_text(utils.get_name('logged_in_as_{}'
                                                      ).format(core.current_login))
-        main.app.header.set_login_text(utils.get_name('logout'))
+        main.app.header.set_login_text(utils.get_name('actions::logout'))
     else:
         core.logout()
         main.app.header.set_info_text(utils.get_name('logged_out'))
-        main.app.header.set_login_text(utils.get_name('login'))
+        main.app.header.set_login_text(utils.get_name('actions::login'))
 
 
 def view_late(late, warn):
@@ -345,5 +346,6 @@ def activate_group(name, src, dest):
 
 
 def new_book(**kwargs):
-    tk_msg.showinfo(utils.get_name('new_book'), utils.get_name('new_book_id_is_%s')
-                    % core.Book.new(**kwargs))
+    tk_msg.showinfo(utils.get_name('actions::new__Book'),
+                    utils.get_name('Book::new_id_{}')
+                    .format(core.Book.new(**kwargs)))
