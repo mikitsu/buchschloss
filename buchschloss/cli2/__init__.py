@@ -105,8 +105,9 @@ def start():
             print(utils.get_name('unexpected_error'))
         else:
             if lupa.lua_type(val) == 'table':
-                if tuple(range(1, len(val)+1)) == tuple(dict(val).keys()):
-                    val = tuple(val)
+                val = dict(val)
+                if tuple(range(1, len(val)+1)) == tuple(val.keys()):
+                    val = tuple(val.values())
                 else:
                     val = dict(val)
             print(val)

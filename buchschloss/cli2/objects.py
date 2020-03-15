@@ -29,7 +29,7 @@ class CheckLuaAccessForbidden:
 def table_to_tuple(table):
     """transform a Lua table to a tuple"""
     if lupa.lua_type(table) == 'table':
-        return tuple(table_to_tuple(v) for v in table)
+        return tuple(table_to_tuple(v) for v in dict(table).values())
     else:
         return table
 
