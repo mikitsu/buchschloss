@@ -113,6 +113,9 @@ class BuchSchlossBaseError(Exception):
         self.title = title
         self.message = message
 
+    def __str__(self):
+        return '{0.title}: {0.message}'.format(self)
+
     @classmethod
     def template_title(cls, template_title):
         """return a subclass that will %-format the given template title

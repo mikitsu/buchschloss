@@ -76,7 +76,7 @@ def execute(command, args, kwargs):
     try:
         return func(*args, **kwargs)
     except core.BuchSchlossBaseError as e:
-        raise ExecutionError('{0.title}: {0.message}'.format(e))
+        raise ExecutionError(str(e))
     except ExitException:
         raise
     except Exception:
