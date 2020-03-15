@@ -288,7 +288,7 @@ def get_book_data(isbn: int):
                          + str(isbn) + '&method=simpleSearch&cqlMode=true')
         r.raise_for_status()
     except requests.exceptions.RequestException:
-        raise core.BuchSchlossError('no_connection', 'no_connection')
+        raise core.BuchSchlossError('book_data::no_connection', 'book_data::no_connection')
 
     person_re = re.compile(r'(\w*, \w*) \((\w*)\)')
     results = {'concerned_people': []}
@@ -300,7 +300,7 @@ def get_book_data(isbn: int):
         link_to_first = page.select_one('#recordLink_0')
         if link_to_first is None:
             raise core.BuchSchlossError(
-                'Book_not_found', 'Book_with_ISBN_{}_not_in_DNB', isbn)
+                'book_data::Book_not_found', 'book_data::Book_with_ISBN_{}_not_in_DNB', isbn)
         r = requests.get('https://portal.dnb.de' + link_to_first['href'])
         page = bs4.BeautifulSoup(r.text)
         table = page.select_one('#fullRecordTable')

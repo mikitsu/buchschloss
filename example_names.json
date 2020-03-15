@@ -28,6 +28,7 @@
     "not_borrowed": "book not borrowed",
     "{}_not_borrowed": "{} isn't borrowed.",
     "{}_not_borrowed_by_{}": "{} isn't borrowed by {}.",
+    "no_connection": "No internet connection",
     "Borrow": {
       "*this*": "borrowing error",
       "borrow_length_not_positive": "OverflowError",
@@ -38,6 +39,10 @@
     },
     "Member": {
       "must_be_level_4_or_editee": "To change someone else's password, you must be Superadmin"
+    },
+    "book_data": {
+      "Book_not_found": "book not found",
+      "Book_with_ISBN_{}_not_in_DNB": "A book with an ISBN of {} wasn't found in the DNB"
     }
   },
   "Book": {
