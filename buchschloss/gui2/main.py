@@ -96,10 +96,10 @@ class App:
         self.center = tk.Frame(self.root)
         self.header = widgets.Header(
             self.root,
-            {'text': utils.get_name('login'), 'command': actions.login},
+            {'text': utils.get_name('actions::login'), 'command': actions.login},
             utils.get_name('not_logged_in'),
-            {'text': utils.get_name('abort'), 'command': self.reset},
-            {'text': utils.get_name('exit_app'), 'command': self.onexit}
+            {'text': utils.get_name('actions::abort'), 'command': self.reset},
+            {'text': utils.get_name('actions::exit_app'), 'command': self.onexit}
         )
 
     def launch(self):
@@ -135,18 +135,18 @@ class App:
 
     def onexit(self):
         """execute when the user exits the application"""
-        if tk_msg.askokcancel(utils.get_name('exit_app'),
-                              utils.get_name('really_exit_app')):
-            if (not config.debug
+        if tk_msg.askokcancel(utils.get_name('actions::exit_app'),
+                              utils.get_name('interactive_question::really_exit_app')):
+            if (isinstance(sys.stderr, core.DummyErrorFile)
                     and sys.stderr.error_happened
                     and tk_msg.askokcancel(
-                        None, utils.get_name('send_error_report'))):
+                        None, utils.get_name('interactive_question::send_error_report'))):
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
                 except utils.requests.RequestException as e:
                     tk_msg.showerror(None, '\n'.join((
-                        utils.get_name('error_while_sending_error_msg'), str(e))))
+                        utils.get_name('error::error_while_sending_error_msg'), str(e))))
             self.root.destroy()
             sys.exit()
 
@@ -185,8 +185,8 @@ def new_book_autofill(form):
             tk_msg.showerror(message=isbn)
             isbn_field.focus()
             return
-        if not tk_msg.askyesno(utils.get_name('create_book'),
-                               utils.get_name('ask_isbn_autofill')):
+        if not tk_msg.askyesno(utils.get_name('actions::new__Book'),
+                               utils.get_name('interactive_question::isbn_autofill')):
             return
         try:
             data = utils.get_book_data(isbn)

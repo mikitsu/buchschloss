@@ -6,6 +6,7 @@
   "info_regarding": "information regarding",
   "logged_in_as_{}": "logged in as {}",
   "logged_out": "logged out",
+  "not_logged_in": "not logged in",
   "Person[{}]\"{}, {}\"": "Person[{}]\"{}, {}\"",
   "Library[{}]": "Library[{}]",
   "Book[{}]\"{}\"": "Book[{}]\"{}\"",
@@ -63,7 +64,9 @@
     "new": "new",
     "view": "view",
     "login": "log in",
-    "logout": "log out"
+    "logout": "log out",
+    "abort": "abort",
+    "exit_app": "exit"
   },
   "form": {
     "name": "name",
@@ -158,7 +161,9 @@
     "current_password": "Please enter your password",
     "new_password": "Please enter the new password",
     "password": "Please enter the password",
-    "send_error_report": "Do you want to send an error report?"
+    "send_error_report": "Do you want to send an error report?",
+    "really_exit_app": "Do you really want to exit?",
+    "isbn_autofill": "Do you want some data to be automatically filled based on the ISBN?"
   },
   "cli": {
     "{}_is_invalid_command": "The command '{}' does not exist.",
