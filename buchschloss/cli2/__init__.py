@@ -95,11 +95,10 @@ def start():
                 val = rt.execute(line)
         except (lupa.LuaError,
                 objects.LuaAccessForbidden,
+                core.BuchSchlossBaseError,
                 TypeError,
                 ) as e:
-            print(str(e))
-        except core.BuchSchlossBaseError as e:
-            print(e.title, e.message, sep=': ')
+            print(e)
         except Exception:
             traceback.print_exc()
             print(utils.get_name('unexpected_error'))
