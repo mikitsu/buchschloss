@@ -5,6 +5,7 @@ BuchSchloss Lua standard library
 local ActionNS_meta = {}
 local ActionNS = {}
 local DataNS = {}
+local new_data_ns
 
 function ActionNS_meta.__index(tbl, key)
     local val = ActionNS[key]
