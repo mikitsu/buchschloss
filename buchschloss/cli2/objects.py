@@ -129,12 +129,12 @@ class LuaDataNS(LuaObject):
                        {'get_allowed': get_allowed,
                         'wrap_iter': dict(wrap_iter),
                         'wrap_data_ns': dict(wrap_data_ns)})
+        cls.specific_class[is_for] = new_cls
         if is_for in cls.__waiting_specific_class:
             for k in cls.__waiting_specific_class[is_for]:
                 other_cls, other_k = k
                 cls.specific_class[other_cls].wrap_iter[other_k] = new_cls
             del cls.__waiting_specific_class[is_for]
-        cls.specific_class[is_for] = new_cls
 
     def lua_get(self, name):
         """enforce wrap_iter ans wrap_data_ns"""
