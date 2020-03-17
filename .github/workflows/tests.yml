@@ -24,11 +24,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    - name: Remove annotations
-      if: matrix.python-version == 3.5
-      run: |
-        pip install strip-hints~=0.1.7
-        python strip_buchschloss_hints.py
     - name: Create dummy DB
       run: touch the.db
     - name: Test with pytest
