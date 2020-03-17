@@ -207,8 +207,9 @@ class LibraryGroupCommon(BaseForm, template=True):
     name: mtkf.Element = NonEmptyEntry
     books: mtkf.Element = IntListEntry
     # not as element to allow Library to have a nice order
-    action = (mtk.RadioChoiceWidget, {'*args': [(a, get_name(a)) for a in
-                                                ['add', 'remove', 'delete']]})
+    action = (mtk.RadioChoiceWidget, {
+        '*args': [(a, get_name('form::LibraryGroupCommon'+a)) for a in
+                  ['add', 'remove', 'delete']]})
 
 
 class GroupForm(LibraryGroupCommon):

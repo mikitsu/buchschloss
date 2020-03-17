@@ -157,9 +157,10 @@ class BuchSchlossError(BuchSchlossBaseError):
         'error::' will be prepended to both title and message
     """
 
-    def __init__(self, title, message, *message_format):
+    def __init__(self, title, message, *message_args, **message_kwargs):
         super().__init__(utils.get_name('error::' + title),
-                         utils.get_name('error::' + message).format(*message_format))
+                         utils.get_name('error::' + message)
+                         .format(*message_args, **message_kwargs))
 
 
 class BuchSchlossPermError(BuchSchlossBaseError):
@@ -908,8 +909,8 @@ class Borrow(ActionNamespace):
         if not book.is_active or book.borrow:
             raise BuchSchlossError('Borrow', 'Borrow::Book_{}_not_available', book.id)
         if book.library not in person.libraries:
-            raise BuchSchlossError('Borrow', 'Borrow::{}_not_in_Library_{}',
-                                   person, book.library.name)
+            raise BuchSchlossError('Borrow', 'Borrow::{person}_not_in_Library_{library}',
+                                   person=person, library=book.library.name)
         if (book.library.pay_required and (person.pay_date or date.min)
                 + timedelta(weeks=52) < date.today()):
             raise BuchSchlossError('Borrow', 'Borrow::Library_{}_needs_payment', book.library)
@@ -951,8 +952,8 @@ class Borrow(ActionNamespace):
         if borrow is None:
             raise BuchSchlossError('not_borrowed', '{}_not_borrowed', book.id)
         if person is not None and borrow.person.id != person:
-            raise BuchSchlossError('not_borrowed', '{}_not_borrowed_by_{}',
-                                   book, person)
+            raise BuchSchlossError('not_borrowed', '{book}_not_borrowed_by_{person}',
+                                   book=book, person=person)
         borrow.is_back = True
         borrow.save()
         logging.info('{} confirmed {} was returned'.format(current_login, borrow))

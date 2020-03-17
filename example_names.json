@@ -41,7 +41,7 @@
     "wrong_password": "The given password is wrong.",
     "not_borrowed": "book not borrowed",
     "{}_not_borrowed": "{} isn't borrowed.",
-    "{}_not_borrowed_by_{}": "{} isn't borrowed by {}.",
+    "{book}_not_borrowed_by_{person}": "{person} hasn't borrowed {book}.",
     "no_connection": "No internet connection",
     "error_while_sending_error_msg": "While sending the error message, an other error occurred",
     "no_password_match": "The passwords don't match.",
@@ -53,7 +53,7 @@
       "*this*": "borrowing error",
       "borrow_length_not_positive": "OverflowError",
       "Book_{}_not_available": "The Book with the ID {} is currently not available.",
-      "{}_not_in_Library_{}": "{} is not allowed to borrow books from {}.",
+      "{person}_not_in_Library_{library}": "{person} is not allowed to borrow books from {library}.",
       "Library_{}_needs_payment": "Payment required to borrow books from {}.",
       "{}_reached_max_borrow": "{} has reached their borrowing limit."
     },
@@ -126,6 +126,9 @@
       "password": "password"
     },
     "LibraryGroupCommon": {
+      "add": "add",
+      "remove": "remove",
+      "delete": "delete",
       "books": "books"
     },
     "Group": {
