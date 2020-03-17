@@ -208,7 +208,7 @@ def get_name(internal: str):
     if '__' in internal:
         return ': '.join(get_name(s) for s in internal.split('__'))
     *path, name = internal.split('::')
-    components = 2**len(path) + 1
+    components = 2**len(path)
     look_in = []
     while components:
         components -= 1
