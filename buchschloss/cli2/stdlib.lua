@@ -4,7 +4,6 @@ BuchSchloss Lua standard library
 
 local ActionNS_meta = {}
 local ActionNS = {}
-local DataNS = {}
 local new_data_ns
 
 function ActionNS_meta.__index(tbl, key)
@@ -12,7 +11,7 @@ function ActionNS_meta.__index(tbl, key)
     if val ~= nil then
         return val
     end
-    return new_data_ns(tbl.backend.view_ns(key))
+    return new_data_ns(tbl.backend.view_ns(key), tbl.backend, key)
 end
 
 function ActionNS_meta.__call(tbl, query)
@@ -20,21 +19,18 @@ function ActionNS_meta.__call(tbl, query)
 end
 
 function ActionNS:new(options)
-    return new_data_ns(self.backend.new(options))
+    return self.backend.new(options)
 end
 
-function new_data_ns(data_ns)
-    local meta = {
-        __index=function(tbl, key) return DataNS[key] or data_ns[key] end
-    }
-    return setmetatable({}, meta)
-end
-
-function DataNS:edit(options)
-    -- TODO
-    print('in edit')
-    print(self)
-    print(options)
+function new_data_ns(data_ns, backend, id)
+    local function index(tbl, key)
+        if key == 'edit' then
+            return function(options) options[1] = id; backend.edit(options) end
+        else
+            return data_ns[key]
+        end
+    end
+    return setmetatable({}, {__index=index})
 end
 
 return {
