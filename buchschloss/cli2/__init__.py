@@ -23,6 +23,23 @@ with open(os.path.join(os.path.dirname(__file__), 'stdlib.lua')) as f:
     STDLIB_CODE = f.read()
 
 
+def lua_set(obj, name, value):
+    """delegate attribute setting from Lua"""
+    return obj.lua_set(name, value)
+
+
+def lua_get(obj, name):
+    """handle attribute access from Lua, delegating if possible"""
+    try:
+        return obj.lua_get(name)
+    except AttributeError:
+        val = getattr(obj, name)
+        if isinstance(val, (int, str, float)):
+            return val
+        else:
+            raise AttributeError
+
+
 def restrict_runtime(runtime, whitelist):
     """restrict a Lua runtime
 
@@ -61,8 +78,7 @@ def restrict_runtime(runtime, whitelist):
 def prepare_runtime():
     """create and initialize a new Lua runtime"""
     # noinspection PyArgumentList
-    runtime = lupa.LuaRuntime(attribute_handlers=(lambda o, n: o.lua_get(n),
-                                                  lambda o, n, v: o.lua_set(n, v)))
+    runtime = lupa.LuaRuntime(attribute_handlers=(lua_get, lua_set))
     restrict_runtime(runtime, config.cli2.whitelist.mapping)
     runtime.globals()['buchschloss'] = runtime.table_from({
         k: objects.LuaActionNS(getattr(core, k), runtime=runtime)
