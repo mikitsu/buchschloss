@@ -25,7 +25,7 @@ end
 function new_data_ns(data_ns, backend, id)
     local function index(tbl, key)
         if key == 'edit' then
-            return function(options) options[1] = id; backend.edit(options) end
+            return function(self, options) options[1] = id; backend.edit(options) end
         else
             return data_ns[key]
         end
