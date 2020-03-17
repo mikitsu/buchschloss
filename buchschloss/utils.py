@@ -12,6 +12,8 @@ they will receive arguments as specified in late_books
 """
 
 import base64
+import functools
+import operator
 import tempfile
 import email
 import smtplib
@@ -206,17 +208,17 @@ def get_name(internal: str):
     if '__' in internal:
         return ': '.join(get_name(s) for s in internal.split('__'))
     *path, name = internal.split('::')
-    current = config.utils.names
-    look_in = [current]
-    try:
-        for k in path:
-            current = current[k]
-            look_in.append(current)
-    except KeyError:
-        if not config.debug:
-            # noinspection PyUnboundLocalVariable
-            logging.warning('invalid namespace {!r} of {!r}'.format(k, internal))
-    look_in.reverse()
+    components = 2**len(path) + 1
+    look_in = []
+    while components:
+        components -= 1
+        try:
+            look_in.append(functools.reduce(
+                operator.getitem,
+                (ns for i, ns in enumerate(path, 1) if components & (1 << (len(path) - i))),
+                config.utils.names))
+        except KeyError:
+            pass
     for ns in look_in:
         try:
             val = ns[name]
