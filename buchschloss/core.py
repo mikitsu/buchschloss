@@ -79,17 +79,18 @@ logging.basicConfig(level=getattr(logging, config.core.log.level),
 class LoginType(enum.Enum):
     MEMBER = 'Member[{name}]({level})'
     GUEST = 'Guest'
-    SCRIPT = 'Script[{name}]({level})'
-    INTERNAL = 'SYSTEM-{name}'
+    SCRIPT = 'Script[{name}]({level})<-{invoker}'
+    INTERNAL = 'SYSTEM'
 
 
 class LoginContext:
     """data about a logged in user"""
 
-    def __init__(self, login_type: LoginType, name: str, level: int):
+    def __init__(self, login_type: LoginType, level: int, **data):
         self.type = login_type
-        self.name = name
         self.level = level
+        for k, v in data.items():
+            setattr(self, k, v)
 
     def __str__(self):
         return self.type.value.format(**self.__dict__)
@@ -401,7 +402,7 @@ def login(name: str, password: str):
         raise BuchSchlossError('login', 'no_Member_with_id_{}', name)
     if authenticate(m, password):
         logging.info('login success {}'.format(m))
-        return LoginContext(LoginType.MEMBER, m.name, m.level)
+        return LoginContext(LoginType.MEMBER, m.level, name=m.name)
     else:
         logging.info('login fail {}'.format(m))
         raise BuchSchlossError('login', 'wrong_password')
@@ -1291,8 +1292,8 @@ class ComplexSearch:  # TODO: use misc.Instance for this
         return to[0] if self.return_first_item else to
 
 
-internal_lc = LoginContext(LoginType.INTERNAL, __name__, 5)
-guest_lc = LoginContext(LoginType.GUEST, '', 0)
+internal_lc = LoginContext(LoginType.INTERNAL, 5)
+guest_lc = LoginContext(LoginType.GUEST, 0)
 misc_data = MiscData()
 
 logging.info('core operational')
