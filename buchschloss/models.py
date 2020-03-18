@@ -1,4 +1,5 @@
 import datetime
+import json
 import sys
 import typing
 
@@ -36,6 +37,15 @@ if config is not None:
     db = SqliteDatabase(config.core.database_name)
 else:
     db = SqliteDatabase(input('Unable to locate config module. Please insert DB name -> '))
+
+
+class JSONField(peewee.TextField):
+    """Save JSON objects"""
+    def python_value(self, value):
+        return None if value is None else json.loads(value)
+
+    def db_value(self, value):
+        return None if value is None else json.dumps(value)
 
 
 class Model(peewee.Model):
@@ -256,6 +266,14 @@ class Member(Model):
     def __str__(self):
         return utils.get_name("Member[{}]({})").format(
             self.name, utils.get_name('level_{}'.format(self.level)))
+
+
+class Script(Model):
+    """Represent a Lua / cli2 script"""
+    name: T.Union[str, CharField] = CharField(primary_key=True)
+    script: T.Union[str, peewee.TextField] = peewee.TextField()
+    setuid: T.Union[int, IntegerField] = IntegerField(null=True)
+    storage: T.Union[dict, JSONField] = JSONField()
 
 
 class Misc(Model):
