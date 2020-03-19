@@ -351,7 +351,7 @@ def auth_required(f):
     def auth_required_wrapper(*args, login_context: LoginContext, current_password: str, **kwargs):
         if login_context.type is not LoginType.MEMBER:
             raise BuchSchlossError('auth_failed', 'not_logged_in')
-        login_member = Member.view_ns(login_context.name, login_context=internal_lc).password
+        login_member = Member.view_ns(login_context.name, login_context=internal_lc)
         if authenticate(login_member, current_password):
             logging.info('{} passed authentication for {}'.format(
                 current_login, f.__name__))
