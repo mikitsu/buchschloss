@@ -919,7 +919,7 @@ class Borrow(ActionNamespace):
             the maximum amount of time a book may be borrowed for is defined
             in the configuration settings
         """
-        if weeks > config.core.borrow_time_limit[current_login.level]:
+        if weeks > config.core.borrow_time_limit[login_context.level]:
             raise BuchSchlossPermError(1)
         if weeks <= 0:
             raise BuchSchlossError('Borrow', 'borrow_length_not_positive')

@@ -246,7 +246,7 @@ action_tree = ActionTree.from_map({
         'edit', FORMS[k], wrapped_action_ns[k].edit, fill_data=wrapped_action_ns[k].view_str)
              for k in ('book', 'person', 'member')
     },  # noqa
-    'search': {k: actions.search(f, wrapped_action_ns[k], getattr(ShowInfoNS, k)) for f, k in (
+    'search': {k: actions.search(f, wrapped_action_ns[k].search, getattr(ShowInfoNS, k)) for f, k in (
         (forms.BookForm, 'book'),
         (forms.PersonForm, 'person'),
         (forms.BorrowSearchForm, 'borrow'),
