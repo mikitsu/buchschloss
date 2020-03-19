@@ -343,7 +343,7 @@ def borrow_restitute(form_cls, callback):
     """function for borrow and restitute actions"""
     def add_btn(form):
         try:
-            pw = [(widgets.Button, {'text': core.Person.view_repr(p),
+            pw = [(widgets.Button, {'text': core.Person.view_repr(p, login_context=main.app.current_login),
                                     'command': partial(form.inject_submit, person=p)})
                   for p in core.misc_data.latest_borrowers]
             widgets.mtk.ContainingWidget(main.app.center, *pw, horizontal=2).pack()
@@ -363,4 +363,4 @@ def activate_group(name, src, dest):
 
 def new_book(**kwargs):
     tk_msg.showinfo(utils.get_name('new_book'), utils.get_name('new_book_id_is_%s')
-                    % core.Book.new(**kwargs))
+                    % core.Book.new(login_context=main.app.current_login, **kwargs))
