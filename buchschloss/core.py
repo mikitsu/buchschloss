@@ -348,18 +348,27 @@ def auth_required(f):
     raise a BuchSchlossBaseError if not given or wrong"""
 
     @wraps(f)
-    def auth_required_wrapper(*args, login_context: LoginContext, current_password: str, **kwargs):
-        if login_context.type is not LoginType.MEMBER:
-            raise BuchSchlossError('auth_failed', 'not_logged_in')
-        login_member = Member.view_ns(login_context.name, login_context=internal_lc)
-        if authenticate(login_member, current_password):
-            logging.info('{} passed authentication for {}'.format(
-                current_login, f.__name__))
-            return f(*args, **kwargs)
+    def auth_required_wrapper(*args, login_context: LoginContext, current_password: str = '', **kwargs):
+        if login_context.type is LoginType.INTERNAL:
+            logging.info('{} was granted access to {}'.format(login_context, f.__qualname__))
+        elif login_context.type is LoginType.SCRIPT:
+            # Todo: auth attributes...
+            logging.info('{} was denied access to {}'.format(login_context, f.__qualname__))
+            raise BuchSchlossError('auth_failed', 'no_script_perms')
+        elif login_context.type is LoginType.MEMBER:
+            # noinspection PyUnresolvedReferences
+            login_member = Member.view_ns(login_context.name, login_context=internal_lc)
+            if authenticate(login_member, current_password):
+                logging.info('{} passed authentication for {}'.format(
+                    login_context, f.__qualname__))
+            else:
+                logging.info('{} failed to authenticate for {}'.format(
+                    login_context, f.__qualname__))
+                raise BuchSchlossError('auth_failed', 'wrong_password')
         else:
-            logging.info('{} failed to authenticate for {}'.format(
-                current_login, f.__name__))
-            raise BuchSchlossError('auth_failed', 'wrong_password')
+            logging.info('{} was denied access to {}'.format(login_context, f.__qualname__))
+            raise BuchSchlossError('auth_failed', 'unknown_auth_category')
+        return f(*args, **kwargs)
 
     auth_required_wrapper.__doc__ += (
         '\n\nThis function requires authentication in form of\n'
@@ -612,7 +621,7 @@ class Person(ActionNamespace):
         """
         if pay_date is None and pay:
             pay_date = date.today()
-        if max_borrow > 3 and not current_login.level >= 4:
+        if max_borrow > 3 and not login_context.level >= 4:
             raise BuchSchlossPermError(4)
         p = models.Person(id=id_, first_name=first_name, last_name=last_name,
                           class_=class_, max_borrow=max_borrow, pay_date=pay_date)
@@ -646,6 +655,8 @@ class Person(ActionNamespace):
                                                       peewee.Field)} | {'pay'})
                 or 'id' in kwargs):
             raise TypeError('unexpected kwarg')
+        if kwargs.get('max_borrow', 0) > 3 and not login_context.level >= 4:
+            raise BuchSchlossPermError(4)
         if kwargs.pop('pay', False):
             kwargs['pay_date'] = date.today()
         errors = set()
@@ -1064,14 +1075,13 @@ class Member(ActionNamespace):
             If the editee is currently logged in, the new password
             needs to be used for authentication immediately
         """
-        global current_login
-        if current_login.level < 4 and current_login.name != member.name:
+        if (login_context.level < 4
+                and (login_context.type is not LoginType.MEMBER
+                     or login_context.name != member.name)):
             raise BuchSchlossError('no_permission', 'must_be_level_4_or_editee')
         member.salt = urandom(config.core.salt_length)
         member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
-        if current_login.name == member.name:
-            current_login = member
         logging.info("{} changed {}'s password".format(login_context, member))
 
     @staticmethod
