@@ -348,7 +348,7 @@ def auth_required(f):
     raise a BuchSchlossBaseError if not given or wrong"""
 
     @wraps(f)
-    def auth_required_wrapper(*args, login_context: LoginContext, current_password: str = '', **kwargs):
+    def auth_required_wrapper(*args, login_context: LoginContext, current_password: str = None, **kwargs):
         if login_context.type is LoginType.INTERNAL:
             logging.info('{} was granted access to {}'.format(login_context, f.__qualname__))
         elif login_context.type is LoginType.SCRIPT:
@@ -356,6 +356,8 @@ def auth_required(f):
             logging.info('{} was denied access to {}'.format(login_context, f.__qualname__))
             raise BuchSchlossError('auth_failed', 'no_script_perms')
         elif login_context.type is LoginType.MEMBER:
+            if current_password is None:
+                raise TypeError('when called with a MEMBER login context, ``current_password`` must be given')
             # noinspection PyUnresolvedReferences
             login_member = Member.view_ns(login_context.name, login_context=internal_lc)
             if authenticate(login_member, current_password):
