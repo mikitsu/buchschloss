@@ -76,7 +76,7 @@ def late_books():
     today = date.today()
     for b in core.Borrow.search((
             ('is_back', 'eq', False),
-            'and', ('return_date', 'gt', today + config.utils.tasks.late_books_warn_time))):
+            'and', ('return_date', 'gt', today + config.utils.tasks.late_books_warn_time)), core.internal_lc):
         if b.return_date < today:
             late.append(b)
         else:
@@ -274,11 +274,11 @@ def get_book_data(isbn: int):
     """Attempt to get book data via the ISBN from the DB, if that fails,
         try the DNB (https://portal.dnb.de)"""
     try:
-        book = next(iter(core.Book.search(('isbn', 'eq', isbn))))
+        book = next(iter(core.Book.search(('isbn', 'eq', isbn), login_context=core.internal_lc)))
     except StopIteration:
         pass  # actually, I could put the whole rest of the function here
     else:
-        data = core.Book.view_str(book.id)
+        data = core.Book.view_str(book.id, login_context=core.internal_lc)
         del data['id'], data['status'], data['return_date'], data['borrowed_by']
         del data['borrowed_by_id'], data['__str__']
         return data
