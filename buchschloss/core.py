@@ -336,7 +336,7 @@ def level_required(level):
         @wraps(f)
         def level_required_wrapper(*args, login_context: LoginContext, **kwargs):
             checker(login_context)
-            return f(*args, **kwargs)
+            return f(*args, login_context=login_context, **kwargs)
 
         return level_required_wrapper
 
