@@ -368,7 +368,7 @@ def auth_required(f):
         else:
             logging.info('{} was denied access to {}'.format(login_context, f.__qualname__))
             raise BuchSchlossError('auth_failed', 'unknown_auth_category')
-        return f(*args, **kwargs)
+        return f(*args, login_context=login_context, **kwargs)
 
     auth_required_wrapper.__doc__ += (
         '\n\nThis function requires authentication in form of\n'
