@@ -8,6 +8,7 @@ import queue
 import threading
 import time
 import sys
+import typing as T
 
 from ..misc import tkstuff as mtk
 
@@ -23,6 +24,19 @@ from . import forms
 from . import widgets
 from . import actions
 from .actions import generic_formbased_action, ShowInfoNS, show_BSE
+
+
+class NSWithLogin:
+    """Wrap around an ActionNamespace providing the current login"""
+    def __init__(self, ans: T.Type[core.ActionNamespace]):
+        self.ans = ans
+
+    def __getattr__(self, item):
+        val = getattr(self.ans, item)
+        if callable(val):
+            return lambda *a, **kw: val(*a, login_context=app.current_login, **kw)
+        else:
+            return val
 
 
 class ActionTree:
@@ -75,6 +89,7 @@ class App:
         .center: the main part
         .queue: actions to be executed separately from the tk event loop
         .root: the tk.Tk instance
+        .current_login: a core.LoginContext instance
     """
 
     def __init__(self):
@@ -87,6 +102,7 @@ class App:
             tk_font.nametofont(font_name.join(('Tk', 'Font'))).config(**font_conf)
         if not config.debug:
             sys.stderr = core.DummyErrorFile()
+        self.current_login = core.guest_lc
         self.queue = queue.Queue()
         self.on_next_reset = []
         self.greeter = tk.Label(self.root,
@@ -200,6 +216,8 @@ def new_book_autofill(form):
     isbn_field.bind('<FocusOut>', filler)
 
 
+app = App()
+
 FORMS = {
     'book': forms.BookForm,
     'person': forms.PersonForm,
@@ -208,12 +226,15 @@ FORMS = {
     'activate_group': forms.GroupActivationForm,
     'member': forms.MemberForm,
     'change_password': forms.ChangePasswordForm,
-    'borrow_search': forms.BorrowSearchForm,
+}
+wrapped_action_ns = {
+    k: NSWithLogin(getattr(core, k.capitalize()))
+    for k in ('book', 'person', 'group', 'library', 'borrow', 'member')
 }
 
 action_tree = ActionTree.from_map({
     'new': {  # TODO: add an AddDict to misc to be able to insert the stuff here
-        k: generic_formbased_action('new', FORMS[k], getattr(core, k.capitalize()).new)
+        k: generic_formbased_action('new', FORMS[k], wrapped_action_ns[k].new)
         for k in ('book', 'person', 'library', 'group', 'member')
         # book here to keep it 1st with insertion ordered dicts
     },
@@ -221,31 +242,26 @@ action_tree = ActionTree.from_map({
         'book': ShowInfoNS.book,
         'person': ShowInfoNS.person,
     },
-    'edit': {k: generic_formbased_action('edit', FORMS[k], v.edit, fill_data=v.view_str)
-             for k, v in {
-                 'book': core.Book,
-                 'person': core.Person,
-                 'member': core.Member,
-             }.items()
+    'edit': {k: generic_formbased_action(
+        'edit', FORMS[k], wrapped_action_ns[k].edit, fill_data=wrapped_action_ns[k].view_str)
+             for k in ('book', 'person', 'member')
     },  # noqa
-    'search': {k: actions.search(FORMS[k], *v) for k, v in {
-        'book': (core.Book, ShowInfoNS.book),
-        'person': (core.Person, ShowInfoNS.person),
-        'borrow_search': (core.Borrow, ShowInfoNS.borrow),
-    }.items()
+    'search': {k: actions.search(f, wrapped_action_ns[k], getattr(ShowInfoNS, k)) for f, k in (
+        (forms.BookForm, 'book'),
+        (forms.PersonForm, 'person'),
+        (forms.BorrowSearchForm, 'borrow'),
+    )
     },
-    'borrow': actions.borrow_restitute(forms.BorrowForm, core.Borrow.new),
-    'restitute': actions.borrow_restitute(forms.RestituteForm, core.Borrow.restitute),
+    'borrow': actions.borrow_restitute(forms.BorrowForm, wrapped_action_ns['borrow'].new),
+    'restitute': actions.borrow_restitute(forms.RestituteForm, wrapped_action_ns['borrow'].restitute),
 })
 action_tree.new.book = generic_formbased_action(
     'new', FORMS['book'], actions.new_book, post_init=new_book_autofill)
 action_tree.edit.change_password = generic_formbased_action(
-    'edit', FORMS['change_password'], core.Member.change_password)
+    'edit', FORMS['change_password'], wrapped_action_ns['member'].change_password)
 action_tree.edit.activate_group = generic_formbased_action(
-    'edit', FORMS['activate_group'], core.Group.activate)
+    'edit', FORMS['activate_group'], wrapped_action_ns['group'].activate)
 action_tree.edit.library = generic_formbased_action(
-    'edit', FORMS['library'], core.Library.edit)
+    'edit', FORMS['library'], wrapped_action_ns['library'].edit)
 action_tree.edit.group = generic_formbased_action(
-    'edit', FORMS['group'], core.Group.edit)
-
-app = App()
+    'edit', FORMS['group'], wrapped_action_ns['group'].edit)

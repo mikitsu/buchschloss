@@ -22,6 +22,19 @@ def show_BSE(e):
     tk_msg.showerror(e.title, e.message)
 
 
+class NSWithLogin:
+    """Wrap around an ActionNamespace providing the current login"""
+    def __init__(self, ans: T.Type[core.ActionNamespace]):
+        self.ans = ans
+
+    def __getattr__(self, item):
+        val = getattr(self.ans, item)
+        if callable(val):
+            return lambda *a, **kw: val(*a, login_context=main.app.current_login, **kw)
+        else:
+            return val
+
+
 # noinspection PyDefaultArgument
 def generic_formbased_action(form_type, form_cls, callback,
                              form_options={}, fill_data=None,
@@ -106,7 +119,7 @@ def generic_formbased_action(form_type, form_cls, callback,
     return action
 
 
-def show_results(results, view_func, master=None):
+def show_results(results: T.Iterable, view_func: T.Callable[[T.Any], dict], master=None):
     """show search results as buttons taking the user to the appropriate view
 
         Arguments:
@@ -148,12 +161,16 @@ def show_results(results, view_func, master=None):
     main.app.on_next_reset.append(lambda: main.app.root.unbind('<q>', q_binding))
 
 
-def search(form_cls, namespace: core.ActionNamespace, view_func):
+def search(form_cls: T.Type[forms.BaseForm],
+           search_func: T.Callable[[T.Any], T.Iterable],
+           view_func: T.Callable[[T.Any], dict]
+           ) -> T.Callable[[T.Optional[tk.Event]], None]:
     """wrapper for generic_formbased_action for search actions
 
     Arguments:
         - form_cls: the misc.tkstuff.forms.Form subclass
-        - namespace: the core namespace in which the search and view functions are
+        - search_func: the function for searching
+        - view_func: the function for viewing individual results
     """
     def search_callback(*, search_mode, exact_match, **kwargs):
         q = ()
@@ -168,7 +185,7 @@ def search(form_cls, namespace: core.ActionNamespace, view_func):
                 else:
                     q = ((k, 'contains', v), search_mode, q)
 
-        results = namespace.search(q)
+        results = search_func(q)
         show_results(results, view_func)
 
     return generic_formbased_action('search', form_cls, search_callback, do_reset=False)
@@ -184,10 +201,10 @@ class ShowInfoNS:
     # noinspection PyDefaultArgument,PyNestedDecorators
     @func_from_static
     @staticmethod
-    def _show_info_action(namespace: T.Type[core.ActionNamespace],
+    def _show_info_action(view_func: T.Callable[[T.Any], dict],
                           special_keys={}, id_get_title='ID',
                           id_get_text='ID:', id_type=int):
-        """prepare a fcuntion displaying information
+        """prepare a function displaying information
 
         Arguments:
             - namespace: the namespace with the viewing function
@@ -224,7 +241,7 @@ class ShowInfoNS:
                     return
 
             try:
-                data = namespace.view_str(id_)
+                data = view_func(id_)
             except core.BuchSchlossBaseError as e:
                 show_BSE(e)
                 main.app.reset()
@@ -249,7 +266,7 @@ class ShowInfoNS:
         return show_info
 
     book = _show_info_action(
-        core.Book,
+        NSWithLogin(core.Book).view_str,
         {'borrowed_by': lambda d: (
             utils.get_name('borrowed_by'), (widgets.Button, {
                 'text': utils.break_string(str(d['borrowed_by']),
@@ -262,7 +279,7 @@ class ShowInfoNS:
         utils.get_name('book_id')
     )
     person = _show_info_action(
-        core.Person,
+        NSWithLogin(core.Person).view_str,
         {'borrows': lambda d: (
             [(widgets.Button, {
                 'text': utils.break_string(t, config.gui2.info_widget.item_length),
@@ -274,7 +291,7 @@ class ShowInfoNS:
         utils.get_name('id')
     )
     borrow = _show_info_action(
-        core.Borrow,
+        NSWithLogin(core.Borrow).view_str,
         {'person': lambda d: (
             (widgets.Button, {
                 'text': utils.break_string(d['person'],
@@ -298,21 +315,21 @@ class ShowInfoNS:
 
 def login():
     """log in"""
-    if isinstance(core.current_login, core.Dummy):
+    if main.app.current_login.type is core.LoginType.GUEST:
         try:
             data = mtkd.FormDialog.ask(main.app.root, forms.LoginForm)
         except mtkd.UserExitedDialog:
             return
         try:
-            core.login(**data)
+            main.app.current_login = core.login(**data)
         except core.BuchSchlossBaseError as e:
             tk_msg.showerror(e.title, e.message)
             return
         main.app.header.set_info_text(utils.get_name('logged_in_as_{}'
-                                                     ).format(core.current_login))
+                                                     ).format(main.app.current_login))
         main.app.header.set_login_text(utils.get_name('logout'))
     else:
-        core.logout()
+        main.app.current_login = core.guest_lc
         main.app.header.set_info_text(utils.get_name('logged_out'))
         main.app.header.set_login_text(utils.get_name('login'))
 
