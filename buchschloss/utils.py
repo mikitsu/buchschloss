@@ -208,7 +208,13 @@ def get_name(internal: str):
         potentially modified
     """
     if '__' in internal:
-        return ': '.join(get_name(s) for s in internal.split('__'))
+        r = []
+        prefix = ''
+        for component in internal.split('__'):
+            prefix += component
+            r.append(get_name(prefix))
+            prefix += '::'
+        return ': '.join(r)
     *path, name = internal.split('::')
     components = 2**len(path)
     look_in = []
@@ -222,6 +228,8 @@ def get_name(internal: str):
         except KeyError:
             pass
     for ns in look_in:
+        if isinstance(ns, str):
+            continue
         try:
             val = ns[name]
             if isinstance(val, str):
