@@ -154,6 +154,13 @@ def start(noisy_success=True):
         except (OSError, json.JSONDecodeError):
             raise Exception('error reading name file')
         else:
+            def convert_name_data(data):
+                if isinstance(data, str):
+                    return data
+                else:
+                    return {k.lower(): convert_name_data(v) for k, v in data.items()}
+
+            name_data = convert_name_data(name_data)
             config['utils']['names'].update(name_data)
 
         # multiline defaults aren't allowed (AFAIK)

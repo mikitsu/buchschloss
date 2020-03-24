@@ -207,6 +207,7 @@ def get_name(internal: str):
     If a name isn't found, a warning is logged and the internal name returned,
         potentially modified
     """
+    internal = internal.lower()
     if '__' in internal:
         r = []
         prefix = ''
