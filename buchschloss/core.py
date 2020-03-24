@@ -44,7 +44,7 @@ from . import models
 __all__ = [
     'BuchSchlossBaseError', 'DummyErrorFile', 'misc_data', 'ComplexSearch',
     'Person', 'Book', 'Member', 'Borrow', 'Library', 'Group',
-    'login', 'logout',
+    'login',
 ]
 
 log_conf = config.core.log
@@ -74,6 +74,30 @@ logging.basicConfig(level=getattr(logging, config.core.log.level),
                     style='{',
                     handlers=[handler],
                     )
+
+
+class LoginType(enum.Enum):
+    MEMBER = 'Member[{name}]({level})'
+    GUEST = 'Guest'
+    SCRIPT = 'Script[{name}]({level})<-{invoker}'
+    INTERNAL = 'SYSTEM'
+
+    def __call__(self, level: int, **kwargs):
+        self.value.format(type=self, level=level, **kwargs)
+        return LoginContext(self, level, **kwargs)
+
+
+class LoginContext:
+    """data about a logged in user"""
+
+    def __init__(self, login_type: LoginType, level: int, **data):
+        self.type = login_type
+        self.level = level
+        for k, v in data.items():
+            setattr(self, k, v)
+
+    def __str__(self):
+        return self.type.value.format(**self.__dict__)
 
 
 class MiscData:
@@ -297,12 +321,12 @@ def from_db(*arguments: T.Type[models.Model], **keyword_arguments: T.Type[models
     return wrapper_maker
 
 
-def check_level(level, resource):
+def check_level(login_context, level, resource):
     """check if the currently logged in member has the given level.
         otherwise, raise a BuchSchlossBaseError and log"""
-    if current_login.level < level:
+    if login_context.level < level:
         logging.info('access to {} denied to {}'
-                     .format(resource, current_login))
+                     .format(resource, login_context))
         raise BuchSchlossPermError(level)
 
 
@@ -311,12 +335,12 @@ def level_required(level):
     raise a BuchSchlossBaseError when requirement not met."""
 
     def wrapper_maker(f):
-        checker = partial(check_level, level, f.__name__)
+        checker = partial(check_level, level=level, resource=f.__qualname__)
 
         @wraps(f)
-        def level_required_wrapper(*args, **kwargs):
-            checker()
-            return f(*args, **kwargs)
+        def level_required_wrapper(*args, login_context: LoginContext, **kwargs):
+            checker(login_context)
+            return f(*args, login_context=login_context, **kwargs)
 
         return level_required_wrapper
 
@@ -328,20 +352,39 @@ def auth_required(f):
     raise a BuchSchlossBaseError if not given or wrong"""
 
     @wraps(f)
-    def auth_required_wrapper(*args, current_password: str, **kwargs):
-        if authenticate(current_login, current_password):
-            logging.info('{} passed authentication for {}'.format(
-                current_login, f.__name__))
-            return f(*args, **kwargs)
+    def auth_required_wrapper(*args,
+                              login_context: LoginContext,
+                              current_password: str = None,
+                              **kwargs):
+        if login_context.type is LoginType.INTERNAL:
+            logging.info('{} was granted access to {}'.format(login_context, f.__qualname__))
+        elif login_context.type is LoginType.SCRIPT:
+            # Todo: auth attributes...
+            logging.info('{} was denied access to {}'.format(login_context, f.__qualname__))
+            raise BuchSchlossError('auth_failed', 'no_script_perms')
+        elif login_context.type is LoginType.MEMBER:
+            if current_password is None:
+                raise TypeError('when called with a MEMBER login context, '
+                                '``current_password`` must be given')
+            # noinspection PyUnresolvedReferences
+            login_member = Member.view_ns(login_context.name, login_context=internal_lc)
+            if authenticate(login_member, current_password):
+                logging.info('{} passed authentication for {}'.format(
+                    login_context, f.__qualname__))
+            else:
+                logging.info('{} failed to authenticate for {}'.format(
+                    login_context, f.__qualname__))
+                raise BuchSchlossError('auth_failed', 'wrong_password')
         else:
-            logging.info('{} failed to authenticate for {}'.format(
-                current_login, f.__name__))
-            raise BuchSchlossError('auth_failed', 'wrong_password')
+            logging.info('{} was denied access to {}'.format(login_context, f.__qualname__))
+            raise BuchSchlossError('auth_failed', 'unknown_auth_category')
+        return f(*args, login_context=login_context, **kwargs)
 
     auth_required_wrapper.__doc__ += (
-        '\n\nThis function requires authentication in form of\n'
+        '\n\nWhen called with a MEMBER LoginContext,\n'
+        'this function requires authentication in form of\n'
         'a `current_password` argument containing the currently\n'
-        "logged in member's password\n")
+        "logged in member's password.\n")
     auth_required.functions.append(f.__qualname__)
     return auth_required_wrapper
 auth_required.functions = []  # noqa
@@ -366,10 +409,12 @@ def authenticate(m, password):
 def login(name: str, password: str):
     """attempt to login the Member with the given name and password.
 
+    Return a LoginContext on success
+
     Try all iterations specified in config.HASH_ITERATIONS
         and update to newest (first) one where applicable
-    raise a BuchSchlossBaseError on failure"""
-    global current_login
+    raise a BuchSchlossBaseError on failure
+    """
     try:
         with models.db:
             m = models.Member.get_by_id(name)
@@ -377,17 +422,10 @@ def login(name: str, password: str):
         raise BuchSchlossError('login', 'no_Member_with_id_{}', name)
     if authenticate(m, password):
         logging.info('login success {}'.format(m))
-        current_login = m
+        return LoginType.MEMBER(m.level, name=m.name)
     else:
         logging.info('login fail {}'.format(m))
         raise BuchSchlossError('login', 'wrong_password')
-
-
-def logout():
-    """log the currently logged in Member out"""
-    global current_login
-    logging.info('logout {}'.format(current_login))
-    current_login = dummy_member
 
 
 def _update_library_group(lg_model: T.Type[models.Model],
@@ -414,29 +452,29 @@ class ActionNamespace(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def new(cls, **kwargs):
+    def new(cls, *, login_context, **kwargs):
         """Create a new record"""
         raise NotImplementedError
 
     @classmethod
     @abc.abstractmethod
-    def view_str(cls, id_: T.Union[int, str]) -> dict:
+    def view_str(cls, id_: T.Union[int, str], *, login_context) -> dict:
         """Return information in a dict"""
         raise NotImplementedError
 
     @classmethod
-    def view_ns(cls, id_: T.Union[int, str]):
+    def view_ns(cls, id_: T.Union[int, str], *, login_context):
         """Return a namespace of information"""
-        check_level(cls.view_level, cls.__name__ + '.view_ns')
+        check_level(login_context, cls.view_level, cls.__name__ + '.view_ns')
         try:
             return cls.model.get_by_id(id_)
         except cls.model.DoesNotExist:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
     @classmethod
-    def view_repr(cls, id_: T.Union[str, int]) -> str:
+    def view_repr(cls, id_: T.Union[str, int], *, login_context) -> str:
         """Return a string representation"""
-        check_level(cls.view_level, cls.__name__ + '.view_repr')
+        check_level(login_context, cls.view_level, cls.__name__ + '.view_repr')
         try:
             return str(next(iter(cls.model.select_str_fields().where(
                 getattr(cls.model, cls.model.pk_name) == id_))))
@@ -444,10 +482,10 @@ class ActionNamespace(abc.ABC):
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
     @classmethod
-    def view_attr(cls, id_: T.Union[str, int], name: str):
+    def view_attr(cls, id_: T.Union[str, int], name: str, *, login_context):
         """Return the value of a specific attribute"""
         # this is said to be faster...
-        check_level(cls.view_level, cls.__name__ + '.view_attr')
+        check_level(login_context, cls.view_level, cls.__name__ + '.view_attr')
         try:
             return getattr(next(iter(cls.model.select(getattr(cls.model, name)).where(
                 getattr(cls.model, cls.model.pk_name) == id_))), name)
@@ -459,9 +497,11 @@ class ActionNamespace(abc.ABC):
                condition: tuple,
                complex_params: T.Iterable['ComplexSearch'] = (),
                complex_action: str = None,
+               *,
+               login_context
                ):
         """search for records. see search for details on arguments"""
-        check_level(cls.view_level, cls.__name__ + '.search')
+        check_level(login_context, cls.view_level, cls.__name__ + '.search')
         return search(cls.model, condition, *complex_params,
                       complex_action=complex_action)
 
@@ -477,7 +517,7 @@ class Book(ActionNamespace):
             series_number: T.Optional[int] = None,
             concerned_people: T.Optional[str] = None,
             genres: T.Optional[str] = None, groups: T.Iterable[str] = (),
-            library: str = 'main') -> int:
+            library: str = 'main', login_context: LoginContext) -> int:
         """Attempt to create a new Book with the given arguments and return the ID
 
         automatically create groups as needed
@@ -498,13 +538,13 @@ class Book(ActionNamespace):
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', library)
             else:
-                logging.info('{} created {}'.format(current_login, b))
+                logging.info('{} created {}'.format(login_context, b))
         return b.id
 
     @staticmethod
     @from_db(models.Book)
     @level_required(2)
-    def edit(book: T.Union[int, models.Book], **kwargs):
+    def edit(book: T.Union[int, models.Book], *, login_context, **kwargs):
         """Edit a Book based on the arguments given.
 
         See Book.__doc__ for more information on the arguments
@@ -532,12 +572,12 @@ class Book(ActionNamespace):
                 v = type(getattr(book, k))(v)
             setattr(book, k, v)
         book.save()
-        logging.info('{} edited {}'.format(current_login, book))
+        logging.info('{} edited {}'.format(login_context, book))
         return errors
 
     @staticmethod
     @from_db(models.Book)
-    def view_str(book: T.Union[int, models.Book]):
+    def view_str(book: T.Union[int, models.Book], *, login_context):
         """Return data about a Book.
 
         Return a dictionary consisting of the following items as strings:
@@ -566,7 +606,7 @@ class Book(ActionNamespace):
         r['borrowed_by'] = str(borrow.person)
         r['borrowed_by_id'] = borrow.person.id
         r['__str__'] = str(book)
-        logging.info('{} viewed {}'.format(current_login, book))
+        logging.info('{} viewed {}'.format(login_context, book))
         return r
 
 
@@ -577,9 +617,10 @@ class Person(ActionNamespace):
 
     @staticmethod
     @level_required(3)
-    def new(id_: int, first_name: str, last_name: str, class_: str,
+    def new(*, id_: int, first_name: str, last_name: str, class_: str,
             max_borrow: int = 3, libraries: T.Iterable[str] = ('main',),
-            pay: bool = None, pay_date: date = None):
+            pay: bool = None, pay_date: date = None,
+            login_context):
         """Attempt to create a new Person with the given arguments.
 
         raise a BuchSchlossBaseError on failure.
@@ -591,7 +632,7 @@ class Person(ActionNamespace):
         """
         if pay_date is None and pay:
             pay_date = date.today()
-        if max_borrow > 3 and not current_login.level >= 4:
+        if max_borrow > 3 and not login_context.level >= 4:
             raise BuchSchlossPermError(4)
         p = models.Person(id=id_, first_name=first_name, last_name=last_name,
                           class_=class_, max_borrow=max_borrow, pay_date=pay_date)
@@ -605,12 +646,12 @@ class Person(ActionNamespace):
             else:
                 raise
         else:
-            logging.info('{} created {} with pay={}'.format(current_login, p, pay))
+            logging.info('{} created {} with pay={}'.format(login_context, p, pay))
 
     @staticmethod
     @level_required(3)
     @from_db(models.Person)
-    def edit(person: T.Union[int, models.Person], **kwargs):
+    def edit(person: T.Union[int, models.Person], *, login_context, **kwargs):
         """Edit a Person based on the arguments given.
 
         See Person.__doc__ for more information on the arguments
@@ -625,6 +666,8 @@ class Person(ActionNamespace):
                                                       peewee.Field)} | {'pay'})
                 or 'id' in kwargs):
             raise TypeError('unexpected kwarg')
+        if kwargs.get('max_borrow', 0) > 3 and not login_context.level >= 4:
+            raise BuchSchlossPermError(4)
         if kwargs.pop('pay', False):
             kwargs['pay_date'] = date.today()
         errors = set()
@@ -633,7 +676,7 @@ class Person(ActionNamespace):
         for k, v in kwargs.items():
             setattr(person, k, v)
         person.save()
-        logging.info('{} edited {}'.format(current_login, person)
+        logging.info('{} edited {}'.format(login_context, person)
                      + (' setting pay_date to {}'.format(kwargs['pay_date'])
                         if 'pay_date' in kwargs else ''))
         return errors
@@ -641,7 +684,7 @@ class Person(ActionNamespace):
     @staticmethod
     @level_required(1)
     @from_db(models.Person)
-    def view_str(person: T.Union[models.Person, int]):
+    def view_str(person: T.Union[models.Person, int], *, login_context):
         """Return data about a Person.
 
         Return a dict consisting of the following items as strings:
@@ -658,7 +701,7 @@ class Person(ActionNamespace):
         r['borrow_book_ids'] = [b.book.id for b in borrows]
         r['libraries'] = ';'.join(L.name for L in person.libraries)
         r['__str__'] = str(person)
-        logging.info('{} viewed {}'.format(current_login, person))
+        logging.info('{} viewed {}'.format(login_context, person))
         return r
 
 
@@ -668,8 +711,11 @@ class Library(ActionNamespace):
 
     @staticmethod
     @level_required(3)
-    def new(name: str, *, books: T.Sequence[int] = (),
-            people: T.Sequence[int] = (), pay_required: bool = True):
+    def new(name: str, *,
+            books: T.Sequence[int] = (),
+            people: T.Sequence[int] = (),
+            pay_required: bool = True,
+            login_context):
         """Create a new Library with the specified name and add it to the specified
                 people and books.
 
@@ -696,8 +742,11 @@ class Library(ActionNamespace):
 
     @staticmethod
     @level_required(3)
-    def edit(action: LibraryGroupAction, name: str, people: T.Sequence[int] = (),
-             books: T.Sequence[int] = (), pay_required: bool = None):
+    def edit(action: LibraryGroupAction, name: str, *,
+             people: T.Sequence[int] = (),
+             books: T.Sequence[int] = (),
+             pay_required: bool = None,
+             login_context):
         """Perform the given action on the Library with the given name
 
             DELETE will remove the reference to the library from all people
@@ -744,7 +793,7 @@ class Library(ActionNamespace):
 
     @staticmethod
     @from_db(models.Library)
-    def view_str(lib):
+    def view_str(lib, *, login_context):
         """Return information on the Library
 
             Return a dict with the following items as strings:
@@ -767,7 +816,7 @@ class Group(ActionNamespace):
 
     @staticmethod
     @level_required(3)
-    def new(name: str, books: T.Sequence[int] = ()):
+    def new(name: str, books: T.Sequence[int] = (), *, login_context):
         """Create a new Group with the given name and books
 
             raise a BuchSchlossBaseError if the Group exists
@@ -786,7 +835,7 @@ class Group(ActionNamespace):
 
     @staticmethod
     @level_required(3)
-    def edit(action: LibraryGroupAction, name: str, books: T.Iterable[int]):
+    def edit(action: LibraryGroupAction, name: str, books: T.Iterable[int], *, login_context):
         """Perform the given action on the Group with the given name
 
             DELETE will remove all references to the Group,
@@ -814,7 +863,7 @@ class Group(ActionNamespace):
     @staticmethod
     @level_required(3)
     @from_db(models.Group)
-    def activate(group, src: T.Sequence[str] = (), dest: str = 'main'):
+    def activate(group, src: T.Sequence[str] = (), dest: str = 'main', *, login_context):
         """Activate a Group
 
             ``src`` is an iterable of the names of origin libraries
@@ -849,7 +898,7 @@ class Group(ActionNamespace):
 
     @staticmethod
     @from_db(models.Group)
-    def view_str(group):
+    def view_str(group, *, login_context):
         """Return data on a Group
 
             Return a dict with the following items as strings:
@@ -872,7 +921,7 @@ class Borrow(ActionNamespace):
 
     @staticmethod
     @from_db(models.Book, models.Person)
-    def new(book, person, weeks):
+    def new(book, person, weeks, *, login_context):
         """Borrow a book.
 
             ``book`` is the ID of the Book begin borrowed
@@ -892,7 +941,7 @@ class Borrow(ActionNamespace):
             the maximum amount of time a book may be borrowed for is defined
             in the configuration settings
         """
-        if weeks > config.core.borrow_time_limit[current_login.level]:
+        if weeks > config.core.borrow_time_limit[login_context.level]:
             raise BuchSchlossPermError(1)
         if weeks <= 0:
             raise BuchSchlossError('Borrow', 'borrow_length_not_positive')
@@ -909,7 +958,7 @@ class Borrow(ActionNamespace):
         rdate = date.today() + timedelta(weeks=weeks)
         models.Borrow.create(person=person, book=book, return_date=rdate)
         logging.info('{} borrowed {} to {} until {}'.format(
-            current_login, book, person, rdate))
+            login_context, book, person, rdate))
         latest = misc_data.latest_borrowers
         # since the values are written to the DB on explicit assignment only
         # and values aren't cached (yet, but I still don't want to rely on it)
@@ -924,7 +973,7 @@ class Borrow(ActionNamespace):
     @staticmethod
     @level_required(1)
     @from_db(models.Book)
-    def restitute(book, person):
+    def restitute(book, person, *, login_context):
         """return a book
 
             ``book`` is the ID of the Book to be returned
@@ -946,13 +995,13 @@ class Borrow(ActionNamespace):
                                    book, person)
         borrow.is_back = True
         borrow.save()
-        logging.info('{} confirmed {} was returned'.format(current_login, borrow))
+        logging.info('{} confirmed {} was returned'.format(login_context, borrow))
         return book.shelf
 
     @staticmethod
     @level_required(1)
     @from_db(models.Borrow)
-    def view_str(borrow):
+    def view_str(borrow, *, login_context):
         """Return information about a Borrow
 
             Return a dictionary containing the following items:
@@ -984,7 +1033,7 @@ class Member(ActionNamespace):
     @staticmethod
     @auth_required
     @level_required(4)
-    def new(name: str, password: str, level: int):
+    def new(name: str, password: str, level: int, *, login_context):
         """Create a new Member
 
             ``name`` must be unique among members and is case-sensitive
@@ -1001,13 +1050,13 @@ class Member(ActionNamespace):
                     raise BuchSchlossError('Member_exists', 'Member_{}_exists', name)
                 else:
                     raise
-        logging.info('{} created {}'.format(current_login, m))
+        logging.info('{} created {}'.format(login_context, m))
 
     @staticmethod
     @auth_required
     @level_required(4)
     @from_db(models.Member)
-    def edit(member, **kwargs):
+    def edit(member, *, login_context, **kwargs):
         """Edit the given member.
 
             Set the given attributes on the given Member.
@@ -1025,31 +1074,30 @@ class Member(ActionNamespace):
         for k, v in kwargs.items():
             setattr(member, k, v)
         member.save()
-        logging.info('{} edited {} to {}'.format(current_login, old_str, member))
+        logging.info('{} edited {} to {}'.format(login_context, old_str, member))
 
     @staticmethod
     @auth_required
     @from_db(models.Member)
-    def change_password(member, new_password):
+    def change_password(member, new_password, *, login_context):
         """Change a Member's password
 
             editing a password requires being level 4 or the editee
             If the editee is currently logged in, the new password
             needs to be used for authentication immediately
         """
-        global current_login
-        if current_login.level < 4 and current_login.name != member.name:
+        if (login_context.level < 4
+                and (login_context.type is not LoginType.MEMBER
+                     or login_context.name != member.name)):
             raise BuchSchlossError('no_permission', 'must_be_level_4_or_editee')
         member.salt = urandom(config.core.salt_length)
         member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
-        if current_login.name == member.name:
-            current_login = member
-        logging.info("{} changed {}'s password".format(current_login, member))
+        logging.info("{} changed {}'s password".format(login_context, member))
 
     @staticmethod
     @from_db(models.Member)
-    def view_str(member):
+    def view_str(member, *, login_context):
         """Return information about a Member
 
             Return a dictionary with the following string items:
@@ -1265,8 +1313,8 @@ class ComplexSearch:  # TODO: use misc.Instance for this
         return to[0] if self.return_first_item else to
 
 
-dummy_member = Dummy(name='<dummy member>', password=b'', salt=b'', level=0)
-current_login = dummy_member
+internal_lc = LoginType.INTERNAL(5)
+guest_lc = LoginType.GUEST(0)
 misc_data = MiscData()
 
 logging.info('core operational')

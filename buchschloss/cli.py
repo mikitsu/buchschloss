@@ -62,6 +62,7 @@ def execute(command, args, kwargs):
         display encountered errors
     """
     func = COMMANDS[command]
+    kwargs['login_context'] = current_login
     try:
         f_args = inspect.signature(func).parameters.keys()
     except (TypeError, ValueError):
@@ -171,7 +172,7 @@ def start():
     try:
         while True:
             try:
-                ui = read_input('{} -> '.format(core.current_login))
+                ui = read_input('{} -> '.format(current_login))
                 handle_user_input(ui)
             except Level8Error as e:
                 print(e.__class__.__name__, e)
@@ -191,6 +192,18 @@ def start():
 
 
 "Specific actions"
+
+
+def login(name, password):
+    """wrap around core.login"""
+    global current_login
+    current_login = core.login(name, password)
+
+
+def logout():
+    """forget the current login"""
+    global current_login
+    current_login = core.guest_lc
 
 
 def help(name=None):
@@ -248,8 +261,8 @@ def foreach(iterable):
 
 
 COMMANDS = {
-    'login': core.login,
-    'logout': core.logout,
+    'login': login,
+    'logout': logout,
     'new_person': core.Person.new,
     'edit_person': core.Person.edit,
     'view_person': core.Person.view_str,
@@ -284,6 +297,7 @@ COMMANDS = {
     'foreach': foreach,
 }
 variables = {}
+current_login = core.guest_lc
 
 
 parser = MyArgumentParser('', add_help=False)
