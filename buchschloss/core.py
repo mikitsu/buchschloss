@@ -82,6 +82,10 @@ class LoginType(enum.Enum):
     SCRIPT = 'Script[{name}]({level})<-{invoker}'
     INTERNAL = 'SYSTEM'
 
+    def __call__(self, level: int, **kwargs):
+        self.value.format(type=self, level=level, **kwargs)
+        return LoginContext(self, level, **kwargs)
+
 
 class LoginContext:
     """data about a logged in user"""
@@ -348,7 +352,10 @@ def auth_required(f):
     raise a BuchSchlossBaseError if not given or wrong"""
 
     @wraps(f)
-    def auth_required_wrapper(*args, login_context: LoginContext, current_password: str = None, **kwargs):
+    def auth_required_wrapper(*args,
+                              login_context: LoginContext,
+                              current_password: str = None,
+                              **kwargs):
         if login_context.type is LoginType.INTERNAL:
             logging.info('{} was granted access to {}'.format(login_context, f.__qualname__))
         elif login_context.type is LoginType.SCRIPT:
@@ -357,7 +364,8 @@ def auth_required(f):
             raise BuchSchlossError('auth_failed', 'no_script_perms')
         elif login_context.type is LoginType.MEMBER:
             if current_password is None:
-                raise TypeError('when called with a MEMBER login context, ``current_password`` must be given')
+                raise TypeError('when called with a MEMBER login context, '
+                                '``current_password`` must be given')
             # noinspection PyUnresolvedReferences
             login_member = Member.view_ns(login_context.name, login_context=internal_lc)
             if authenticate(login_member, current_password):
@@ -414,7 +422,7 @@ def login(name: str, password: str):
         raise BuchSchlossError('login', 'no_Member_with_id_{}', name)
     if authenticate(m, password):
         logging.info('login success {}'.format(m))
-        return LoginContext(LoginType.MEMBER, m.level, name=m.name)
+        return LoginType.MEMBER(m.level, name=m.name)
     else:
         logging.info('login fail {}'.format(m))
         raise BuchSchlossError('login', 'wrong_password')
@@ -1305,8 +1313,8 @@ class ComplexSearch:  # TODO: use misc.Instance for this
         return to[0] if self.return_first_item else to
 
 
-internal_lc = LoginContext(LoginType.INTERNAL, 5)
-guest_lc = LoginContext(LoginType.GUEST, 0)
+internal_lc = LoginType.INTERNAL(5)
+guest_lc = LoginType.GUEST(0)
 misc_data = MiscData()
 
 logging.info('core operational')

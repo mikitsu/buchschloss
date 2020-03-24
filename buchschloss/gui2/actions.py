@@ -343,9 +343,10 @@ def borrow_restitute(form_cls, callback):
     """function for borrow and restitute actions"""
     def add_btn(form):
         try:
-            pw = [(widgets.Button, {'text': core.Person.view_repr(p, login_context=main.app.current_login),
-                                    'command': partial(form.inject_submit, person=p)})
-                  for p in core.misc_data.latest_borrowers]
+            pw = [(widgets.Button, {
+                'text': core.Person.view_repr(p, login_context=main.app.current_login),
+                'command': partial(form.inject_submit, person=p)
+            }) for p in core.misc_data.latest_borrowers]
             widgets.mtk.ContainingWidget(main.app.center, *pw, horizontal=2).pack()
         except core.BuchSchlossBaseError as e:
             show_BSE(e)

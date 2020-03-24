@@ -74,9 +74,10 @@ def late_books():
     late = []
     warn = []
     today = date.today()
+    warn_for = today + config.utils.tasks.late_books_warn_time
     for b in core.Borrow.search((
-            ('is_back', 'eq', False),
-            'and', ('return_date', 'gt', today + config.utils.tasks.late_books_warn_time)), core.internal_lc):
+            ('is_back', 'eq', False), 'and', ('return_date', 'gt', warn_for)),
+            login_context=core.internal_lc):
         if b.return_date < today:
             late.append(b)
         else:
@@ -88,7 +89,8 @@ def late_books():
 def backup():
     """Local backups.
 
-    Run backup_shift and copy "name" db to "name.1", encrypting if a key is given in config
+    Run backup_shift and copy "name" db to "name.1",
+    encrypting if a key is given in config
     """
     backup_shift(os, config.utils.tasks.backup_depth)
     data = get_database_bytes()
@@ -113,7 +115,8 @@ def get_database_bytes():
 def ftp_backup():
     """Remote backups via FTP.
 
-    Run backup_shift and upload "name" DB as "name.1", encrypted if a key is given in config
+    Run backup_shift and upload "name" DB as "name.1",
+    encrypted if a key is given in config
     """
     conf = config.utils
     if conf.tasks.secret_key is None:
@@ -274,7 +277,8 @@ def get_book_data(isbn: int):
     """Attempt to get book data via the ISBN from the DB, if that fails,
         try the DNB (https://portal.dnb.de)"""
     try:
-        book = next(iter(core.Book.search(('isbn', 'eq', isbn), login_context=core.internal_lc)))
+        book = next(iter(core.Book.search(
+            ('isbn', 'eq', isbn), login_context=core.internal_lc)))
     except StopIteration:
         pass  # actually, I could put the whole rest of the function here
     else:

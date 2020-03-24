@@ -93,7 +93,8 @@ class OptionsFromSearch(mtk.OptionChoiceWidget):
 
     def __init__(self, master, *, action_ns: core.ActionNamespace,
                  attribute='name', allow_none=False, **kwargs):
-        values = [(getattr(o, attribute), str(o)) for o in action_ns.search((), login_context=core.internal_lc)]
+        values = [(getattr(o, attribute), str(o)) for o in
+                  action_ns.search((), login_context=core.internal_lc)]
         if allow_none:
             values.insert(0, (None, ''))
         super().__init__(master, values=values, **kwargs)
@@ -218,8 +219,12 @@ class MultiChoicePopup(tk.Button):
 class SearchMultiChoice(MultiChoicePopup):
     """MultiChoicePopup that gets values from searches"""
 
-    def __init__(self, master, cnf={}, *, action_ns: core.ActionNamespace, attribute='name', **kwargs):
-        options = [(getattr(o, attribute), str(o)) for o in action_ns.search((), login_context=core.internal_lc)]
+    def __init__(self, master, cnf={}, *,
+                 action_ns: core.ActionNamespace,
+                 attribute='name',
+                 **kwargs):
+        options = [(getattr(o, attribute), str(o)) for o in
+                   action_ns.search((), login_context=core.internal_lc)]
         super().__init__(master, cnf, options=options, **kwargs)
 
     def action(self, event=None):

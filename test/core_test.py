@@ -37,7 +37,7 @@ def create_person(id_, **options):
 
 def for_levels(func, perm_level, assert_func=lambda x: True):
     """test for correct level testing"""
-    ctxt = core.LoginContext(core.LoginType.INTERNAL, 0)
+    ctxt = core.LoginType.INTERNAL(0)
     for level in range(perm_level):
         ctxt.level = level
         with pytest.raises(core.BuchSchlossBaseError):
@@ -51,10 +51,10 @@ def test_auth_required(db):
     """test the @auth_required decorator"""
     models.Member.create(
         name='name', salt=b'', level=0, password=core.pbkdf(b'Pa$$w0rd', b''))
-    ctxt_member = core.LoginContext(core.LoginType.MEMBER, 0, name='name')
-    ctxt_internal = core.LoginContext(core.LoginType.INTERNAL, 0)
+    ctxt_member = core.LoginType.MEMBER(0, name='name')
+    ctxt_internal = core.LoginType.INTERNAL(0)
     # noinspection PyTypeChecker
-    ctxt_guest = core.LoginContext(core.LoginType.GUEST, 0)
+    ctxt_guest = core.LoginType.GUEST(0)
 
     @core.auth_required
     def test(login_context):
@@ -112,7 +112,14 @@ def test_misc_data(db):
 
 def test_person_new(db):
     """test Person.new"""
-    ctxt = for_levels(partial(core.Person.new, id_=123, first_name='first', last_name='last', class_='cls'), 3)
+    ctxt = for_levels(
+        partial(
+            core.Person.new,
+            id_=123,
+            first_name='first',
+            last_name='last',
+            class_='cls'),
+        3)
     person_new = partial(core.Person.new, login_context=ctxt)
     p = models.Person.get_by_id(123)
     assert p.id == 123
@@ -124,15 +131,18 @@ def test_person_new(db):
     with pytest.raises(core.BuchSchlossBaseError):
         person_new(id_=123, first_name='first', last_name='last', class_='cls')
     with pytest.raises(core.BuchSchlossBaseError):
-        person_new(id_=124, first_name='first', last_name='last', class_='cls', max_borrow=5, pay=True)
+        person_new(id_=124, first_name='first', last_name='last', class_='cls',
+                   max_borrow=5, pay=True)
     ctxt.level = 4
     old_today = datetime.date.today()  # in case this is run around midnight...
-    person_new(id_=124, first_name='first', last_name='last',class_= 'cls', max_borrow=5, pay=True)
+    person_new(id_=124, first_name='first', last_name='last', class_='cls',
+               max_borrow=5, pay=True)
     p = models.Person.get_by_id(124)
     assert p.id == 124
     assert p.max_borrow == 5
     assert p.pay_date in (datetime.date.today(), old_today)
-    person_new(id_=125, first_name='first', last_name='last', class_='cls', pay_date=datetime.date(1956, 1, 31))
+    person_new(id_=125, first_name='first', last_name='last', class_='cls',
+               pay_date=datetime.date(1956, 1, 31))
     p = models.Person.get_by_id(125)
     assert p.id == 125
     assert p.pay_date == datetime.date(1956, 1, 31)
@@ -162,7 +172,8 @@ def test_person_edit(db):
     models.Library.create(name='lib_2')
     e = person_edit(123, libraries=('lib_1', 'lib_does_not_exist'))
     assert e
-    assert list(models.Person.get_by_id(123).libraries) == [models.Library.get_by_id('lib_1')]
+    assert (list(models.Person.get_by_id(123).libraries)
+            == [models.Library.get_by_id('lib_1')])
     with pytest.raises(core.BuchSchlossBaseError):
         person_edit(124)
     with pytest.raises(TypeError):
@@ -319,7 +330,8 @@ def test_book_view_str(db):
                        publisher='publ', year=456, medium='rare', library='lib0',
                        shelf='A5')
     b = models.Book.get_by_id(1)
-    book_view = partial(core.Book.view_str, login_context=core.LoginContext(core.LoginType.INTERNAL, 0))
+    book_view = partial(core.Book.view_str,
+                        login_context=core.LoginType.INTERNAL(0))
     assert book_view(1) == {
         'id': '1',
         'isbn': '123',
@@ -434,7 +446,8 @@ def test_library_view_str(db):
     b_2 = create_book()
     p_1 = create_person(123)
     p_2 = create_person(124)
-    library_view = partial(core.Library.view_str, login_context=core.LoginContext(core.LoginType.INTERNAL, 0))
+    library_view = partial(core.Library.view_str,
+                           login_context=core.LoginType.INTERNAL(0))
     with pytest.raises(core.BuchSchlossBaseError):
         library_view('does not exist')
     assert library_view('lib') == {
@@ -541,7 +554,7 @@ def test_group_view_str(db):
     models.Group.create(name='group-1')
     create_book()
     create_book()
-    group_view = partial(core.Group.view_str, login_context=core.LoginContext(core.LoginType.INTERNAL, 0))
+    group_view = partial(core.Group.view_str, login_context=core.LoginType.INTERNAL(0))
     assert group_view('group-1') == {
         '__str__': str(models.Group.get_by_id('group-1')),
         'name': 'group-1',
@@ -587,18 +600,20 @@ def test_member_change_password(db):
     models.Member.create(name='other', level=0, salt=b'', password=core.pbkdf(b'', b''))
     for_levels(partial(core.Member.change_password, 'name', 'new'), 4)
     assert core.authenticate(models.Member.get_by_id('name'), 'new')
-    ctxt_editee = core.LoginContext(core.LoginType.MEMBER, 0, name='name')
-    ctxt_other = core.LoginContext(core.LoginType.MEMBER, 0, name='other')
-    core.Member.change_password('name', 'other', login_context=ctxt_editee, current_password='new')
+    ctxt_editee = core.LoginType.MEMBER(0, name='name')
+    ctxt_other = core.LoginType.MEMBER(0, name='other')
+    core.Member.change_password(
+        'name', 'other', login_context=ctxt_editee, current_password='new')
     assert core.authenticate(models.Member.get_by_id('name'), 'other')
     with pytest.raises(core.BuchSchlossBaseError):
-        core.Member.change_password('name', 'third', login_context=ctxt_other, current_password='')
+        core.Member.change_password(
+            'name', 'third', login_context=ctxt_other, current_password='')
 
 
 def test_member_view_str(db):
     """test Member.view_str"""
     models.Member.create(name='name', level=0, salt=b'', password=b'')
-    assert core.Member.view_str('name', login_context=core.LoginContext(core.LoginType.INTERNAL, 0)) == {
+    assert core.Member.view_str('name', login_context=core.LoginType.INTERNAL(0)) == {
         '__str__': str(models.Member.get_by_id('name')),
         'name': 'name',
         'level': utils.get_level(0),
@@ -624,7 +639,7 @@ def test_borrow_new(db):
                       pay_date=(datetime.date.today()
                                 - datetime.timedelta(weeks=52, days=-1)),
                       libraries=['main', 'no-pay'])
-    ctxt = core.LoginContext(core.LoginType.INTERNAL, 0)
+    ctxt = core.LoginType.INTERNAL(0)
     borrow_new = partial(core.Borrow.new, login_context=ctxt)
     # follows config settings
     for i in range(5):
@@ -666,7 +681,7 @@ def test_search(db):
     person = create_person(123, class_='cls', libraries=['main'])
     ctxt_person = for_levels(partial(core.Person.search, ()), 1)
     person_search = partial(core.Person.search, login_context=ctxt_person)
-    book_search = partial(core.Book.search, login_context=core.LoginContext(core.LoginType.INTERNAL, 0))
+    book_search = partial(core.Book.search, login_context=core.LoginType.INTERNAL(0))
     assert tuple(book_search(('author', 'eq', 'author name'))) == (book_1,)
     assert set(book_search(())) == {book_1, book_2}
     assert (tuple(book_search((('author', 'ne', 'author name'), 'or', ())))

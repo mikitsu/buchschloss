@@ -242,18 +242,21 @@ action_tree = ActionTree.from_map({
         'book': ShowInfoNS.book,
         'person': ShowInfoNS.person,
     },
-    'edit': {k: generic_formbased_action(
-        'edit', FORMS[k], wrapped_action_ns[k].edit, fill_data=wrapped_action_ns[k].view_str)
+    'edit': {k: generic_formbased_action('edit', FORMS[k], wrapped_action_ns[k].edit,
+                                         fill_data=wrapped_action_ns[k].view_str)
              for k in ('book', 'person', 'member')
     },  # noqa
-    'search': {k: actions.search(f, wrapped_action_ns[k].search, getattr(ShowInfoNS, k)) for f, k in (
+    'search': {k: actions.search(f, wrapped_action_ns[k].search, getattr(ShowInfoNS, k))
+               for f, k in (
         (forms.BookForm, 'book'),
         (forms.PersonForm, 'person'),
         (forms.BorrowSearchForm, 'borrow'),
     )
     },
-    'borrow': actions.borrow_restitute(forms.BorrowForm, wrapped_action_ns['borrow'].new),
-    'restitute': actions.borrow_restitute(forms.RestituteForm, wrapped_action_ns['borrow'].restitute),
+    'borrow': actions.borrow_restitute(
+        forms.BorrowForm, wrapped_action_ns['borrow'].new),
+    'restitute': actions.borrow_restitute(
+        forms.RestituteForm, wrapped_action_ns['borrow'].restitute),
 })
 action_tree.new.book = generic_formbased_action(
     'new', FORMS['book'], actions.new_book, post_init=new_book_autofill)
