@@ -373,9 +373,10 @@ def auth_required(f):
         return f(*args, login_context=login_context, **kwargs)
 
     auth_required_wrapper.__doc__ += (
-        '\n\nThis function requires authentication in form of\n'
+        '\n\nWhen called with a MEMBER LoginContext,\n'
+        'this function requires authentication in form of\n'
         'a `current_password` argument containing the currently\n'
-        "logged in member's password\n")
+        "logged in member's password.\n")
     auth_required.functions.append(f.__qualname__)
     return auth_required_wrapper
 auth_required.functions = []  # noqa
