@@ -198,12 +198,14 @@ def get_name(internal: str):
     """Get an end-user suitable name.
 
     Try lookup in config.utils.names.
-    "__" is replaced by ": " with components looked up individually
+    "<namespace>::<name>" may specify a namespace in which lookups are performed first,
+        falling back to the global names if nothing is found.
+        Namespaces may be nested.
+    "__" is replaced by ": " with components (located left/right)
+        looked up up individually, with the first (left) acting
+        as namespace for the second (right).
     If a name isn't found, a warning is logged and the internal name returned,
         potentially modified
-    "<namespace>::<name>" may specify a namespace in which lookups are performed first,
-        falling back to the global names if nothing is found
-    "__" takes precedence over "::"
     """
     if '__' in internal:
         return ': '.join(get_name(s) for s in internal.split('__'))
