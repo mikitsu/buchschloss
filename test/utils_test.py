@@ -37,3 +37,5 @@ def test_get_name():
     assert utils.get_name('a::b::c::i') == 'CI'
     assert utils.get_name('a::b::c::g') == 'G'
     assert utils.get_name('does::not::exist::at::all::c::d') == 'CD'
+    assert utils.get_name('a::b::c__e') == 'ABC: ABCE'
+    assert utils.get_name('a::c::h__i') == 'ACH: CI'
