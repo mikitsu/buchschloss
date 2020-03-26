@@ -83,7 +83,7 @@ class SeriesEntry(mtk.ContainingWidget):
 
 class ActionChoiceWidget(mtk.ContainingWidget):
     def __init__(self, master, actions, **kw):
-        widgets = [(Button, {'text': utils.get_name('actions::'+txt), 'command': cmd})
+        widgets = [(Button, {'text': utils.get_name('actions::' + txt), 'command': cmd})
                    for txt, cmd in actions]
         super().__init__(master, *widgets, **kw)
 

@@ -25,7 +25,6 @@ import re
 import enum
 import abc
 import builtins
-import traceback
 import logging
 import logging.handlers
 
@@ -845,7 +844,10 @@ class Group(ActionNamespace):
 
     @staticmethod
     @level_required(3)
-    def edit(action: LibraryGroupAction, name: str, books: T.Iterable[int], *, login_context):
+    def edit(action: LibraryGroupAction,
+             name: str,
+             books: T.Iterable[int],
+             *, login_context):
         """Perform the given action on the Group with the given name
 
             DELETE will remove all references to the Group,

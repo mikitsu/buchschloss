@@ -689,7 +689,7 @@ def test_search(db):
     assert (tuple(book_search((('author', 'contains', 'name'), 'and', ())))
             == (book_1,))
     assert (tuple(book_search((('library.people.class_', 'eq', 'cls'),
-                                    'and', ('id', 'lt', 2))))
+                               'and', ('id', 'lt', 2))))
             == (book_1,))
     assert (tuple(person_search(('libraries.books.author', 'contains', '2')))
             == (person,))

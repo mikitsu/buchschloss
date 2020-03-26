@@ -183,7 +183,8 @@ def start():
             # make the terminal prompt go onto a new line
             print()
         if not config.debug and sys.stderr.error_happened:
-            if input(utils.get_name('interactive_question::send_error_report') + '\n')[0] in 'yYjJ':
+            if (input(utils.get_name('interactive_question::send_error_report') + '\n')
+                    .startswith('yYjJ')):
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
