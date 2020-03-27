@@ -310,7 +310,7 @@ def test_book_edit(db):
     assert not book_edit(1, groups=['group-1'])
     assert set(g.name for g in models.Book.get_by_id(1).groups) == {'group-1'}
     e = book_edit(1, groups=('group-2', 'does not exist'))
-    assert e == {utils.get_name('no_Group_with_id_{}').format('does not exist')}
+    assert e == {utils.get_name('error::no_Group_with_id_{}').format('does not exist')}
     assert set(g.name for g in models.Book.get_by_id(1).groups) == {'group-2'}
     assert models.Book.get_by_id(1).library.name == 'lib'
     assert not book_edit(1, medium='med')
@@ -348,7 +348,7 @@ def test_book_view_str(db):
         'shelf': 'A5',
         'library': 'lib0',
         'groups': '',
-        'status': utils.get_name('available'),
+        'status': utils.get_name('Book::available'),
         'return_date': '-----',
         'borrowed_by': '-----',
         'borrowed_by_id': None,
@@ -365,16 +365,16 @@ def test_book_view_str(db):
                          class_='cls', max_borrow=3)
     borrow = models.Borrow.create(book=1, person=123, return_date=datetime.date(1956, 1, 31))
     data = book_view(1)
-    assert data['status'] == utils.get_name('borrowed')
+    assert data['status'] == utils.get_name('Book::borrowed')
     assert data['return_date'] == datetime.date(1956, 1, 31).strftime(config.core.date_format)
     assert data['borrowed_by'] == str(models.Person.get_by_id(123))
     assert data['borrowed_by_id'] == 123
     borrow.is_back = True
     borrow.save()
-    assert book_view(1)['status'] == utils.get_name('available')
+    assert book_view(1)['status'] == utils.get_name('Book::available')
     b.is_active = False
     b.save()
-    assert book_view(1)['status'] == utils.get_name('inactive')
+    assert book_view(1)['status'] == utils.get_name('Book::inactive')
 
 
 def test_library_new(db):
@@ -689,7 +689,7 @@ def test_search(db):
     assert (tuple(book_search((('author', 'contains', 'name'), 'and', ())))
             == (book_1,))
     assert (tuple(book_search((('library.people.class_', 'eq', 'cls'),
-                                    'and', ('id', 'lt', 2))))
+                               'and', ('id', 'lt', 2))))
             == (book_1,))
     assert (tuple(person_search(('libraries.books.author', 'contains', '2')))
             == (person,))

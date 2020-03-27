@@ -39,24 +39,31 @@ class PasswordFormWidget(mtkf.FormWidget):
     def clean_data(self):
         super().clean_data()
         if self.data[self.password_name] != self.data[self.password2_name]:
-            self.errors[self.password2_name].add(get_name('error_password_match'))
+            self.errors[self.password2_name].add(get_name('error::no_password_match'))
             self.widget_dict[self.password_name].delete(0, tk.END)
             self.widget_dict[self.password2_name].delete(0, tk.END)
         del self.data[self.password2_name]
 
 
-def form_get_name(name):
+def form_get_name(form_name):
     """adapt utils.get_name to forms"""
-    if name.endswith('_search_alt'):
-        name = name[:-len('_search_alt')]
-    # put namespace lookup here
-    return get_name(name)
+    def inner(name):
+        """adapt utils.get_name to forms"""
+        if name.endswith('_search_alt'):
+            name = name[:-len('_search_alt')]
+        return get_name('::'.join(('form', form_name, name)))
+    return inner
 
 
 class BaseForm(mtkf.Form, template=True):
+    """Base class for forms.
+
+        handles autocompletes and appropriate get_name handling
+    """
     def __init_subclass__(cls, *, template=None, **kwargs):
-        autocompletes = config.gui2.get('autocomplete').get(
-            cls.__name__.replace('Form', ''))
+        form_name = cls.__name__.replace('Form', '')
+        cls.get_name = form_get_name(form_name)
+        autocompletes = config.gui2.get('autocomplete').get(form_name)
         for k, v in vars(cls).items():
             if isinstance(v, tuple) and len(v) == 2:
                 c, o = v
@@ -78,10 +85,9 @@ class BaseForm(mtkf.Form, template=True):
         # workaround, this isn't needed if we decide to update misc
         error_display_options = {'popup_field_name_resolver': get_name}
 
-    get_name = form_get_name
 
-
-class SearchableForm(BaseForm, template=True):
+class SearchForm(BaseForm, template=True):
+    """Base class for forms that offer search functionality"""
     class FormWidget(mtkf.FormWidget):
         def submit_action(self, event=None):
             if 'search_mode' in self.widget_dict:
@@ -106,7 +112,7 @@ class SearchableForm(BaseForm, template=True):
     exact_match: GroupElement.ONLY_SEARCH = CheckbuttonWithVar
 
 
-class BookForm(SearchableForm):
+class BookForm(SearchForm):
     class FormWidget(mtkf.FormWidget):
         default_content = config.gui2.get('entry defaults').get('Book').mapping
 
@@ -149,15 +155,9 @@ class BookForm(SearchableForm):
     shelf: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-shelf'})
 
 
-class PersonForm(SearchableForm):
+class PersonForm(SearchForm):
     class FormWidget:
         default_content = config.gui2.get('entry defaults').get('Person').mapping
-
-    def get_name(name: str):
-        if name == 'id_':
-            return get_name('s_nr')
-        else:
-            return get_name(name)
 
     id_: GroupElement.NO_SEARCH = IntEntry
     first_name: mtkf.Element = NonEmptyEntry
@@ -207,8 +207,9 @@ class LibraryGroupCommon(BaseForm, template=True):
     name: mtkf.Element = NonEmptyEntry
     books: mtkf.Element = IntListEntry
     # not as element to allow Library to have a nice order
-    action = (mtk.RadioChoiceWidget, {'*args': [(a, get_name(a)) for a in
-                                                ['add', 'remove', 'delete']]})
+    action = (mtk.RadioChoiceWidget, {
+        '*args': [(a, get_name('form::LibraryGroupCommon' + a))
+                  for a in ['add', 'remove', 'delete']]})
 
 
 class GroupForm(LibraryGroupCommon):
@@ -253,12 +254,12 @@ class RestituteForm(BorrowRestCommonForm):
     pass
 
 
-class BorrowSearchForm(SearchableForm):
+class BorrowSearchForm(SearchForm):
     book__id: mtkf.Element = IntEntry
     book__library: mtkf.Element = Entry
     book__groups: mtkf.Element = Entry
 
-    person__s_nr: mtkf.Element = IntEntry
+    person__id: mtkf.Element = IntEntry
     person__first_name: mtkf.Element = Entry
     person__last_name: mtkf.Element = Entry
     person__class_: mtkf.Element = ClassEntry

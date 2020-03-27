@@ -12,6 +12,8 @@ they will receive arguments as specified in late_books
 """
 
 import base64
+import functools
+import operator
 import tempfile
 import email
 import smtplib
@@ -199,28 +201,39 @@ def get_name(internal: str):
     """Get an end-user suitable name.
 
     Try lookup in config.utils.names.
-    "__" is replaced by ": " with components looked up individually
+    "<namespace>::<name>" may specify a namespace in which lookups are performed first,
+        falling back to the global names if nothing is found.
+        Namespaces may be nested.
+    "__" is replaced by ": " with components (located left/right)
+        looked up up individually, with the first (left) acting
+        as namespace for the second (right).
     If a name isn't found, a warning is logged and the internal name returned,
         potentially modified
-    "<namespace>::<name>" may specify a namespace in which lookups are performed first,
-        falling back to the global names if nothing is found
-    "__" takes precedence over "::"
     """
+    internal = internal.lower()
     if '__' in internal:
-        return ': '.join(get_name(s) for s in internal.split('__'))
+        r = []
+        prefix = ''
+        for component in internal.split('__'):
+            prefix += component
+            r.append(get_name(prefix))
+            prefix += '::'
+        return ': '.join(r)
     *path, name = internal.split('::')
-    current = config.utils.names
-    look_in = [current]
-    try:
-        for k in path:
-            current = current[k]
-            look_in.append(current)
-    except KeyError:
-        if not config.debug:
-            # noinspection PyUnboundLocalVariable
-            logging.warning('invalid namespace {!r} of {!r}'.format(k, internal))
-    look_in.reverse()
+    components = 2**len(path)
+    look_in = []
+    while components:
+        components -= 1
+        try:
+            look_in.append(functools.reduce(
+                operator.getitem,
+                (ns for i, ns in enumerate(path, 1) if components & (1 << (len(path) - i))),
+                config.utils.names))
+        except KeyError:
+            pass
     for ns in look_in:
+        if isinstance(ns, str):
+            continue
         try:
             val = ns[name]
             if isinstance(val, str):
@@ -292,7 +305,7 @@ def get_book_data(isbn: int):
                          + str(isbn) + '&method=simpleSearch&cqlMode=true')
         r.raise_for_status()
     except requests.exceptions.RequestException:
-        raise core.BuchSchlossError('no_connection', 'no_connection')
+        raise core.BuchSchlossError('book_data::no_connection', 'book_data::no_connection')
 
     person_re = re.compile(r'(\w*, \w*) \((\w*)\)')
     results = {'concerned_people': []}
@@ -304,7 +317,7 @@ def get_book_data(isbn: int):
         link_to_first = page.select_one('#recordLink_0')
         if link_to_first is None:
             raise core.BuchSchlossError(
-                'Book_not_found', 'Book_with_ISBN_{}_not_in_DNB', isbn)
+                'book_data::Book_not_found', 'book_data::Book_with_ISBN_{}_not_in_DNB', isbn)
         r = requests.get('https://portal.dnb.de' + link_to_first['href'])
         page = bs4.BeautifulSoup(r.text)
         table = page.select_one('#fullRecordTable')

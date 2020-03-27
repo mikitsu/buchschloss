@@ -25,7 +25,6 @@ import re
 import enum
 import abc
 import builtins
-import traceback
 import logging
 import logging.handlers
 
@@ -68,8 +67,9 @@ if log_conf.file:
 else:
     handler = logging.StreamHandler(sys.stdout)
 del log_conf
+# noinspection PyArgumentList
 logging.basicConfig(level=getattr(logging, config.core.log.level),
-                    format='{asctime} - {levelname} - {funcName}: {msg}',
+                    format='{asctime} - {levelname}: {msg}',
                     datefmt='%Y-%m-%d %H:%M:%S',
                     style='{',
                     handlers=[handler],
@@ -176,11 +176,14 @@ class BuchSchlossError(BuchSchlossBaseError):
 
         The message will be passed through utils.get_name and .format will
         be called with an optional tuple (unpacked) given
+
+        'error::' will be prepended to both title and message
     """
 
-    def __init__(self, title, message, *message_format):
-        super().__init__(utils.get_name(title),
-                         utils.get_name(message).format(*message_format))
+    def __init__(self, title, message, *message_args, **message_kwargs):
+        super().__init__(utils.get_name('error::' + title),
+                         utils.get_name('error::' + message)
+                         .format(*message_args, **message_kwargs))
 
 
 class BuchSchlossPermError(BuchSchlossBaseError):
@@ -194,6 +197,12 @@ class BuchSchlossPermError(BuchSchlossBaseError):
 
 class BuchSchlossNotFoundError(BuchSchlossError.template_title('%s_not_found')
                                .template_message('no_%s_with_id_{}')):
+    def __init__(self, model: str, pk):
+        super().__init__(model, model, pk)
+
+
+class BuchSchlossExistsError(BuchSchlossError.template_title('%s_exists')
+                             .template_message('%s_with_id_{}_exists')):
     def __init__(self, model: str, pk):
         super().__init__(model, model, pk)
 
@@ -419,7 +428,7 @@ def login(name: str, password: str):
         with models.db:
             m = models.Member.get_by_id(name)
     except models.Member.DoesNotExist:
-        raise BuchSchlossError('login', 'no_Member_with_id_{}', name)
+        raise BuchSchlossNotFoundError('Member', name)
     if authenticate(m, password):
         logging.info('login success {}'.format(m))
         return LoginType.MEMBER(m.level, name=m.name)
@@ -599,9 +608,10 @@ class Book(ActionNamespace):
         r['library'] = book.library.name
         r['groups'] = ';'.join(g.name for g in book.groups)
         borrow = book.borrow or Dummy(id=None, _bool=False)
-        r['status'] = utils.get_name('borrowed' if borrow else
-                                     ('available' if book.is_active
-                                      else 'inactive'))
+        r['status'] = utils.get_name('Book::' +  # noqa
+                                     ('borrowed' if borrow else
+                                      ('available' if book.is_active
+                                       else 'inactive')))
         r['return_date'] = str(borrow.return_date.strftime(config.core.date_format))
         r['borrowed_by'] = str(borrow.person)
         r['borrowed_by_id'] = borrow.person.id
@@ -640,9 +650,8 @@ class Person(ActionNamespace):
         try:
             p.save(force_insert=True)
         except peewee.IntegrityError as e:
-            traceback.print_exc()
             if str(e).startswith('UNIQUE'):
-                raise BuchSchlossError('Person_exists', 'Person_{}_exists', id_)
+                raise BuchSchlossExistsError('Person', id_)
             else:
                 raise
         else:
@@ -732,7 +741,7 @@ class Library(ActionNamespace):
                 lib = models.Library.create(name=name, pay_required=pay_required)
             except peewee.IntegrityError as e:
                 if str(e).startswith('UNIQUE'):
-                    raise BuchSchlossError('Library_exists', 'Library_{}_exists', name)
+                    raise BuchSchlossExistsError('Library', name)
                 else:
                     raise
             else:
@@ -827,7 +836,7 @@ class Group(ActionNamespace):
                 group = models.Group.create(name=name)
             except peewee.IntegrityError as e:
                 if str(e).startswith('UNIQUE'):
-                    raise BuchSchlossError('Group_exists', 'Group_{}_exists', name)
+                    raise BuchSchlossExistsError('Group', name)
                 else:
                     raise
             else:
@@ -835,7 +844,10 @@ class Group(ActionNamespace):
 
     @staticmethod
     @level_required(3)
-    def edit(action: LibraryGroupAction, name: str, books: T.Iterable[int], *, login_context):
+    def edit(action: LibraryGroupAction,
+             name: str,
+             books: T.Iterable[int],
+             *, login_context):
         """Perform the given action on the Group with the given name
 
             DELETE will remove all references to the Group,
@@ -944,25 +956,25 @@ class Borrow(ActionNamespace):
         if weeks > config.core.borrow_time_limit[login_context.level]:
             raise BuchSchlossPermError(1)
         if weeks <= 0:
-            raise BuchSchlossError('Borrow', 'borrow_length_not_positive')
+            raise BuchSchlossError('Borrow', 'Borrow::borrow_length_not_positive')
         if not book.is_active or book.borrow:
-            raise BuchSchlossError('Borrow', 'Book_{}_not_available', book.id)
+            raise BuchSchlossError('Borrow', 'Borrow::Book_{}_not_available', book.id)
         if book.library not in person.libraries:
-            raise BuchSchlossError('Borrow', '{}_not_in_Library_{}',
-                                   person, book.library.name)
+            raise BuchSchlossError('Borrow', 'Borrow::{person}_not_in_Library_{library}',
+                                   person=person, library=book.library.name)
         if (book.library.pay_required and (person.pay_date or date.min)
                 + timedelta(weeks=52) < date.today()):
-            raise BuchSchlossError('Borrow', 'Library_{}_needs_payment', book.library)
+            raise BuchSchlossError('Borrow', 'Borrow::Library_{}_needs_payment', book.library)
         if len(person.borrows) >= person.max_borrow:
-            raise BuchSchlossError('Borrow', '{}_has_reached_max_borrow', person)
+            raise BuchSchlossError('Borrow', 'Borrow::{}_reached_max_borrow', person)
         rdate = date.today() + timedelta(weeks=weeks)
         models.Borrow.create(person=person, book=book, return_date=rdate)
         logging.info('{} borrowed {} to {} until {}'.format(
             login_context, book, person, rdate))
         latest = misc_data.latest_borrowers
         # since the values are written to the DB on explicit assignment only
-        # and values aren't cached (yet, but I still don't want to rely on it)
-        # but read on each lookup, the temporary variable is important
+        # [[and values aren't cached (yet, but I still don't want to rely on it)
+        # but read on each lookup]], the temporary variable is important
         if person.id in latest:
             latest.remove(person.id)
         else:
@@ -989,10 +1001,11 @@ class Borrow(ActionNamespace):
         """
         borrow = book.borrow
         if borrow is None:
-            raise BuchSchlossError('not_borrowed', '{}_not_borrowed', book.id)
+            raise BuchSchlossError('Borrow::not_borrowed', 'Borrow::{}_not_borrowed', book.id)
         if person is not None and borrow.person.id != person:
-            raise BuchSchlossError('not_borrowed', '{}_not_borrowed_by_{}',
-                                   book, person)
+            raise BuchSchlossError('Borrow::not_borrowed',
+                                   'Borrow::{book}_not_borrowed_by_{person}',
+                                   book=book, person=person)
         borrow.is_back = True
         borrow.save()
         logging.info('{} confirmed {} was returned'.format(login_context, borrow))
@@ -1047,7 +1060,7 @@ class Member(ActionNamespace):
                                          salt=salt, level=level)
             except peewee.IntegrityError as e:
                 if str(e).startswith('UNIQUE'):
-                    raise BuchSchlossError('Member_exists', 'Member_{}_exists', name)
+                    raise BuchSchlossExistsError('Member', name)
                 else:
                     raise
         logging.info('{} created {}'.format(login_context, m))
@@ -1089,7 +1102,7 @@ class Member(ActionNamespace):
         if (login_context.level < 4
                 and (login_context.type is not LoginType.MEMBER
                      or login_context.name != member.name)):
-            raise BuchSchlossError('no_permission', 'must_be_level_4_or_editee')
+            raise BuchSchlossError('no_permission', 'Member::must_be_level_4_or_editee')
         member.salt = urandom(config.core.salt_length)
         member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
