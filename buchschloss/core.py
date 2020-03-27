@@ -608,7 +608,7 @@ class Book(ActionNamespace):
         r['library'] = book.library.name
         r['groups'] = ';'.join(g.name for g in book.groups)
         borrow = book.borrow or Dummy(id=None, _bool=False)
-        r['status'] = utils.get_name('Book::' +
+        r['status'] = utils.get_name('Book::' +  # noqa
                                      ('borrowed' if borrow else
                                       ('available' if book.is_active
                                        else 'inactive')))

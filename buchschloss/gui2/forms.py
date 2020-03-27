@@ -45,13 +45,13 @@ class PasswordFormWidget(mtkf.FormWidget):
         del self.data[self.password2_name]
 
 
-def form_get_name(from_name):
+def form_get_name(form_name):
     """adapt utils.get_name to forms"""
     def inner(name):
         """adapt utils.get_name to forms"""
         if name.endswith('_search_alt'):
             name = name[:-len('_search_alt')]
-        return get_name('::'.join(('form', from_name, name)))
+        return get_name('::'.join(('form', form_name, name)))
     return inner
 
 
