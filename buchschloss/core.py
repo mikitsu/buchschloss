@@ -1001,9 +1001,10 @@ class Borrow(ActionNamespace):
         """
         borrow = book.borrow
         if borrow is None:
-            raise BuchSchlossError('not_borrowed', '{}_not_borrowed', book.id)
+            raise BuchSchlossError('Borrow::not_borrowed', 'Borrow::{}_not_borrowed', book.id)
         if person is not None and borrow.person.id != person:
-            raise BuchSchlossError('not_borrowed', '{book}_not_borrowed_by_{person}',
+            raise BuchSchlossError('Borrow::not_borrowed',
+                                   'Borrow::{book}_not_borrowed_by_{person}',
                                    book=book, person=person)
         borrow.is_back = True
         borrow.save()

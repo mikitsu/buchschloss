@@ -39,9 +39,6 @@
     "Member_with_id_{}_exists": "There is already a member with the name {}.",
     "auth_failed": "authentication failed",
     "wrong_password": "The given password is wrong.",
-    "not_borrowed": "book not borrowed",
-    "{}_not_borrowed": "{} isn't borrowed.",
-    "{book}_not_borrowed_by_{person}": "{person} hasn't borrowed {book}.",
     "no_connection": "No internet connection",
     "error_while_sending_error_msg": "While sending the error message, an other error occurred",
     "no_password_match": "The passwords don't match.",
@@ -55,7 +52,10 @@
       "Book_{}_not_available": "The Book with the ID {} is currently not available.",
       "{person}_not_in_Library_{library}": "{person} is not allowed to borrow books from {library}.",
       "Library_{}_needs_payment": "Payment required to borrow books from {}.",
-      "{}_reached_max_borrow": "{} has reached their borrowing limit."
+      "{}_reached_max_borrow": "{} has reached their borrowing limit.",
+      "not_borrowed": "book not borrowed",
+      "{}_not_borrowed": "{} isn't borrowed.",
+      "{book}_not_borrowed_by_{person}": "{person} hasn't borrowed {book}."
     },
     "Member": {
       "must_be_level_4_or_editee": "To change someone else's password, you must be Superadmin"

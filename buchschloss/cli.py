@@ -166,6 +166,13 @@ def handle_user_input(ui):
     do_execution(ns, args, kwargs)
 
 
+def ask(question):
+    """Ask a yes/no question"""
+    print(utils.get_name('cli::interactive_question::' + question))
+    r = input()
+    return r and r[0].lower() in 'yj'  # TODO: make this configurable
+
+
 def start():
     """Entry point. Provide a REPL"""
     if not config.debug:
@@ -183,8 +190,7 @@ def start():
             # make the terminal prompt go onto a new line
             print()
         if not config.debug and sys.stderr.error_happened:
-            if (input(utils.get_name('interactive_question::send_error_report') + '\n')
-                    .startswith('yYjJ')):
+            if ask('send_error_report'):
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
