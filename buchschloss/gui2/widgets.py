@@ -1,8 +1,7 @@
 """widgets"""
 
 import tkinter as tk
-from tkinter import Entry, Label
-from tkinter.ttk import Button
+from tkinter import Entry, Label, Button
 from functools import partial
 from collections import abc
 import typing as T
@@ -83,7 +82,8 @@ class SeriesEntry(mtk.ContainingWidget):
 
 class ActionChoiceWidget(mtk.ContainingWidget):
     def __init__(self, master, actions, **kw):
-        widgets = [(Button, {'text': utils.get_name('actions::' + txt), 'command': cmd})
+        widgets = [(Button, {'text': utils.get_name('actions::' + txt), 'command': cmd,
+                             'padx': 50})
                    for txt, cmd in actions]
         super().__init__(master, *widgets, **kw)
 
@@ -111,7 +111,7 @@ class InfoWidget(mtk.ContainingWidget):
                 widgets.append((Label, {}))
             elif isinstance(v, str):
                 widgets.append((Label, {
-                    'text': utils.break_string(v, config.gui2.info_widget.item_length)}))
+                    'text': v, 'wraplength': config.gui2.info_widget.width/2}))
             elif isinstance(v, abc.Sequence):
                 if len(v) and isinstance(v[0], type) and issubclass(v[0], tk.Widget):
                     widgets.append(v)
@@ -280,8 +280,8 @@ class SearchResultWidget(mtk.ContainingWidget):
         widgets = [(Label, {'text': utils.get_name('{}_results').format(len(results))})]
         for r in results:
             widgets.append((Button, {
-                'text': utils.break_string(str(r),
-                                           config.gui2.search_result_widget.item_length),
+                'text': r,
+                'wraplength': config.gui2.search_result_widget.width,
                 'command': partial(view_func, r.id)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))
 
