@@ -96,6 +96,7 @@ class FormWidget(mtk.ContainingWidget):
             `default_content` is a mapping from field names to
                 their default content for this form. The fields must
                 have a setting method recognized by misc.tkstuff.get_setter.
+                Nonexistent fields are ignored
             `take_focus` specifies if the first form element should take focus
             `submit_on_return` is an element of FormWidget.SubmitOnReturn.
                 see its __doc__ for details
@@ -135,8 +136,8 @@ class FormWidget(mtk.ContainingWidget):
         super().__init__(master, *pass_widgets, **options)
         self.widget_dict = {k: w for k, w in zip(widget_keys, self.widgets)}
 
-        for k, v in default_content.items():
-            mtk.get_setter(self.widget_dict[k])(v)
+        for k in default_content.keys() & self.widget_dict.keys():
+            mtk.get_setter(self.widget_dict[k])(default_content[k])
         if submit_on_return is FormWidget.SubmitOnReturn.LAST:
             self.widgets[-1].bind('<Return>', self.submit_action)
         elif submit_on_return is FormWidget.SubmitOnReturn.ALL:

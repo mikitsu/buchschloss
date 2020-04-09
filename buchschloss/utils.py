@@ -4,12 +4,16 @@ contents (for use):
     - run() -- call once on startup. takes care of all automatic tasks
     - send_email() -- send an email
     - get_name() -- get a pretty name
-    - get_book_data() -- attempt to get data about a book based on the ISBN (first local DB, then DNB).
+    - get_book_data() -- attempt to get data about a book based on the ISBN
+        (first local DB, then DNB).
 
-to add late handlers, append them to late_handlers. they will receive arguments as specified in late_books()
+to add late handlers, append them to late_handlers.
+they will receive arguments as specified in late_books
 """
 
 import base64
+import functools
+import operator
 import tempfile
 import email
 import smtplib
@@ -17,7 +21,6 @@ import ssl
 from datetime import datetime, timedelta, date
 import time
 import threading
-import shutil
 import os
 import ftplib
 import ftputil
@@ -37,6 +40,7 @@ from buchschloss import core, config
 
 class FormattedDate(date):
     """print a datetime.date as specified in config.core.date_format"""
+
     def __str__(self):
         return self.strftime(config.core.date_format)
 
@@ -56,11 +60,11 @@ class FormattedDate(date):
 def run_checks():
     """Run stuff to do as specified by times set in config"""
     while True:
-        if datetime.now() > core.misc_data.check_date+timedelta(minutes=45):
+        if datetime.now() > core.misc_data.check_date + timedelta(minutes=45):
             for stuff in stuff_to_do:
                 threading.Thread(target=stuff).start()
             core.misc_data.check_date = datetime.now() + config.utils.tasks.repeat_every
-        time.sleep(5*60*60)
+        time.sleep(5 * 60 * 60)
 
 
 def late_books():
@@ -72,9 +76,10 @@ def late_books():
     late = []
     warn = []
     today = date.today()
+    warn_for = today + config.utils.tasks.late_books_warn_time
     for b in core.Borrow.search((
-            ('is_back', 'eq', False),
-            'and', ('return_date', 'gt', today+config.utils.late_books_warn_time))):
+            ('is_back', 'eq', False), 'and', ('return_date', 'gt', warn_for)),
+            login_context=core.internal_lc):
         if b.return_date < today:
             late.append(b)
         else:
@@ -86,64 +91,89 @@ def late_books():
 def backup():
     """Local backups.
 
-    Run backup_shift and copy "name" db to "name.1", encrypting if a key is given in config
+    Run backup_shift and copy "name" db to "name.1",
+    encrypting if a key is given in config
     """
     backup_shift(os, config.utils.tasks.backup_depth)
-    if config.utils.tasks.secret_key is None:
-        shutil.copyfile(config.core.database_name, config.core.database_name+'.1')
-    else:
-        data = get_encrypted_database()
-        with open(config.core.database_name+'.1', 'wb') as f:
-            f.write(data)
+    data = get_database_bytes()
+    with open(config.core.database_name + '.1', 'wb') as f:
+        f.write(data)
 
 
-def get_encrypted_database():
-    """get the encrypted contents of the database file"""
-    if fernet is None:
-        raise RuntimeError('encryption requested, but no cryptography available')
+def get_database_bytes():
+    """get the contents of the database file,
+        encrypted if a key is specified in config"""
     with open(config.core.database_name, 'rb') as f:
         plain = f.read()
+    if config.utils.tasks.secret_key is None:
+        return plain
+    if fernet is None:
+        raise RuntimeError('encryption requested, but no cryptography available')
     key = base64.urlsafe_b64encode(config.utils.tasks.secret_key)
     cipher = fernet.Fernet(key).encrypt(plain)
     return base64.urlsafe_b64decode(cipher)
 
 
-def web_backup():
-    """Remote backups.
+def ftp_backup():
+    """Remote backups via FTP.
 
-    Run backup_shift and upload "name" DB as "name.1", encrypted if a key is given in config
+    Run backup_shift and upload "name" DB as "name.1",
+    encrypted if a key is given in config
     """
     conf = config.utils
     if conf.tasks.secret_key is None:
+        # get_database_bytes handles encryption,
+        # but this saves copying a file
         upload_path = config.core.database_name
         file = None
     else:
         file = tempfile.NamedTemporaryFile(delete=False)
-        file.write(get_encrypted_database())
+        file.write(get_database_bytes())
         file.close()
         upload_path = file.name
 
-    factory = ftplib.FTP_TLS if conf.tls else ftplib.FTP
+    factory = ftplib.FTP_TLS if conf.ftp.tls else ftplib.FTP
     # noinspection PyDeprecation
     with ftputil.FTPHost(conf.ftp.host, conf.ftp.username, conf.ftp.password,
                          session_factory=factory, use_list_a_option=False) as host:
         backup_shift(host, conf.tasks.web_backup_depth)
-        host.upload(upload_path, config.core.database_name+'.1')
+        host.upload(upload_path, config.core.database_name + '.1')
     if file is not None:
         os.unlink(file.name)
+
+
+def http_backup():
+    """remote backups via HTTP"""
+    conf = config.utils.http
+    data = get_database_bytes()
+    options: 'dict' = {}
+    if conf.Basic_authentication.username:
+        options['auth'] = (conf.Basic_authentication.username,
+                           conf.Basic_authentication.password)
+    if conf.POST_authentication.username or conf.POST_authentication.password:
+        options.setdefault('data', {})['username'] = conf.POST_authentication.username
+        options['data']['password'] = conf.POST_authentication.password
+    try:
+        r = requests.post(conf.url, files={conf.file_name: data}, **options)
+    except requests.RequestException as e:
+        logging.error('exception during HTTP request: ' + str(e))
+        return
+    if r.status_code != 200:
+        logging.error('received unexpected status code {} during HTTP backup'
+                      .format(r.status_code))
 
 
 def backup_shift(fs, depth):
     """shift all name.number up one number to the given depth
         in the given filesystem (os or remote FTP host)"""
-    number_name = lambda n: '.'.join((config.core.database_name, str(n)))
+    number_name = lambda n: '.'.join((config.core.database_name, str(n)))  # noqa
     try:
         fs.remove(number_name(depth))
     except FileNotFoundError:
         pass
     for f in range(depth, 1, -1):
         try:
-            fs.rename(number_name(f-1), number_name(f))
+            fs.rename(number_name(f - 1), number_name(f))
         except FileNotFoundError:
             pass
 
@@ -171,26 +201,39 @@ def get_name(internal: str):
     """Get an end-user suitable name.
 
     Try lookup in config.utils.names.
-    "__" is replaced by ": " with components looked up individually
-    If a name isn't found, a warning is logged and the internal name returned, potentially modified
     "<namespace>::<name>" may specify a namespace in which lookups are performed first,
-        falling back to the global names if nothing is found
-    "__" takes precedence over "::"
+        falling back to the global names if nothing is found.
+        Namespaces may be nested.
+    "__" is replaced by ": " with components (located left/right)
+        looked up up individually, with the first (left) acting
+        as namespace for the second (right).
+    If a name isn't found, a warning is logged and the internal name returned,
+        potentially modified
     """
+    internal = internal.lower()
     if '__' in internal:
-        return ': '.join(get_name(s) for s in internal.split('__'))
+        r = []
+        prefix = ''
+        for component in internal.split('__'):
+            prefix += component
+            r.append(get_name(prefix))
+            prefix += '::'
+        return ': '.join(r)
     *path, name = internal.split('::')
-    current = config.utils.names
-    look_in = [current]
-    try:
-        for k in path:
-            current = current[k]
-            look_in.append(current)
-    except KeyError:
-        # noinspection PyUnboundLocalVariable
-        logging.warning('invalid namespace {!r} of {!r}'.format(k, internal))
-    look_in.reverse()
+    components = 2**len(path)
+    look_in = []
+    while components:
+        components -= 1
+        try:
+            look_in.append(functools.reduce(
+                operator.getitem,
+                (ns for i, ns in enumerate(path, 1) if components & (1 << (len(path) - i))),
+                config.utils.names))
+        except KeyError:
+            pass
     for ns in look_in:
+        if isinstance(ns, str):
+            continue
         try:
             val = ns[name]
             if isinstance(val, str):
@@ -201,8 +244,19 @@ def get_name(internal: str):
                 raise TypeError('{!r} is neither dict nor str'.format(val))
         except KeyError:
             pass
-    logging.warning('Name "{}" was not found in the namefile'.format('::'.join(path+[name])))
-    return '::'.join(path+[name])
+    name = '::'.join(path + [name])
+    if not config.debug:
+        logging.warning('Name "{}" was not found in the namefile'.format(name))
+    return name
+
+
+def get_level(number: int = None):
+    """get the level name corresponding to the given number
+        or a sequence of all level names"""
+    if number is None:
+        return config.utils.names.level_names
+    else:
+        return config.utils.names.level_names[number]
 
 
 def break_string(text, size, break_char=string.punctuation, cut_char=string.whitespace):
@@ -224,9 +278,9 @@ def break_string(text, size, break_char=string.punctuation, cut_char=string.whit
                 break
             i -= 1
         else:
-            i = size-1
+            i = size - 1
         i += 1
-        r.append(text[:i-cut])
+        r.append(text[:i - cut])
         text = text[i:]
     r.append(text)
     return '\n'.join(r)
@@ -236,11 +290,12 @@ def get_book_data(isbn: int):
     """Attempt to get book data via the ISBN from the DB, if that fails,
         try the DNB (https://portal.dnb.de)"""
     try:
-        book = next(iter(core.Book.search(('isbn', 'eq', isbn))))
+        book = next(iter(core.Book.search(
+            ('isbn', 'eq', isbn), login_context=core.internal_lc)))
     except StopIteration:
         pass  # actually, I could put the whole rest of the function here
     else:
-        data = core.Book.view_str(book.id)
+        data = core.Book.view_str(book.id, login_context=core.internal_lc)
         del data['id'], data['status'], data['return_date'], data['borrowed_by']
         del data['borrowed_by_id'], data['__str__']
         return data
@@ -250,7 +305,7 @@ def get_book_data(isbn: int):
                          + str(isbn) + '&method=simpleSearch&cqlMode=true')
         r.raise_for_status()
     except requests.exceptions.RequestException:
-        raise core.BuchSchlossError('no_connection', 'no_connection')
+        raise core.BuchSchlossError('book_data::no_connection', 'book_data::no_connection')
 
     person_re = re.compile(r'(\w*, \w*) \((\w*)\)')
     results = {'concerned_people': []}
@@ -262,8 +317,8 @@ def get_book_data(isbn: int):
         link_to_first = page.select_one('#recordLink_0')
         if link_to_first is None:
             raise core.BuchSchlossError(
-                'Book_not_found', 'Book_with_ISBN_{}_not_in_DNB', isbn)
-        r = requests.get('https://portal.dnb.de'+link_to_first['href'])
+                'book_data::Book_not_found', 'book_data::Book_with_ISBN_{}_not_in_DNB', isbn)
+        r = requests.get('https://portal.dnb.de' + link_to_first['href'])
         page = bs4.BeautifulSoup(r.text)
         table = page.select_one('#fullRecordTable')
 
@@ -281,7 +336,7 @@ def get_book_data(isbn: int):
                     if g[1] == 'Verfasser':
                         results['author'] = g[0]
                     else:
-                        results['concerned_people'].append(g[1]+': '+g[0])
+                        results['concerned_people'].append(g[1] + ': ' + g[0])
             elif td[0] == 'Verlag':
                 results['publisher'] = td[1].split(':')[1].strip()
             elif td[0] == 'Zeitliche Einordnung':
@@ -305,7 +360,7 @@ def _default_late_handler(late, warn):
     with open('late.txt', 'w') as f:
         f.write(head)
         f.write('\n'.join(str(L) for L in late))
-    with open('warn.txt',  'w') as f:
+    with open('warn.txt', 'w') as f:
         f.write(head)
         f.write('\n'.join(str(w) for w in warn))
 

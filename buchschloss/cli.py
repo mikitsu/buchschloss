@@ -13,7 +13,7 @@ import operator
 import datetime
 try:
     # on linux (all? some?), importing will make arrow keys usable
-    import readline
+    import readline  # noqa
 except ImportError:
     pass
 
@@ -62,21 +62,24 @@ def execute(command, args, kwargs):
         display encountered errors
     """
     func = COMMANDS[command]
+    kwargs['login_context'] = current_login
     try:
         f_args = inspect.signature(func).parameters.keys()
     except (TypeError, ValueError):
         pass
     else:
-        if func.__name__ in core.auth_required.functions:
-            kwargs['current_password'] = getpass.getpass(utils.get_name('current_password'))
+        if func.__qualname__ in core.auth_required.functions:
+            kwargs['current_password'] = getpass.getpass(
+                utils.get_name('interactive_question::current_password'))
         for i, name in enumerate(f_args):
             if 'password' in name:
-                passwd = getpass.getpass(utils.get_name(name)+': ')
+                passwd = getpass.getpass(utils.get_name(
+                    'interactive_question::' + name) + ': ')
                 args.insert(i, passwd)
     try:
         return func(*args, **kwargs)
     except core.BuchSchlossBaseError as e:
-        raise ExecutionError('{0.title}: {0.message}'.format(e))
+        raise ExecutionError(str(e))
     except ExitException:
         raise
     except Exception:
@@ -124,7 +127,7 @@ def eval_val(val):
             return ast.literal_eval(val)
         except Exception:
             return val
-eval_val.last_result = None
+eval_val.last_result = None  # noqa
 
 
 def read_input(prompt):
@@ -148,7 +151,7 @@ def do_execution(data, args, kwargs):
         do_execution(NS, (r,), {})
     else:
         if data.cmd:
-            print(data.cmd, 'is not a valid command')
+            print(utils.get_name('cli::{}_is_invalid_command').format(data.cmd))
         if r is not None:
             pprint.pprint(r)
             eval_val.last_result = r
@@ -163,6 +166,13 @@ def handle_user_input(ui):
     do_execution(ns, args, kwargs)
 
 
+def ask(question):
+    """Ask a yes/no question"""
+    print(utils.get_name('cli::interactive_question::' + question))
+    r = input()
+    return r and r[0].lower() in 'yj'  # TODO: make this configurable
+
+
 def start():
     """Entry point. Provide a REPL"""
     if not config.debug:
@@ -171,21 +181,38 @@ def start():
     try:
         while True:
             try:
-                ui = read_input('{} -> '.format(core.current_login))
+                ui = read_input('{} -> '.format(current_login))
                 handle_user_input(ui)
             except Level8Error as e:
                 print(e.__class__.__name__, e)
-    except ExitException:
+    except (ExitException, EOFError) as e:
+        if isinstance(e, EOFError):
+            # make the terminal prompt go onto a new line
+            print()
         if not config.debug and sys.stderr.error_happened:
-            if input(utils.get_name('send_error_report')+'\n')[0] in 'yYjJ':
+            if ask('send_error_report'):
                 try:
-                    utils.send_email(utils.get_name('error_in_buchschloss'), '\n\n\n'.join(sys.stderr.error_texts))
+                    utils.send_email(utils.get_name('error_in_buchschloss'),
+                                     '\n\n\n'.join(sys.stderr.error_texts))
                 except utils.requests.RequestException as e:
-                    print('\n'.join((utils.get_name('error_while_sending_error_msg'), str(e))))
+                    print('\n'.join((utils.get_name('error::error_while_sending_error_msg'),
+                                     str(e))))
             sys.exit()
 
 
 "Specific actions"
+
+
+def login(name, password):
+    """wrap around core.login"""
+    global current_login
+    current_login = core.login(name, password)
+
+
+def logout():
+    """forget the current login"""
+    global current_login
+    current_login = core.guest_lc
 
 
 def help(name=None):
@@ -194,21 +221,21 @@ def help(name=None):
     If "commands" is passed, list possible commands.
     If no action is given, display general help."""
     print('+++ Attention: passwords are *never* taken directly as parameters +++')
-    print('+++ Achtung: Passwörter *nie* direkt als Parameter angeben +++\n\n')
-    
+    print(utils.get_name('cli::dont_give_passwords'), '\n\n')
+
     def getsig(func):
         try:
             return str(inspect.signature(func))
         except (ValueError, TypeError):
             return '(<?>)'
-        
+
     if name is None:
         parser.print_help()
         return
     elif name == 'commands':
         print('\n\n'.join('{}{}: {}'.format(
-            n, getsig(f), (inspect.getdoc(f) or 'No docstring').split('\n\n')[0]
-            ) for n, f in COMMANDS.items() if callable(f)))
+            n, getsig(f), (inspect.getdoc(f) or 'No docstring').split('\n\n')[0])
+            for n, f in COMMANDS.items() if callable(f)))
         return
     elif name in COMMANDS:
         obj = COMMANDS[name]
@@ -243,8 +270,8 @@ def foreach(iterable):
 
 
 COMMANDS = {
-    'login': core.login,
-    'logout': core.logout,
+    'login': login,
+    'logout': logout,
     'new_person': core.Person.new,
     'edit_person': core.Person.edit,
     'view_person': core.Person.view_str,
@@ -279,24 +306,12 @@ COMMANDS = {
     'foreach': foreach,
 }
 variables = {}
+current_login = core.guest_lc
 
 
 parser = MyArgumentParser('', add_help=False)
-parser.add_argument('action', help='The name of the function to call',
+parser.add_argument('action', help=utils.get_name('cli::help::action'),
                     choices=COMMANDS)
-parser.add_argument('args', nargs='*', help='The arguments to use. '
-                    'Will be evaluated as Python literals or, '
-                    'on failure, as strings. '
-                    'Stored values may be used by putting the '
-                    'name between <angle brackets>. '
-                    'Pass positional arguments at their position. '
-                    'Pass keyword arguments as `key`=`model`, '
-                    'where `key` is the argument name (string) and '
-                    '`model` its model (evaluated as Python literal or, '
-                    'if that fails, as string')
-parser.add_argument('--store', help='Store the result of this call in '
-                    'a variable with the name. The model may be '
-                    'retrieved by putting the name in <angle brackets>')
-parser.add_argument('-c', '--cmd', help='Invoke the given command '
-                    'with the result of the execution as sole '
-                    'positional argument.')
+parser.add_argument('args', nargs='*', help=utils.get_name('cli::help::args'))
+parser.add_argument('--store', help=utils.get_name('cli::help::args'))
+parser.add_argument('-c', '--cmd', help=utils.get_name('cli::help::cmd'))

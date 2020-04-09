@@ -1,5 +1,193 @@
 {
-  "level_0": "inactive",
-  "no_permission": "Permission denied",
-  "must_be_{}": "For this action, you must be at least {}."
+  "unexpected_error": "unexpected error",
+  "error_in_buchschloss": "Error in BuchSchloss",
+  "errors_{}": "the following errors occurred:\n\n{}",
+  "back_to_results": "back to search results",
+  "{}_results": "{} results",
+  "info_regarding": "information regarding",
+  "logged_in_as_{}": "logged in as {}",
+  "logged_out": "logged out",
+  "not_logged_in": "not logged in",
+  "Person[{}]\"{}, {}\"": "Person[{}]\"{}, {}\"",
+  "Library[{}]": "Library[{}]",
+  "Book[{}]\"{}\"": "Book[{}]\"{}\"",
+  "Group[{}]": "Group[{}]",
+  "Member[{}]({})": "Member[{}]({})",
+  "error": {
+    "no_permission": "permission denied",
+    "must_be_{}": "For this action, you must be at least {}.",
+    "must_be_level_4_or_editee": "",
+    "Book_not_found": "book not found",
+    "no_Book_with_id_{}": "There is no book with the ID {}.",
+    "Person_not_found": "person not found",
+    "no_Person_with_id_{}": "There is no person with the ID {}.",
+    "Member_not_found": "member not found",
+    "no_Member_with_id_{}": "There is no member with the name {}.",
+    "Library_not_found": "library not found",
+    "no_Library_with_id_{}": "There is no library with the name {}.",
+    "Libraries_not_found": "libraries not found",
+    "no_Libraries_with_id_{}": "There are no libraries with the names {}.",
+    "Group_not_found": "group not found",
+    "no_Group_with_id_{}": "There is no group with the name {}.",
+    "Person_exists": "the person already exists",
+    "Person_with_id_{}_exists": "There is already a person with the ID {}.",
+    "Library_exists": "the library already exists",
+    "Library_with_id_{}_exists": "There is already a library with the name {}.",
+    "Group_exists": "the group already exists",
+    "Group_with_id_{}_exists": "There is already a group with the name {}.",
+    "Member_exists": "the member already exists",
+    "Member_with_id_{}_exists": "There is already a member with the name {}.",
+    "auth_failed": "authentication failed",
+    "wrong_password": "The given password is wrong.",
+    "no_connection": "No internet connection",
+    "error_while_sending_error_msg": "While sending the error message, an other error occurred",
+    "no_password_match": "The passwords don't match.",
+    "gui2": {
+      "series_number_must_be_int": "The series number must be an integer",
+      "number_without_series": "If giving a series number, you must also specify a series name"
+    },
+    "Borrow": {
+      "*this*": "borrowing error",
+      "borrow_length_not_positive": "OverflowError",
+      "Book_{}_not_available": "The Book with the ID {} is currently not available.",
+      "{person}_not_in_Library_{library}": "{person} is not allowed to borrow books from {library}.",
+      "Library_{}_needs_payment": "Payment required to borrow books from {}.",
+      "{}_reached_max_borrow": "{} has reached their borrowing limit.",
+      "not_borrowed": "book not borrowed",
+      "{}_not_borrowed": "{} isn't borrowed.",
+      "{book}_not_borrowed_by_{person}": "{person} hasn't borrowed {book}."
+    },
+    "Member": {
+      "must_be_level_4_or_editee": "To change someone else's password, you must be Superadmin"
+    },
+    "book_data": {
+      "Book_not_found": "book not found",
+      "Book_with_ISBN_{}_not_in_DNB": "A book with an ISBN of {} wasn't found in the DNB"
+    }
+  },
+  "actions": {
+    "new": "new",
+    "view": "view",
+    "edit": "edit",
+    "search": "search",
+    "borrow": "borrow",
+    "restitute": "return",
+    "borrow_search": "borrowing action",
+    "change_password": "change password",
+    "activate_group": "activate a group",
+    "login": "log in",
+    "logout": "log out",
+    "abort": "abort",
+    "exit_app": "exit"
+  },
+  "form": {
+    "name": "name",
+    "current_password": "your password",
+    "password2": "repeat password",
+    "Search": {
+      "search_mode": "search mode",
+      "exact_match": "require exact match"
+    },
+    "Book": {
+      "id": "ID",
+      "isbn": "ISBN",
+      "author": "author",
+      "title": "title",
+      "series": "series",
+      "language": "language",
+      "publisher": "publisher",
+      "concerned_people": "other people",
+      "year": "year",
+      "medium": "medium",
+      "genres": "genres",
+      "library": "library",
+      "groups": "groups",
+      "shelf": "shelf"
+    },
+    "Person": {
+      "id_": "ID",
+      "first_name": "first name",
+      "last_name": "last name",
+      "class_": "class",
+      "max_borrow": "max. borrowed books",
+      "libraries": "libraries",
+      "pay": "has paid"
+    },
+    "Member": {
+      "level": "level",
+      "password": "new password"
+    },
+    "ChangePassword": {
+      "member": "name",
+      "new_password": "new password"
+    },
+    "Login": {
+      "name": "name",
+      "password": "password"
+    },
+    "LibraryGroupCommon": {
+      "add": "add",
+      "remove": "remove",
+      "delete": "delete",
+      "books": "books"
+    },
+    "Group": {
+      "action": "action"
+    },
+    "Library": {
+      "action": "action",
+      "people": "people",
+      "pay_required": "payment required"
+    },
+    "GroupActivation": {
+      "name": "group",
+      "src": "source libraries",
+      "dest": "destination library"
+    },
+    "BorrowRestCommon": {
+      "person": "person",
+      "book": "book"
+    },
+    "Borrow": {
+      "weeks": "borrow time (weeks)"
+    },
+    "BorrowSearch": {
+      "is_back": "was returned"
+    }
+  },
+  "Book": {
+    "*this*": "book",
+    "id": "ID",
+    "new_id_{}": "The new book has the ID {}.",
+    "borrowed": "borrowed",
+    "available": "available",
+    "inactive": "removed"
+  },
+  "Person": {
+    "*this*": "person",
+    "id": "ID"
+  },
+  "Borrow": {
+    "*this*": "borrowing action",
+    "is_back": "is_back",
+    "until_{}": "borrowed until {}"
+  },
+  "interactive_question": {
+    "current_password": "Please enter your password",
+    "new_password": "Please enter the new password",
+    "password": "Please enter the password",
+    "send_error_report": "Do you want to send an error report?",
+    "really_exit_app": "Do you really want to exit?",
+    "isbn_autofill": "Do you want some data to be automatically filled based on the ISBN?"
+  },
+  "cli": {
+    "{}_is_invalid_command": "The command '{}' does not exist.",
+    "dont_give_passwords": "Only type a password when specifically prompted",
+    "help": {
+      "action": "The name of the function to call",
+      "args": "The arguments to use. Will be evaluated as Python literals or, on failure, as strings. Stored values may be used by putting the name between <angle brackets>. Pass positional arguments at their position. Pass keyword arguments as `key`=`value`, where `key` is the argument name (string) and `value` its value (evaluated as Python literal or, if that fails, as string",
+      "store": "Store the result of this call in a variable with the name. The model may be retrieved by putting the name in <angle brackets>",
+      "cmd": "Invoke the given command with the result of the execution as sole positional argument."
+    }
+  }
 }

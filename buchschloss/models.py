@@ -1,11 +1,12 @@
+"""model definitions"""
 import datetime
 import json
 import sys
 import typing
 
 import peewee
-from peewee import SqliteDatabase, CharField, IntegerField, DateField, BooleanField, BlobField, \
-    ForeignKeyField, ManyToManyField, AutoField
+from peewee import (SqliteDatabase, CharField, IntegerField, DateField, BooleanField,
+                    BlobField, ForeignKeyField, ManyToManyField, AutoField)
 from playhouse.fields import PickleField
 
 try:
@@ -51,7 +52,6 @@ class JSONField(peewee.TextField):
 class Model(peewee.Model):
     """Base class for all models."""
     DoesNotExist: peewee.DoesNotExist
-    repr_data: T.Mapping[str, str]
     str_fields: T.Iterable[peewee.Field]
     pk_type: T.Type
     pk_name: str = 'id'
@@ -89,13 +89,13 @@ class Person(Model):
     Repräsentiert einen angemeldeten Schüler
 
     Attributes:
-        - id: ID Schülerausweisnummer
-        - first_name: Vorname
-        - last_name: Nachname
-        - class_: Klasse
-        - max_borrow: max. no. of borrowings allowed simultaneously; maximale Ausleihanzahl
-        - borrows: current borrows; derzeitige Ausleihen
-        - libraries: libraries allowed; erlaubte Bibliotheken
+        - id
+        - first_name
+        - last_name
+        - class_
+        - max_borrow: max. number of borrowings allowed simultaneously
+        - borrows: current borrows
+        - libraries: libraries allowed
     """
     id: T.Union[int, IntegerField] = IntegerField(primary_key=True)
     first_name: T.Union[str, CharField] = CharField()
@@ -108,13 +108,8 @@ class Person(Model):
     @property
     def borrows(self):
         return Borrow.select().where(Borrow.person == self,
-                                     Borrow.is_back == False)
+                                     Borrow.is_back == False)  # noqa
 
-    repr_data = {
-        'ein': 'eine',
-        'name': 'Person',
-        'id': 'Schülerausweisnummer',
-    }
     str_fields = (id, last_name, first_name)
     pk_type = int
 
@@ -125,9 +120,7 @@ class Person(Model):
 
 
 class Library(Model):
-    """Represent the libraries a Person has access to.
-
-    Speichert die Bibliotheken, zu denen eine Person Zugang hat."""
+    """Represent the libraries a Person has access to."""
     people: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]\
         = ManyToManyField(Person, 'libraries')
     books: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]
@@ -137,11 +130,6 @@ class Library(Model):
     def __str__(self):
         return utils.get_name('Library[{}]').format(self.name)
 
-    repr_data = {
-        'ein': 'eine',
-        'name': 'Bibliothek',
-        'id': 'Name'
-    }
     str_fields = (name,)
     pk_name = 'name'
 
@@ -149,7 +137,6 @@ class Library(Model):
 class Book(Model):
     """Represent a Book.
 
-    Repräsentiert ein Buch.
     Attributes (selection):
         - author, isbn, title, series, language, publisher, concerned_people,
             year, medium, genres : general data about the book
@@ -182,11 +169,6 @@ class Book(Model):
     def borrow(self):
         return Borrow.get_or_none(Borrow.book == self, is_back=False)
 
-    repr_data = {
-        'ein': 'ein',
-        'name': 'Buch',
-        'id': 'ID',
-    }
     str_fields = (id, title)
 
     def __str__(self):
@@ -194,9 +176,7 @@ class Book(Model):
 
 
 class Group(Model):
-    """Represent a Group.
-
-    Repräsentiert eine Gruppe"""
+    """Represent a Group."""
     books: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]\
         = ManyToManyField(Book, 'groups')
     name: T.Union[str, CharField] = CharField(primary_key=True)
@@ -204,11 +184,6 @@ class Group(Model):
     def __str__(self):
         return utils.get_name('Group[{}]').format(self.name)
 
-    repr_data = {
-        'ein': 'eine',
-        'name': 'Gruppe',
-        'id': 'Name'
-    }
     str_fields = (name,)
     pk_name = 'name'
 
@@ -216,13 +191,11 @@ class Group(Model):
 class Borrow(Model):
     """Represent a borrow action.
 
-    Repräsentiert einen Entleihvorgang.
-
     Attributes:
-        - person: the Person borrowing; die ausleihende Person
-        - book: the Book borrowed; das ausgeliehene Buch
-        - is_back: if the Book was returned; ob das Buch bereits zurckgegeben wurde
-        - return_date: date by which the Book must de returned; Datum bis zu dem das Buch zurckgegeben sein muss
+        - person: the Person borrowing
+        - book: the Book borrowed
+        - is_back: if the Book was returned
+        - return_date: date by which the Book must de returned
     """
     id: T.Union[int, IntegerField] = AutoField(primary_key=True)
     person: Person = ForeignKeyField(Person)
@@ -230,42 +203,30 @@ class Borrow(Model):
     is_back: T.Union[bool, BooleanField] = BooleanField(default=False)
     return_date: T.Union[datetime.date, DateField] = FormattedDateField()
 
-    repr_data = {
-        'ein': 'ein',
-        'name': 'Ausleihvorgang',
-        'id': 'ID',
-    }
-    str_fields = (id, person, book, return_date, is_back)  # keep ID in, needed for further info
+    # keep ID in, needed for further info
+    str_fields = (id, person, book, return_date, is_back)
 
     def __str__(self):
         if self.is_back:
-            is_back = utils.get_name('is_back')
+            is_back = utils.get_name('Borrow::is_back')
         else:
-            is_back = utils.get_name('until_{}').format(self.return_date)
+            is_back = utils.get_name('Borrow::until_{}').format(self.return_date)
         return '{}: {} {}'.format(self.person, self.book, is_back)
 
 
 class Member(Model):
-    """Represent a Member of the Rund-ums-Lesen-AG
-
-    Repräsentiert ein Mitglied der Rund-ums-Lesen-AG,
-    d.h. eine Person, die Ausleihen, Rückgaben und ggf. Verwaltungsaufgeben durchführen kann."""
+    """Represent a Member of the library organisation team"""
     name: T.Union[str, CharField] = CharField(primary_key=True)
     password: T.Union[bytes, BlobField] = BlobField()
     salt: T.Union[bytes, BlobField] = BlobField()
     level: T.Union[int, IntegerField] = IntegerField()
 
-    repr_data = {
-        'ein': 'ein',
-        'name': 'Mitglied',
-        'id': 'Name'
-    }
     str_fields = (name, level)
     pk_name = 'name'
 
     def __str__(self):
         return utils.get_name("Member[{}]({})").format(
-            self.name, utils.get_name('level_{}'.format(self.level)))
+            self.name, utils.get_level(self.level))
 
 
 class Script(Model):
@@ -283,11 +244,6 @@ class Misc(Model):
     pk: T.Union[str, CharField] = CharField(primary_key=True)
     data: T.Any = PickleField()
 
-    repr_data = {
-        'ein': 'ein',
-        'name': 'Interna',
-        'id': 'Name'
-    }
     str_fields = (pk,)
     pk_name = 'pk'
 
