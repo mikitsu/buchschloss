@@ -1155,7 +1155,7 @@ class Script(ActionNamespace):
     @classmethod
     @auth_required
     @level_required(4)
-    @from_db(models.Script)
+    @from_db(script=models.Script)
     def edit(cls, script: T.Union[str, models.Script], *, login_context, **kwargs):
         """edit a script"""
         if not set(kwargs) <= cls._model_fields or 'name' in kwargs:

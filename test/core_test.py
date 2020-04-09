@@ -716,7 +716,43 @@ def test_script_new(db):
     assert script.name == 'test-script'
     assert script.code == 'this should be valid Lua code'
     assert script.setlevel == 3
+    assert script.storage == {}
     script_new(name='with-setlevel-none', code='mode Lua code', setlevel=None)
     assert models.Script.get_by_id('with-setlevel-none').setlevel is None
     with pytest.raises(core.BuchSchlossBaseError):
         script_new(name='test-script', code='with the same name', setlevel=None)
+
+
+def test_script_edit(db):
+    """test Script.edit"""
+    models.Script.create(name='name', code='code', setlevel=3, storage={})
+    ctxt = for_levels(partial(
+        core.Script.edit,
+        'name',
+        code='new code'),
+        4
+    )
+    script_edit = partial(core.Script.edit, login_context=ctxt)
+    assert models.Script.get_by_id('name').code == 'new code'
+    with pytest.raises(TypeError):
+        script_edit('name', name='not allowed')
+    with pytest.raises(TypeError):
+        script_edit('name', unknown='attribute')
+    with pytest.raises(core.BuchSchlossBaseError):
+        script_edit('unknown', code='blah')
+
+
+def test_script_view_str(db):
+    """test Script.view_str"""
+    script = models.Script.create(name='name', code='code', setlevel=None, storage={})
+    ctxt = for_levels(partial(core.Script.view_str, 'name'), 0,
+                      lambda x: x == {'name': 'name', 'setlevel': '-----'})
+    script_view_str = partial(core.Script.view_str, login_context=ctxt)
+    script.setlevel = 0
+    script.save()
+    assert script_view_str('name') == {'name': 'name', 'setlevel': utils.get_level(0)}
+    script.setlevel = 3
+    script.save()
+    assert script_view_str('name') == {'name': 'name', 'setlevel': utils.get_level(3)}
+    with pytest.raises(core.BuchSchlossBaseError):
+        script_view_str('whatever')
