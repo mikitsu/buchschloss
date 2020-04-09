@@ -232,7 +232,7 @@ class Member(Model):
 class Script(Model):
     """Represent a Lua / cli2 script"""
     name: T.Union[str, CharField] = CharField(primary_key=True)
-    script: T.Union[str, peewee.TextField] = peewee.TextField()
+    code: T.Union[str, peewee.TextField] = peewee.TextField()
     setlevel: T.Union[int, IntegerField] = IntegerField(null=True)
     storage: T.Union[dict, JSONField] = JSONField()
 

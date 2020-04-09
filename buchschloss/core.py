@@ -1133,7 +1133,7 @@ class Script(ActionNamespace):
     @staticmethod
     @auth_required
     @level_required(4)
-    def new(*, name: str, script: str, setlevel: T.Optional[int],
+    def new(*, name: str, code: str, setlevel: T.Optional[int],
             login_context: LoginContext):
         """create a new script with the given arguments
 
@@ -1142,7 +1142,7 @@ class Script(ActionNamespace):
         """
         try:
             new = models.Script.create(
-                name=name, script=script, setlevel=setlevel, storage={})
+                name=name, code=code, setlevel=setlevel, storage={})
         except peewee.IntegrityError as e:
             if str(e).startswith('UNIQUE'):
                 raise BuchSchlossExistsError('Script', name)
