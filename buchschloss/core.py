@@ -455,19 +455,26 @@ def _update_library_group(lg_model: T.Type[models.Model],
 
 
 class ActionNamespace(abc.ABC):
-    """Abstract base class for the Book, Person Member, Library, Group and Borrow namespaces"""
+    """Abstract base class for the Book, Person, Member,
+    Library, Group, Borrow and Script namespaces"""
     model: T.ClassVar[models.Model]
     view_level: T.ClassVar[int] = 0
+    _model_fields: T.ClassVar[set]
 
-    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        """add a ``_model_fields`` attribute containing a set of field names"""
+        cls._model_fields = {k for k in dir(cls.model)
+                             if isinstance(getattr(cls.model, k), peewee.Field)}
+
+    @staticmethod
     @abc.abstractmethod
-    def new(cls, *, login_context, **kwargs):
+    def new(*, login_context, **kwargs):
         """Create a new record"""
         raise NotImplementedError
 
-    @classmethod
+    @staticmethod
     @abc.abstractmethod
-    def view_str(cls, id_: T.Union[int, str], *, login_context) -> dict:
+    def view_str(id_: T.Union[int, str], *, login_context) -> dict:
         """Return information in a dict"""
         raise NotImplementedError
 
@@ -550,10 +557,10 @@ class Book(ActionNamespace):
                 logging.info('{} created {}'.format(login_context, b))
         return b.id
 
-    @staticmethod
+    @classmethod
     @from_db(models.Book)
     @level_required(2)
-    def edit(book: T.Union[int, models.Book], *, login_context, **kwargs):
+    def edit(cls, book: T.Union[int, models.Book], *, login_context, **kwargs):
         """Edit a Book based on the arguments given.
 
         See Book.__doc__ for more information on the arguments
@@ -561,9 +568,7 @@ class Book(ActionNamespace):
             or the new library does not exist
         return a set of error messages for errors during group changes
         """
-        if ((not set(kwargs.keys()) <= {k for k in dir(models.Book)
-                                        if isinstance(getattr(models.Book, k),
-                                                      peewee.Field)})
+        if ((not set(kwargs.keys()) <= cls._model_fields)
                 or 'id' in kwargs):
             raise TypeError('unexpected kwarg')
         groups = set(kwargs.pop('groups', ()))
@@ -657,10 +662,10 @@ class Person(ActionNamespace):
         else:
             logging.info('{} created {} with pay={}'.format(login_context, p, pay))
 
-    @staticmethod
+    @classmethod
     @level_required(3)
     @from_db(models.Person)
-    def edit(person: T.Union[int, models.Person], *, login_context, **kwargs):
+    def edit(cls, person: T.Union[int, models.Person], *, login_context, **kwargs):
         """Edit a Person based on the arguments given.
 
         See Person.__doc__ for more information on the arguments
@@ -670,10 +675,7 @@ class Person(ActionNamespace):
         raise a BuchSchlossBaseError if the Person isn't found.
         Return a set of errors found during updating the person's libraries
         """
-        if ((not set(kwargs.keys()) <= {k for k in dir(models.Person)
-                                        if isinstance(getattr(models.Person, k),
-                                                      peewee.Field)} | {'pay'})
-                or 'id' in kwargs):
+        if (not set(kwargs.keys()) <= cls._model_fields | {'pay'} or 'id' in kwargs):
             raise TypeError('unexpected kwarg')
         if kwargs.get('max_borrow', 0) > 3 and not login_context.level >= 4:
             raise BuchSchlossPermError(4)
@@ -1122,6 +1124,58 @@ class Member(ActionNamespace):
             '__str__': str(member),
             'name': member.name,
             'level': utils.get_level(member.level),
+        }
+
+
+class Script(ActionNamespace):
+    """namespace for Script-related functions"""
+
+    @staticmethod
+    @auth_required
+    @level_required(4)
+    def new(*, name: str, script: str, setlevel: T.Optional[int],
+            login_context: LoginContext):
+        """create a new script with the given arguments
+
+        raise a BuchSchlossError if a script with the names name already exists
+        see models.Script for details on arguments
+        """
+        try:
+            new = models.Script.create(
+                name=name, script=script, setlevel=setlevel, storage={})
+        except peewee.IntegrityError as e:
+            if str(e).startswith('UNIQUE'):
+                raise BuchSchlossExistsError('Script', name)
+            else:
+                raise
+        else:
+            logging.info('{} created {}'.format(login_context, new))
+
+    @classmethod
+    @auth_required
+    @level_required(4)
+    @from_db(models.Script)
+    def edit(cls, script: T.Union[str, models.Script], *, login_context, **kwargs):
+        """edit a script"""
+        if not set(kwargs) <= cls._model_fields or 'name' in kwargs:
+            raise TypeError('unexpected kwarg')
+        for k, v in kwargs.items():
+            setattr(script, k, v)
+        script.save()
+        logging.info('{} edited {}'.format(login_context, script))
+
+    @staticmethod
+    @from_db(models.Script)
+    def view_str(script: T.Union[models.Script, str], *, login_context) -> dict:
+        """return a dict with the following items:
+
+        'name': the script name
+        'setlevel': the script's setlevel status ('-----' if not set)
+        """
+        return {
+            'name': script.name,
+            'setlevel': ('-----' if script.setlevel is None
+                         else utils.get_level(script.setlevel)),
         }
 
 
