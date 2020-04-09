@@ -558,7 +558,7 @@ class Book(ActionNamespace):
         return b.id
 
     @classmethod
-    @from_db(models.Book)
+    @from_db(book=models.Book)
     @level_required(2)
     def edit(cls, book: T.Union[int, models.Book], *, login_context, **kwargs):
         """Edit a Book based on the arguments given.
@@ -664,7 +664,7 @@ class Person(ActionNamespace):
 
     @classmethod
     @level_required(3)
-    @from_db(models.Person)
+    @from_db(person=models.Person)
     def edit(cls, person: T.Union[int, models.Person], *, login_context, **kwargs):
         """Edit a Person based on the arguments given.
 
@@ -675,7 +675,7 @@ class Person(ActionNamespace):
         raise a BuchSchlossBaseError if the Person isn't found.
         Return a set of errors found during updating the person's libraries
         """
-        if (not set(kwargs.keys()) <= cls._model_fields | {'pay'} or 'id' in kwargs):
+        if not set(kwargs.keys()) <= cls._model_fields | {'pay'} or 'id' in kwargs:
             raise TypeError('unexpected kwarg')
         if kwargs.get('max_borrow', 0) > 3 and not login_context.level >= 4:
             raise BuchSchlossPermError(4)
@@ -1129,6 +1129,7 @@ class Member(ActionNamespace):
 
 class Script(ActionNamespace):
     """namespace for Script-related functions"""
+    model = models.Script
 
     @staticmethod
     @auth_required
