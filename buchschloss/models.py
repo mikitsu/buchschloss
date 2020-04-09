@@ -236,6 +236,17 @@ class Script(Model):
     setlevel: T.Union[int, IntegerField] = IntegerField(null=True)
     storage: T.Union[dict, JSONField] = JSONField()
 
+    str_fields = ('name', 'setlevel')
+    pk_name = 'name'
+
+    def __str__(self):
+        if self.setlevel is None:
+            return '{}[{}]'.format(utils.get_name('Script'), self.name)
+        else:
+            return '{}[{}]({})'.format(
+                utils.get_name('Script'), self.name, utils.get_level(self.setlevel)
+            )
+
 
 class Misc(Model):
     """Store singular data (e.g. date for recurring action)
