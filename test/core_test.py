@@ -700,3 +700,23 @@ def test_search(db):
             == {book_2, book_1})
     assert tuple(book_search(('year', 'ge', 2001))) == ()
     assert tuple(book_search(('year', 'ge', 2000))) == (book_2,)
+
+
+def test_script_new(db):
+    """test Script.new"""
+    ctxt = for_levels(partial(
+        core.Script.new,
+        name='test-script',
+        code='this should be valid Lua code',
+        setlevel=3),
+        4,
+    )
+    script_new = partial(core.Script.new, login_context=ctxt)
+    script = models.Script.get_by_id('test-script')
+    assert script.name == 'test-script'
+    assert script.code == 'this should be valid Lua code'
+    assert script.setlevel == 3
+    script_new(name='with-setlevel-none', code='mode Lua code', setlevel=None)
+    assert models.Script.get_by_id('with-setlevel-none').setlevel is None
+    with pytest.raises(core.BuchSchlossBaseError):
+        script_new(name='test-script', code='with the same name', setlevel=None)
