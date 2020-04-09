@@ -272,7 +272,7 @@ class Script(Model):
     """Represent a Lua / cli2 script"""
     name: T.Union[str, CharField] = CharField(primary_key=True)
     script: T.Union[str, peewee.TextField] = peewee.TextField()
-    setuid: T.Union[int, IntegerField] = IntegerField(null=True)
+    setlevel: T.Union[int, IntegerField] = IntegerField(null=True)
     storage: T.Union[dict, JSONField] = JSONField()
 
 
