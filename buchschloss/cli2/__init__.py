@@ -75,13 +75,15 @@ def restrict_runtime(runtime, whitelist):
     return runtime
 
 
-def prepare_runtime():
+def prepare_runtime(login_context):
     """create and initialize a new Lua runtime"""
     # noinspection PyArgumentList
     runtime = lupa.LuaRuntime(attribute_handlers=(lua_get, lua_set))
     restrict_runtime(runtime, config.cli2.whitelist.mapping)
     runtime.globals()['buchschloss'] = runtime.table_from({
-        k: objects.LuaActionNS(getattr(core, k), runtime=runtime)
+        k: objects.LuaActionNS(getattr(core, k),
+                               login_context=login_context,
+                               runtime=runtime)
         for k in 'Book Person Group Library Borrow Member'.split()
     })
     for k, v in dict(runtime.execute(STDLIB_CODE)).items():
@@ -91,16 +93,20 @@ def prepare_runtime():
 
 def start():
     """provide a REPL"""
-    rt = prepare_runtime()
-    for k, v in {
-        'login': lupa.unpacks_lua_table(core.login),
-        'getpass': getpass.getpass,
-        'logout': core.logout,
-    }.items():
-        rt.globals()[k] = v
+    username = input(utils.get_name('interactive_question::username'))
+    if username:
+        password = getpass.getpass(utils.get_name('interactive_question::password'))
+        try:
+            login_context = core.login(username, password)
+        except core.BuchSchlossBaseError as e:
+            print(e)
+            return
+    else:
+        login_context = core.guest_lc
+    rt = prepare_runtime(login_context)
     while True:
         try:
-            line = input(str(core.current_login)+'@buchschloss-cli2 ==> ')
+            line = input(str(login_context)+'@buchschloss-cli2 ==> ')
         except EOFError:
             print()
             return

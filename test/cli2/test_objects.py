@@ -57,20 +57,22 @@ class Dummy:  # TODO: move this out to misc
 def test_action_ns():
     FLAG = object()
 
-    def view_ns(a):
+    def view_ns(a, *, login_context):
+        assert login_context is FLAG
         if a == 1:
             return FLAG
         else:
             raise core.BuchSchlossBaseError('', '')
 
-    def new(param, *, other_param):
+    def new(param, *, other_param, login_context):
+        assert login_context is FLAG
         return param, other_param
 
     # noinspection PyArgumentList
     rt = lupa.LuaRuntime(attribute_handlers=(cli2.lua_get, cli2.lua_set))
     dummy = Dummy(view_ns=view_ns, new=new, _call=lambda s, dns, runtime=None: dns)
     objects.LuaDataNS.specific_class[dummy] = dummy
-    ns_book = objects.LuaActionNS(dummy, runtime=rt)
+    ns_book = objects.LuaActionNS(dummy, login_context=FLAG, runtime=rt)
     rt.globals()['book'] = ns_book
     with pytest.raises(AttributeError):
         rt.eval('book.view_str')

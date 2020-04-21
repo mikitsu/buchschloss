@@ -24,6 +24,7 @@ class DummyActionNS:
 
 def test_new(monkeypatch):
     """test <Model>:new()"""
+    flag = object()
     book_dummy = DummyActionNS({'new': [1, 2, 3]})
     monkeypatch.setattr(core, 'Book', book_dummy)
     monkeypatch.setitem(objects.LuaDataNS.specific_class, book_dummy,
@@ -32,17 +33,18 @@ def test_new(monkeypatch):
                             'wrap_iter': {},
                             'wrap_data_ns': {}
                         }))
-    rt = cli2.prepare_runtime()
+    rt = cli2.prepare_runtime(flag)
     assert rt.eval('Book:new{author="author", title="title"}') == 1
     rt.execute('Book:new({year=0, isbn=123})')
     assert tuple(book_dummy.calls['new']) == (
-        ((), {'author': 'author', 'title': 'title'}),
-        ((), {'year': 0, 'isbn': 123}),
+        ((), {'author': 'author', 'title': 'title', 'login_context': flag}),
+        ((), {'year': 0, 'isbn': 123, 'login_context': flag}),
     )
 
 
 def test_view(monkeypatch):
     """test <Model>[<pk>]"""
+    flag = object()
     person_dummy = DummyActionNS({'view_ns': [
         types.SimpleNamespace(first_name='first', pay_date=datetime.datetime(1965, 1, 31)),
         types.SimpleNamespace(first_name='first', pay_date=None),
@@ -54,11 +56,12 @@ def test_view(monkeypatch):
                             'wrap_iter': {},
                             'wrap_data_ns': {}
                         }))
-    rt = cli2.prepare_runtime()
-    assert tuple(rt.execute('date = Person[123].pay_date; return {date.day, date.month, date.year}').values()
-                 ) == (31, 1, 1965)
+    rt = cli2.prepare_runtime(flag)
+    assert tuple(rt.execute(
+        'date = Person[123].pay_date; return {date.day, date.month, date.year}')
+                 .values()) == (31, 1, 1965)
     assert rt.eval('Person[124].first_name') == 'first'
     assert tuple(person_dummy.calls['view_ns']) == (
-        ((123,), {}),
-        ((124,), {}),
+        ((123,), {'login_context': flag}),
+        ((124,), {'login_context': flag}),
     )

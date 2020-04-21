@@ -1,6 +1,7 @@
 """Objects passed to Lua scripts"""
 
 import abc
+import functools
 import itertools
 import typing as T
 
@@ -71,8 +72,9 @@ class LuaActionNS(LuaObject):
     """wrap an ActionNamespace for use with Lua"""
     get_allowed = ('new', 'view_ns', 'edit', 'search')
 
-    def __init__(self, action_ns: T.Type[core.ActionNamespace], **kwargs):
+    def __init__(self, action_ns: T.Type[core.ActionNamespace], login_context, **kwargs):
         super().__init__(**kwargs)
+        self.login_context = login_context
         self.action_ns = action_ns
         self.data_ns = LuaDataNS.specific_class[action_ns]
 
@@ -83,17 +85,20 @@ class LuaActionNS(LuaObject):
         # noinspection PyUnreachableCode
         val = getattr(self.action_ns, name)
         if callable(val):
-            val = lupa.unpacks_lua_table(val)
+            val = lupa.unpacks_lua_table(
+                functools.partial(val, login_context=self.login_context))
         return val
 
     def search(self, condition):
         """transform the Lua table into a tuple"""
-        results = self.action_ns.search(table_to_tuple(condition))
+        results = self.action_ns.search(table_to_tuple(condition),
+                                        login_context=self.login_context)
         return self.runtime.table(*(self.data_ns(o, runtime=self.runtime) for o in results))
 
     def view_ns(self, id_):
         """wrap the result in LuaDataNS"""
-        return self.data_ns(self.action_ns.view_ns(id_), runtime=self.runtime)
+        return self.data_ns(self.action_ns.view_ns(id_, login_context=self.login_context),
+                            runtime=self.runtime)
 
 
 class LuaDataNS(LuaObject):
