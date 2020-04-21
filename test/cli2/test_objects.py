@@ -4,6 +4,7 @@ import lupa
 import pytest
 
 from buchschloss import core
+from buchschloss import cli2
 from buchschloss.cli2 import objects
 
 
@@ -62,17 +63,30 @@ def test_action_ns():
         else:
             raise core.BuchSchlossBaseError('', '')
 
-    rt = lupa.LuaRuntime()
-    dummy = Dummy(view_ns=view_ns, _call=lambda s, dns, runtime=None: dns)
+    def new(param, *, other_param):
+        return param, other_param
+
+    # noinspection PyArgumentList
+    rt = lupa.LuaRuntime(attribute_handlers=(cli2.lua_get, cli2.lua_set))
+    dummy = Dummy(view_ns=view_ns, new=new, _call=lambda s, dns, runtime=None: dns)
     objects.LuaDataNS.specific_class[dummy] = dummy
     ns_book = objects.LuaActionNS(dummy, runtime=rt)
     rt.globals()['book'] = ns_book
     with pytest.raises(AttributeError):
         rt.eval('book.view_str')
     assert rt.eval('book.view_ns') is not None
+    assert rt.eval('book.new')
     assert rt.eval('book.view_ns(1)') is FLAG
     with pytest.raises(core.BuchSchlossBaseError):
         rt.eval('book.view_ns(2)')
+    assert (rt.eval('book.new{param="val 1", other_param="something else"}')
+            == ('val 1', 'something else'))
+    assert (rt.eval('book.new{"positional", other_param="keyword"}')
+            == ('positional', 'keyword'))
+    with pytest.raises(TypeError):
+        rt.eval('book.new("positional", "as well")')
+    with pytest.raises(TypeError):
+        rt.eval('book.new{"positional", "as well"}')
 
 
 def test_data_ns():
