@@ -172,13 +172,17 @@
     "is_back": "is_back",
     "until_{}": "borrowed until {}"
   },
+  "Script": {
+    "*this*": "script"
+  },
   "interactive_question": {
     "current_password": "Please enter your password",
     "new_password": "Please enter the new password",
     "password": "Please enter the password",
     "send_error_report": "Do you want to send an error report?",
     "really_exit_app": "Do you really want to exit?",
-    "isbn_autofill": "Do you want some data to be automatically filled based on the ISBN?"
+    "isbn_autofill": "Do you want some data to be automatically filled based on the ISBN?",
+    "username": "Your Username (blank for unauthenticated access): "
   },
   "cli": {
     "{}_is_invalid_command": "The command '{}' does not exist.",
