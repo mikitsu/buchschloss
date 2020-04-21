@@ -39,6 +39,7 @@ import peewee
 from . import config
 from . import utils
 from . import models
+from . import cli2
 
 __all__ = [
     'BuchSchlossBaseError', 'DummyErrorFile', 'misc_data', 'ComplexSearch',
@@ -74,6 +75,12 @@ logging.basicConfig(level=getattr(logging, config.core.log.level),
                     style='{',
                     handlers=[handler],
                     )
+
+
+class ScriptPermissions(enum.Flag):
+    AUTH_GRANTED = enum.auto()
+    REQUESTS = enum.auto()
+    STORE = enum.auto()
 
 
 class LoginType(enum.Enum):
@@ -1178,6 +1185,22 @@ class Script(ActionNamespace):
             'setlevel': ('-----' if script.setlevel is None
                          else utils.get_level(script.setlevel)),
         }
+
+    @staticmethod
+    @from_db(models.Script)
+    def execute(script: T.Union[models.Script, str], *, callbacks, login_context):
+        """Execute a script"""
+        if script.setlevel is not None:
+            script_lc_level = script.setlevel
+        else:
+            script_lc_level = login_context.level
+        script_lc = LoginType.SCRIPT(
+            script_lc_level, name=script.name, invoker=login_context)
+        rt = cli2.prepare_runtime(script_lc)
+        # TODO: handle REQUESTS permission
+        # TODO: handle storage
+        # TODO: handle callbacks
+        rt.execute(script.code)
 
 
 def search(o: T.Type[models.Model], condition: T.Tuple = None,
