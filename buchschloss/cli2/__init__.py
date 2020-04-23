@@ -39,7 +39,7 @@ def table_to_data(table):
         if keys == list(range(1, len(keys)+1)):
             return [table_to_data(t) for t in table.values()]
         else:
-            return {k: table_to_data(v) for k, v in table.itmes()}
+            return {k: table_to_data(v) for k, v in table.items()}
     else:
         return table
 
