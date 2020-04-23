@@ -39,7 +39,6 @@ import peewee
 from . import config
 from . import utils
 from . import models
-from . import cli2
 
 __all__ = [
     'BuchSchlossBaseError', 'DummyErrorFile', 'misc_data', 'ComplexSearch',
@@ -1190,6 +1189,9 @@ class Script(ActionNamespace):
     @from_db(models.Script)
     def execute(script: T.Union[models.Script, str], *, callbacks, login_context):
         """Execute a script"""
+        # avoid problems with circular import
+        # core -> cli2.__init__ -> cli2.objects -> core
+        from . import cli2
         if script.setlevel is not None:
             script_lc_level = script.setlevel
         else:
