@@ -8,6 +8,7 @@ import typing as T
 import lupa
 
 from .. import core
+from .. import cli2
 
 
 class LuaAccessForbidden(AttributeError):
@@ -25,14 +26,6 @@ class CheckLuaAccessForbidden:
         if (not isinstance(exc_val, LuaAccessForbidden)
                 and isinstance(exc_val, AttributeError)):
             return True
-
-
-def table_to_tuple(table):
-    """transform a Lua table to a tuple"""
-    if lupa.lua_type(table) == 'table':
-        return tuple(table_to_tuple(v) for v in dict(table).values())
-    else:
-        return table
 
 
 class LuaObject(abc.ABC):
@@ -91,7 +84,7 @@ class LuaActionNS(LuaObject):
 
     def search(self, condition):
         """transform the Lua table into a tuple"""
-        results = self.action_ns.search(table_to_tuple(condition),
+        results = self.action_ns.search(cli2.table_to_data(condition),
                                         login_context=self.login_context)
         return self.runtime.table(*(self.data_ns(o, runtime=self.runtime) for o in results))
 

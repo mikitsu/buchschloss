@@ -2,6 +2,7 @@
 
 import getpass
 import traceback
+import typing as T
 import os
 
 try:
@@ -17,6 +18,30 @@ from .. import core
 from .. import config
 from .. import utils
 from . import objects
+
+
+def data_to_table(runtime, data):
+    """Convert JSON-type (maps and arrays) data to a lua table"""
+    if isinstance(data, (str, int, float)):
+        return data
+    if isinstance(data, T.Sequence):
+        return runtime.table(*[data_to_table(runtime, d) for d in data])
+    elif isinstance(data, T.Mapping):
+        return runtime.table(**{k: data_to_table(runtime, v) for k, v in data.items()})
+    else:
+        raise TypeError("can't handle '{}'".format(type(data)))
+
+
+def table_to_data(table):
+    """convert a Lua table to a dict or a list"""
+    if lupa.lua_type(table) == 'table':
+        keys = sorted(table.keys())
+        if keys == list(range(1, len(keys)+1)):
+            return [table_to_data(t) for t in table.values()]
+        else:
+            return {k: table_to_data(v) for k, v in table.itmes()}
+    else:
+        return table
 
 
 with open(os.path.join(os.path.dirname(__file__), 'stdlib.lua')) as f:
@@ -125,10 +150,4 @@ def start():
             traceback.print_exc()
             print(utils.get_name('unexpected_error'))
         else:
-            if lupa.lua_type(val) == 'table':
-                val = dict(val)
-                if tuple(range(1, len(val)+1)) == tuple(val.keys()):
-                    val = tuple(val.values())
-                else:
-                    val = dict(val)
-            print(val)
+            print(table_to_data(val))
