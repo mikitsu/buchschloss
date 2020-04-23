@@ -700,6 +700,8 @@ def test_search(db):
             == {book_2, book_1})
     assert tuple(book_search(('year', 'ge', 2001))) == ()
     assert tuple(book_search(('year', 'ge', 2000))) == (book_2,)
+    assert tuple(book_search(('id', 'in', (1, 200, 300)))) == (book_1,)
+    assert tuple(book_search(('author', 'in', ('neither', 'matches')))) == ()
 
 
 def test_script_new(db):

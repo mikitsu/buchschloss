@@ -1277,6 +1277,8 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
             a, q = follow_path(a, q)
             if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
                 return q.where(getattr(operator, op)(a, b))
+            elif op == 'in':
+                return q.where(a << b)
             elif op == 'contains':
                 return q.where(a.contains(b))
             else:
