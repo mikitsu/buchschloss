@@ -152,6 +152,8 @@ class LuaDataNS(LuaObject):
                     getattr(self.data_ns, name), runtime=self.runtime)
             else:
                 return None
+        elif name == '__str__':
+            return str(self.data_ns)
         else:
             with CheckLuaAccessForbidden():
                 return super().lua_get(name)
