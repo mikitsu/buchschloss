@@ -1,5 +1,5 @@
 --[[
-BuchSchloss Lua standard library
+BuchSchloss Lua builtins
 ]]--
 
 local ActionNS_meta = {}

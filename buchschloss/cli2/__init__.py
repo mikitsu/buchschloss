@@ -44,7 +44,7 @@ def table_to_data(table):
         return table
 
 
-with open(os.path.join(os.path.dirname(__file__), 'stdlib.lua')) as f:
+with open(os.path.join(os.path.dirname(__file__), 'builtins.lua')) as f:
     STDLIB_CODE = f.read()
 
 
