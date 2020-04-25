@@ -5,6 +5,7 @@ import pytest
 
 from buchschloss import core
 from buchschloss import cli2
+from buchschloss import utils
 from buchschloss.cli2 import objects
 
 
@@ -103,3 +104,40 @@ def test_data_ns():
     assert ldn.lua_get('c').lua_get('a') == '1'
     with pytest.raises(AttributeError):
         ldn.lua_get('e')
+
+
+def test_ui_interaction(monkeypatch):
+    def save_arg(return_val=None):
+        """return a function that saves its argument when called"""
+        def func(arg):
+            func.calls.append(arg)
+            return return_val
+        func.calls = []
+        return func
+    get_name_flag = object()
+    display = save_arg()
+    get_data = save_arg()
+    ask = save_arg()
+    alert = save_arg()
+    get_name = save_arg(get_name_flag)
+    monkeypatch.setattr(utils, 'get_name', get_name)
+    rt = lupa.LuaRuntime()
+    default_cb = {'display': display, 'get_data': get_data}
+    rt.globals()['defaults'] = objects.LuaUIInteraction(
+        default_cb, 'prefix::', runtime=rt)
+    rt.globals()['no_alert'] = objects.LuaUIInteraction(
+        {**default_cb, 'ask': ask}, 'prefix::', runtime=rt)
+    rt.globals()['no_ask'] = objects.LuaUIInteraction(
+        {**default_cb, 'alert': alert}, 'prefix::', runtime=rt)
+    rt.execute('no_alert.ask("msg")')
+    assert (len(ask.calls) == 1
+            and ask.calls[-1] is get_name_flag
+            and get_name.calls[-1] == 'prefix::msg')
+    rt.execute('no_ask.alert("msg-2")')
+    assert (len(alert.calls) == 1
+            and alert.calls[-1] is get_name_flag
+            and get_name.calls[-1] == 'prefix::msg-2')
+    rt.execute('defaults.display{this="a table", with={"sub", "tables"}}')
+    assert (len(display.calls) == 1
+            and display.calls[-1] == {'this': 'a table', 'with': ['sub', 'tables']}
+            and len(get_name.calls) == 2)

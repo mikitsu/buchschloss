@@ -7,6 +7,7 @@ import typing as T
 
 import lupa
 
+from .. import utils
 from .. import core
 from .. import cli2
 
@@ -152,6 +153,46 @@ class LuaDataNS(LuaObject):
                 return super().lua_get(name)
             # noinspection PyUnreachableCode
             return getattr(self.data_ns, name)
+
+
+class LuaUIInteraction(LuaObject):
+    """Provide Lua code a way to interact with the user interface"""
+    get_allowed = ('ask', 'display', 'get_data', 'get_name')
+
+    def __init__(self, callbacks, script_prefix, **kwargs):
+        """provide the callbacks and script-specific prefix for get_name"""
+        super().__init__(**kwargs)
+        self.script_prefix = script_prefix
+        self.callbacks = callbacks
+
+        if 'ask' not in callbacks:  # yes, after the assignment
+            def ask(question):
+                """provide default implementation of 'ask'"""
+                callbacks['display'](question)
+                return callbacks['get_data']({'key': 'bool'})['key']
+            callbacks['ask'] = ask
+        callbacks.setdefault('alert', callbacks['display'])
+
+    def ask(self, question):
+        """ask the user a yes/no question"""
+        return self.callbacks['ask'](self.get_name(question))
+
+    def alert(self, message):
+        """display a short text message"""
+        self.callbacks['alert'](self.get_name(message))
+
+    def display(self, data):
+        """display data to the user"""
+        return self.callbacks['display'](cli2.table_to_data(data))
+
+    def get_data(self, data_spec):
+        """get input from the user. Includes acceptable types (int, str, bool)"""
+        return cli2.data_to_table(
+            self.runtime, self.callbacks['get_data'](cli2.table_to_data(data_spec)))
+
+    def get_name(self, internal):
+        """provide access to utils.get_name from Lua code"""
+        return utils.get_name(self.script_prefix + internal)
 
 
 LuaDataNS.add_specific(core.Book,

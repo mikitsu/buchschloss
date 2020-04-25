@@ -1198,10 +1198,10 @@ class Script(ActionNamespace):
             script_lc_level = login_context.level
         script_lc = LoginType.SCRIPT(
             script_lc_level, name=script.name, invoker=login_context)
-        rt = cli2.prepare_runtime(script_lc)
+        get_name_prefix = 'script-data::{}::'.format(script.name)
+        rt = cli2.prepare_runtime(script_lc, add_ui=(callbacks, get_name_prefix))
         # TODO: handle REQUESTS permission
         # TODO: handle storage
-        # TODO: handle callbacks
         rt.execute(script.code)
 
 

@@ -100,8 +100,13 @@ def restrict_runtime(runtime, whitelist):
     return runtime
 
 
-def prepare_runtime(login_context):
-    """create and initialize a new Lua runtime"""
+def prepare_runtime(login_context, *, add_ui=None):
+    """create and initialize a new Lua runtime
+
+    Optional modifiers:
+        ``add_ui`` may be (<dict of callbacks>, <script prefix for get_name>)
+        TODO: requests etc.
+    """
     # noinspection PyArgumentList
     runtime = lupa.LuaRuntime(attribute_handlers=(lua_get, lua_set))
     restrict_runtime(runtime, config.cli2.whitelist.mapping)
@@ -111,6 +116,8 @@ def prepare_runtime(login_context):
                                runtime=runtime)
         for k in 'Book Person Group Library Borrow Member'.split()
     })
+    if add_ui:
+        runtime.globals()['ui'] = objects.LuaUIInteraction(*add_ui)
     for k, v in dict(runtime.execute(STDLIB_CODE)).items():
         runtime.globals()[k] = v
     return runtime
@@ -129,6 +136,7 @@ def start():
     else:
         login_context = core.guest_lc
     rt = prepare_runtime(login_context)
+    rt.globals()['getpass'] = getpass.getpass  # for auth_required functions
     while True:
         try:
             line = input(str(login_context)+'@buchschloss-cli2 ==> ')
