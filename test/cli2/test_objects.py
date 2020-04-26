@@ -141,3 +141,36 @@ def test_ui_interaction(monkeypatch):
     assert (len(display.calls) == 1
             and display.calls[-1] == {'this': 'a table', 'with': ['sub', 'tables']}
             and len(get_name.calls) == 2)
+
+
+def test_requests_bs4(monkeypatch):
+    """test the requests and bs4 Lua interfaces"""
+    def get(url):
+        return {
+            'https://test.invalid/plain.txt':
+                Dummy(headers={'Content-Type': 'text/plain'},
+                      text='<span>This</span> is <b>plain</b> text'),
+            'http://sub.test-2.invalid/doc.html':
+                Dummy(headers={'Content-Type': 'text/html'},
+                      text='<html><head><title>HTML</title></head>'
+                           '<body><p id="content">HTML</p></body></html>'),
+            'https://test.invalid/garbled':
+                Dummy(headers={}, text='<p>html as well</p>')
+        }[url]
+    monkeypatch.setattr('requests.get', get)
+    rt = lupa.LuaRuntime()
+    rt.globals()['requests'] = objects.LuaRequestsInterface(runtime=rt)
+    assert (rt.eval('requests.get("https://test.invalid/plain.txt")')
+            == '<span>This</span> is <b>plain</b> text')
+    rt.execute('r = requests.get("http://sub.test-2.invalid/doc.html")')
+    assert isinstance(rt.eval('r'), objects.LuaBS4Interface)
+    assert rt.eval('r.text') == 'HTMLHTML'
+    assert rt.eval('r.select_one("body").text') == 'HTML'
+    assert rt.eval("r.select_one('#content').attrs.id") == 'content'
+    assert rt.eval('r.select_one("p").text == r.select("p")[1].text')
+    assert (rt.eval('requests.get("https://test.invalid/plain.txt", "html").text')
+            == 'This is plain text')
+    assert (rt.eval('requests.get("https://test.invalid/garbled")')
+            == '<p>html as well</p>')
+    assert (rt.eval('requests.get("https://test.invalid/garbled", "html").text')
+            == 'html as well')

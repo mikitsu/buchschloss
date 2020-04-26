@@ -4,12 +4,16 @@ import abc
 import functools
 import itertools
 import typing as T
+import warnings
 
 import lupa
+import bs4
+import requests
 
 from .. import utils
 from .. import core
 from .. import cli2
+from .. import config
 
 
 class LuaAccessForbidden(AttributeError):
@@ -193,6 +197,58 @@ class LuaUIInteraction(LuaObject):
     def get_name(self, internal):
         """provide access to utils.get_name from Lua code"""
         return utils.get_name(self.script_prefix + internal)
+
+
+class LuaBS4Interface(LuaObject):
+    """Provide Lua code an interface to bs4"""
+    get_allowed = ('select', 'select_one', 'attrs', 'text')
+
+    def __init__(self, markup, features=None, **kwargs):
+        super().__init__(**kwargs)
+        if isinstance(markup, bs4.Tag):
+            self.tag = markup
+        else:
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', 'No parser was')
+                self.tag = bs4.BeautifulSoup(markup, features=features)
+        self.text = self.tag.get_text()
+        self.attrs = cli2.data_to_table(self.runtime, self.tag.attrs)
+
+    def __str__(self):
+        return str(self.tag)
+
+    def select(self, selector):
+        """wrap bs4.Tag's .select"""
+        return self.runtime.table(*map(
+            functools.partial(type(self), runtime=self.runtime),
+            self.tag.select(selector)))
+
+    def select_one(self, selector):
+        """wrap bs4.Tag's .select_one"""
+        r = self.tag.select_one(selector)
+        if r is None:
+            return None
+        else:
+            return type(self)(r, runtime=self.runtime)
+
+
+class LuaRequestsInterface(LuaObject):
+    """Provide Lua code an interface to requests"""
+    get_allowed = config.cli2.requests.methods
+
+    def get(self, url, result='auto'):
+        """wrap requests.get"""
+        if config.cli2.requests.url_regex.search(url) is None:
+            return None
+        r = requests.get(url)
+        if result == 'auto':
+            result = r.headers.get('Content-Type', '').split('/')[-1]
+        if result in ('html', 'xml'):
+            return LuaBS4Interface(r.text, result, runtime=self.runtime)
+        elif result == 'json':
+            return cli2.data_to_table(self.runtime, r.json())
+        else:
+            return r.text
 
 
 LuaDataNS.add_specific(core.Book,

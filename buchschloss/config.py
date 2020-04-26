@@ -8,6 +8,7 @@ import base64
 import binascii
 from collections.abc import Mapping
 import pprint
+import re
 
 import configobj
 from configobj import validate
@@ -79,12 +80,21 @@ def is_base64bytes(value, length=None):
     return data
 
 
+def is_regex(value):
+    """check whether the value is a valid regex and compile it"""
+    try:
+        return re.compile(value)
+    except re.error:
+        raise validate.VdtValueError(value)
+
+
 validator = validate.Validator({
     'timedelta': is_timedelta,
     'optionlist': is_optionlist,
     'task_list': is_task_list,
     'file': is_file,
     'base64bytes': is_base64bytes,
+    'regex': is_regex,
 })
 
 
