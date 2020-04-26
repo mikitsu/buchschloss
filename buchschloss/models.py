@@ -18,6 +18,7 @@ except ImportError:
         config = None
 if __name__ != '__main__':
     from . import utils
+    from . import core
 
 __all__ = [
     'db',
@@ -81,6 +82,15 @@ class FormattedDateField(DateField):
         if isinstance(value, utils.FormattedDate):
             return value.todate()
         return value
+
+
+class ScriptPermissionField(IntegerField):
+    def python_value(self, value):
+        # noinspection PyArgumentList
+        return core.ScriptPermissions(value)
+
+    def db_value(self, value):
+        return value.value
 
 
 class Person(Model):
@@ -235,6 +245,8 @@ class Script(Model):
     code: T.Union[str, peewee.TextField] = peewee.TextField()
     setlevel: T.Union[int, IntegerField] = IntegerField(null=True)
     storage: T.Union[dict, JSONField] = JSONField()
+    permissions: 'T.Union[core.ScriptPermissions, ScriptPermissionField]' \
+        = ScriptPermissionField()
 
     str_fields = ('name', 'setlevel')
     pk_name = 'name'

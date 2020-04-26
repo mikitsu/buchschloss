@@ -42,8 +42,8 @@ from . import models
 
 __all__ = [
     'BuchSchlossBaseError', 'DummyErrorFile', 'misc_data', 'ComplexSearch',
-    'Person', 'Book', 'Member', 'Borrow', 'Library', 'Group',
-    'login',
+    'Person', 'Book', 'Member', 'Borrow', 'Library', 'Group', 'Script',
+    'login', 'ScriptPermissions',
 ]
 
 log_conf = config.core.log
@@ -1140,7 +1140,11 @@ class Script(ActionNamespace):
     @staticmethod
     @auth_required
     @level_required(4)
-    def new(*, name: str, code: str, setlevel: T.Optional[int],
+    def new(*,
+            name: str,
+            code: str,
+            setlevel: T.Optional[int],
+            permissions: ScriptPermissions,
             login_context: LoginContext):
         """create a new script with the given arguments
 
@@ -1149,7 +1153,8 @@ class Script(ActionNamespace):
         """
         try:
             new = models.Script.create(
-                name=name, code=code, setlevel=setlevel, storage={})
+                name=name, code=code, setlevel=setlevel,
+                permissions=permissions, storage={})
         except peewee.IntegrityError as e:
             if str(e).startswith('UNIQUE'):
                 raise BuchSchlossExistsError('Script', name)
