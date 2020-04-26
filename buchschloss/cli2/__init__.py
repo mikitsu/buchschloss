@@ -100,11 +100,12 @@ def restrict_runtime(runtime, whitelist):
     return runtime
 
 
-def prepare_runtime(login_context, *, add_ui=None):
+def prepare_runtime(login_context, *, add_ui=None, add_storage=None):
     """create and initialize a new Lua runtime
 
     Optional modifiers:
         ``add_ui`` may be (<dict of callbacks>, <script prefix for get_name>)
+        ``add_storage`` may be an object consiting of basic values, dicts and tuples/lists
         TODO: requests etc.
     """
     # noinspection PyArgumentList
@@ -118,6 +119,8 @@ def prepare_runtime(login_context, *, add_ui=None):
     })
     if add_ui:
         runtime.globals()['ui'] = objects.LuaUIInteraction(*add_ui)
+    if add_storage is not None:
+        runtime.globals()['storage'] = data_to_table(runtime, add_storage)
     for k, v in dict(runtime.execute(STDLIB_CODE)).items():
         runtime.globals()[k] = v
     return runtime

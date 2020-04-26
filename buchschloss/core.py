@@ -1204,9 +1204,14 @@ class Script(ActionNamespace):
         script_lc = LoginType.SCRIPT(
             script_lc_level, name=script.name, invoker=login_context)
         get_name_prefix = 'script-data::{}::'.format(script.name)
-        rt = cli2.prepare_runtime(script_lc, add_ui=(callbacks, get_name_prefix))
+        rt = cli2.prepare_runtime(
+            script_lc,
+            add_ui=(callbacks, get_name_prefix),
+            add_storage=(script.storage
+                         if ScriptPermissions.STORE in script.permissions
+                         else None),
+        )
         # TODO: handle REQUESTS permission
-        # TODO: handle storage
         rt.execute(script.code)
 
 
