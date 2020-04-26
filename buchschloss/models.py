@@ -54,19 +54,10 @@ class Model(peewee.Model):
     """Base class for all models."""
     DoesNotExist: peewee.DoesNotExist
     str_fields: T.Iterable[peewee.Field]
-    pk_type: T.Type
     pk_name: str = 'id'
 
     class Meta:
         database = db
-
-    def __init_subclass__(cls):
-        if hasattr(cls, 'pk_type'):
-            return
-        for k, v in vars(cls).items():
-            if isinstance(v, peewee.Field) and v.primary_key:
-                cls.pk_type = typing.get_type_hints(cls)[k]
-                break
 
     @classmethod
     def select_str_fields(cls):
@@ -121,7 +112,6 @@ class Person(Model):
                                      Borrow.is_back == False)  # noqa
 
     str_fields = (id, last_name, first_name)
-    pk_type = int
 
     def __str__(self):
         return utils.get_name('Person[{}]"{}, {}"').format(
