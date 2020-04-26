@@ -1214,8 +1214,8 @@ class Script(ActionNamespace):
             add_storage=(script.storage
                          if ScriptPermissions.STORE in script.permissions
                          else None),
+            add_requests=(ScriptPermissions.REQUESTS in script.permissions),
         )
-        # TODO: handle REQUESTS permission
         rt.execute(script.code)
 
 
