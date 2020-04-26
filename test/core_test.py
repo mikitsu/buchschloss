@@ -710,7 +710,8 @@ def test_script_new(db):
         core.Script.new,
         name='test-script',
         code='this should be valid Lua code',
-        setlevel=3),
+        setlevel=3,
+        permissions=core.ScriptPermissions(3)),
         4,
     )
     script_new = partial(core.Script.new, login_context=ctxt)
@@ -719,15 +720,20 @@ def test_script_new(db):
     assert script.code == 'this should be valid Lua code'
     assert script.setlevel == 3
     assert script.storage == {}
-    script_new(name='with-setlevel-none', code='mode Lua code', setlevel=None)
+    assert script.permissions is core.ScriptPermissions(3)
+    script_new(name='with-setlevel-none', code='mode Lua code',
+               permissions=core.ScriptPermissions(0), setlevel=None)
     assert models.Script.get_by_id('with-setlevel-none').setlevel is None
     with pytest.raises(core.BuchSchlossBaseError):
-        script_new(name='test-script', code='with the same name', setlevel=None)
+        script_new(name='test-script', code='with the same name',
+                   permissions=core.ScriptPermissions(0), setlevel=None)
 
 
 def test_script_edit(db):
     """test Script.edit"""
-    models.Script.create(name='name', code='code', setlevel=3, storage={})
+    # noinspection PyArgumentList
+    models.Script.create(name='name', code='code', setlevel=3,
+                         permissions=core.ScriptPermissions(0), storage={})
     ctxt = for_levels(partial(
         core.Script.edit,
         'name',
@@ -746,15 +752,25 @@ def test_script_edit(db):
 
 def test_script_view_str(db):
     """test Script.view_str"""
-    script = models.Script.create(name='name', code='code', setlevel=None, storage={})
-    ctxt = for_levels(partial(core.Script.view_str, 'name'), 0,
-                      lambda x: x == {'name': 'name', 'setlevel': '-----'})
+    script = models.Script.create(name='name', code='code', setlevel=None, storage={},
+                                  permissions=core.ScriptPermissions(0))
+    ctxt = for_levels(
+        partial(core.Script.view_str, 'name'), 0,
+        lambda x: x == {'name': 'name', 'setlevel': '-----', 'permissions': ''})
     script_view_str = partial(core.Script.view_str, login_context=ctxt)
     script.setlevel = 0
+    script.permissions = core.ScriptPermissions.STORE | core.ScriptPermissions.REQUESTS
     script.save()
-    assert script_view_str('name') == {'name': 'name', 'setlevel': utils.get_level(0)}
+    data = script_view_str('name')
+    assert set(data.pop('permissions').split(';')) == {
+        utils.get_name('Script::permissions::STORE'),
+        utils.get_name('Script::permissions::REQUESTS')}
+    assert data == {'name': 'name', 'setlevel': utils.get_level(0)}
     script.setlevel = 3
+    script.permissions = core.ScriptPermissions.STORE
     script.save()
-    assert script_view_str('name') == {'name': 'name', 'setlevel': utils.get_level(3)}
+    assert (script_view_str('name')
+            == {'name': 'name', 'setlevel': utils.get_level(3),
+                'permissions': utils.get_name('Script::permissions::STORE')})
     with pytest.raises(core.BuchSchlossBaseError):
         script_view_str('whatever')

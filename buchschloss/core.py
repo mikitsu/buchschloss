@@ -1183,11 +1183,15 @@ class Script(ActionNamespace):
 
         'name': the script name
         'setlevel': the script's setlevel status ('-----' if not set)
+        'permissions': the scripts permissions, separated by ';'
         """
         return {
             'name': script.name,
             'setlevel': ('-----' if script.setlevel is None
                          else utils.get_level(script.setlevel)),
+            'permissions': ';'.join(utils.get_name('Script::permissions::' + p.name)
+                                    for p in ScriptPermissions
+                                    if p in script.permissions)
         }
 
     @staticmethod
