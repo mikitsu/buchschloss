@@ -728,7 +728,7 @@ def test_script_new(db):
         script_new(name='test-script', code='with the same name',
                    permissions=core.ScriptPermissions(0), setlevel=None)
     with pytest.raises(ValueError):
-        script_new(name='contains:invlaid"chars', code='',
+        script_new(name='contains:invalid"chars', code='',
                    permissions=core.ScriptPermissions(0), setlevel=None)
 
 
