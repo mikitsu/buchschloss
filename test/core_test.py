@@ -727,6 +727,9 @@ def test_script_new(db):
     with pytest.raises(core.BuchSchlossBaseError):
         script_new(name='test-script', code='with the same name',
                    permissions=core.ScriptPermissions(0), setlevel=None)
+    with pytest.raises(ValueError):
+        script_new(name='contains:invlaid"chars', code='',
+                   permissions=core.ScriptPermissions(0), setlevel=None)
 
 
 def test_script_edit(db):

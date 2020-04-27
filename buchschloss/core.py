@@ -1136,11 +1136,13 @@ class Member(ActionNamespace):
 class Script(ActionNamespace):
     """namespace for Script-related functions"""
     model = models.Script
+    # I'll probably only ever use max. 2 of those, but why not reserve them all
+    reserved_chars = set('!"#$%&\'*+/:;<=>?@[\\]^`{|}~')
 
-    @staticmethod
+    @classmethod
     @auth_required
     @level_required(4)
-    def new(*,
+    def new(cls, *,
             name: str,
             code: str,
             setlevel: T.Optional[int],
@@ -1151,6 +1153,9 @@ class Script(ActionNamespace):
         raise a BuchSchlossError if a script with the names name already exists
         see models.Script for details on arguments
         """
+        if cls.reserved_chars & set(name):
+            raise ValueError("Name contains illegal characters {}"
+                             .format(''.join(cls.reserved_chars & set(name))))
         try:
             new = models.Script.create(
                 name=name, code=code, setlevel=setlevel,
