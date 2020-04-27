@@ -100,7 +100,8 @@ def restrict_runtime(runtime, whitelist):
     return runtime
 
 
-def prepare_runtime(login_context, *, add_ui=None, add_storage=None, add_requests=False):
+def prepare_runtime(login_context: core.LoginContext, *,
+                    add_ui=None, add_storage=None, add_requests=False):
     """create and initialize a new Lua runtime
 
     Optional modifiers:
@@ -118,7 +119,7 @@ def prepare_runtime(login_context, *, add_ui=None, add_storage=None, add_request
         for k in 'Book Person Group Library Borrow Member'.split()
     })
     if add_ui:
-        runtime.globals()['ui'] = objects.LuaUIInteraction(*add_ui)
+        runtime.globals()['ui'] = objects.LuaUIInteraction(*add_ui, runtime=runtime)
     if add_storage is not None:
         runtime.globals()['storage'] = data_to_table(runtime, add_storage)
     if add_requests:

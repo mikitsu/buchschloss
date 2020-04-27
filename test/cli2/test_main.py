@@ -2,6 +2,8 @@
 
 import lupa
 from buchschloss import cli2
+from buchschloss.cli2 import objects
+from buchschloss import core
 
 
 def test_restrict_list():
@@ -30,3 +32,21 @@ def test_table_conversion():
     # note: list/tuple is both allowed
     assert (cli2.table_to_data(rt.eval('{a=123, b={"c", {d="e"}}}'))
             == {'a': 123, 'b': ['c', {'d': 'e'}]})
+
+
+def test_prepare_runtime():
+    lc = core.LoginType.INTERNAL(5)
+    rt = cli2.prepare_runtime(lc)
+    assert not set(rt.globals()) & {'ui', 'storage', 'requests'}
+    rt = cli2.prepare_runtime(
+        lc,
+        add_ui=({'display': lambda x: None}, 'prefix::'),
+        add_storage={'x': 123},
+        add_requests=True,
+    )
+    assert len(set(rt.globals()) & {'ui', 'storage', 'requests'}) == 3
+    assert rt.eval('storage.x') == 123
+    assert isinstance(rt.globals()['ui'], objects.LuaUIInteraction)
+    assert rt.globals()['ui'].runtime is rt
+    assert isinstance(rt.globals()['requests'], objects.LuaRequestsInterface)
+    assert rt.globals()['requests'].runtime is rt
