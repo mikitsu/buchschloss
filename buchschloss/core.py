@@ -1138,6 +1138,7 @@ class Script(ActionNamespace):
     model = models.Script
     # I'll probably only ever use max. 2 of those, but why not reserve them all
     reserved_chars = set('!"#$%&\'*+/:;<=>?@[\\]^`{|}~')
+    callbacks = None
 
     @classmethod
     @auth_required
@@ -1199,9 +1200,9 @@ class Script(ActionNamespace):
                                     if p in script.permissions)
         }
 
-    @staticmethod
+    @classmethod
     @from_db(models.Script)
-    def execute(script: T.Union[models.Script, str], *, callbacks, login_context):
+    def execute(cls, script: T.Union[models.Script, str], *, login_context):
         """Execute a script"""
         # avoid problems with circular import
         # core -> cli2.__init__ -> cli2.objects -> core
@@ -1215,7 +1216,9 @@ class Script(ActionNamespace):
         get_name_prefix = 'script-data::{}::'.format(script.name)
         rt = cli2.prepare_runtime(
             script_lc,
-            add_ui=(callbacks, get_name_prefix),
+            add_ui=((cls.callbacks, get_name_prefix)
+                    if cls.callbacks is not None
+                    else None),
             add_storage=(script.storage
                          if ScriptPermissions.STORE in script.permissions
                          else None),
