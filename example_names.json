@@ -17,6 +17,8 @@
     "no_permission": "permission denied",
     "must_be_{}": "For this action, you must be at least {}.",
     "must_be_level_4_or_editee": "",
+    "no_script_perms": "The script does not have the AUTH_GRANTED permission",
+    "unknown_auth_category": "You must log in",
     "Book_not_found": "book not found",
     "no_Book_with_id_{}": "There is no book with the ID {}.",
     "Person_not_found": "person not found",
@@ -173,7 +175,12 @@
     "until_{}": "borrowed until {}"
   },
   "Script": {
-    "*this*": "script"
+    "*this*": "script",
+    "permissions": {
+      "STORE": "store data",
+      "AUTH_GRANTED": "perform authenticated tasks",
+      "REQUESTS": "access the internet"
+    }
   },
   "interactive_question": {
     "current_password": "Please enter your password",
@@ -196,7 +203,7 @@
   },
   "script-data": {
     "leseclub": {
-      "book_already_borrowed": ""
+      "really_end_leseclub": "Do you really want to ent the LeseClub?"
     }
   }
 }
