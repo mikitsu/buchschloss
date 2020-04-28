@@ -268,3 +268,10 @@ action_tree.edit.library = generic_formbased_action(
     'edit', FORMS['library'], wrapped_action_ns['library'].edit)
 action_tree.edit.group = generic_formbased_action(
     'edit', FORMS['group'], wrapped_action_ns['group'].edit)
+
+core.Script.callbacks = {
+    'ask': partial(tk_msg.askyesno, None),
+    'alert': partial(tk_msg.showinfo, None),
+    'display': actions.display_cli2_data,
+    'get_data': actions.handle_cli2_get_data,
+}

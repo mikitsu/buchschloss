@@ -1,6 +1,7 @@
 """translate GUI actions to core-provided functions"""
 
 import collections
+import itertools
 import tkinter as tk
 import tkinter.messagebox as tk_msg
 from functools import partial
@@ -9,6 +10,7 @@ import typing as T
 
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import dialogs as mtkd
+from ..misc.tkstuff import forms as mtkf
 from ..misc import validation as mval
 from . import main
 from . import forms
@@ -370,3 +372,51 @@ def new_book(**kwargs):
                     utils.get_name('Book::new_id_{}')
                     .format(core.Book.new(login_context=main.app.current_login,
                                           **kwargs)))
+
+
+def display_cli2_data(data):
+    """provide a callback for cli2's display"""
+    popup = tk.Toplevel(main.app.root)
+    popup.transient()
+    popup.grab_set()
+    widget_cls, kwargs = get_cli2_data_widget(popup, data)
+    # TODO: make scrolled?
+    # this relies on strict LtR evaluation. If it breaks, just use two lines
+    widget = widget_cls(popup, *kwargs.pop('*args', ()), **kwargs)
+    widget.pack()
+    tk.Button(popup, command=popup.destroy, text='OK').pack()
+
+
+def get_cli2_data_widget(master, data):
+    """recursively create a widget for cli' display callback"""
+    if isinstance(data, dict):
+        return (mtk.ContainingWidget,
+                {'*args': itertools.chain(*(((tk.Label, {'text': k}),
+                                            get_cli2_data_widget(master, v))
+                                            for k, v in data.items())),
+                 'horizontal': 2})
+    elif isinstance(data, T.Sequence) and not isinstance(data, str):
+        return (mtk.ContainingWidget,
+                {'*args': map(partial(get_cli2_data_widget, master), data),
+                 'direction': (tk.BOTTOM, tk.RIGHT)})
+    else:
+        return (tk.Label, {'text': data})
+
+
+def handle_cli2_get_data(data_spec):
+    """provide a callback for cli2's get_data"""
+    type_widget_map = {
+        'int': widgets.IntEntry,
+        'bool': widgets.CheckbuttonWithVar,
+        'str': tk.Entry,
+    }
+    name_data = {}
+    cls_body = {'get_name': name_data.__getitem__}
+    for name, k, v in data_spec:
+        cls_body[k] = mtkf.Element(type_widget_map[v])
+        name_data[k] = name
+    form = type('Cli2DataForm', (mtkf.Form,), cls_body)
+    try:
+        return mtkd.FormDialog.ask(main.app.root, form)
+    except mtkd.UserExitedDialog:
+        return None
