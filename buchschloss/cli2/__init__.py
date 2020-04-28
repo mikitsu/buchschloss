@@ -22,7 +22,7 @@ from . import objects
 
 def data_to_table(runtime, data):
     """Convert JSON-type (maps and arrays) data to a lua table"""
-    if isinstance(data, (str, int, float)):
+    if isinstance(data, (str, int, float, bool, type(None))):
         return data
     if isinstance(data, T.Sequence):
         return runtime.table(*[data_to_table(runtime, d) for d in data])
