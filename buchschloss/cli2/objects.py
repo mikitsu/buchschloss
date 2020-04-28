@@ -172,8 +172,7 @@ class LuaUIInteraction(LuaObject):
         if 'ask' not in callbacks:  # yes, after the assignment
             def ask(question):
                 """provide default implementation of 'ask'"""
-                callbacks['display'](question)
-                return callbacks['get_data']({'key': 'bool'})['key']
+                return callbacks['get_data']((question, 'key', 'bool'))['key']
             callbacks['ask'] = ask
         callbacks.setdefault('alert', callbacks['display'])
 
@@ -191,8 +190,8 @@ class LuaUIInteraction(LuaObject):
 
     def get_data(self, data_spec):
         """get input from the user. Includes acceptable types (int, str, bool)"""
-        return cli2.data_to_table(
-            self.runtime, self.callbacks['get_data'](cli2.table_to_data(data_spec)))
+        data_spec = ((k, self.get_name(k), v) for k, v in cli2.table_to_data(data_spec))
+        return cli2.data_to_table(self.runtime, self.callbacks['get_data'](data_spec))
 
     def get_name(self, internal):
         """provide access to utils.get_name from Lua code"""
