@@ -193,5 +193,10 @@
       "store": "Store the result of this call in a variable with the name. The model may be retrieved by putting the name in <angle brackets>",
       "cmd": "Invoke the given command with the result of the execution as sole positional argument."
     }
+  },
+  "script-data": {
+    "leseclub": {
+      "book_already_borrowed": ""
+    }
   }
 }

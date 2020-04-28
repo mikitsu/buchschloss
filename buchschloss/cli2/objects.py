@@ -176,13 +176,17 @@ class LuaUIInteraction(LuaObject):
             callbacks['ask'] = ask
         callbacks.setdefault('alert', callbacks['display'])
 
-    def ask(self, question):
+    @lupa.unpacks_lua_table_method
+    def ask(self, question, *format_args, **format_kwargs):
         """ask the user a yes/no question"""
-        return self.callbacks['ask'](self.get_name(question))
+        return self.callbacks['ask'](self.get_name(question)
+                                     .format(*format_args, **format_kwargs))
 
-    def alert(self, message):
+    @lupa.unpacks_lua_table_method
+    def alert(self, message, *format_args, **format_kwargs):
         """display a short text message"""
-        self.callbacks['alert'](self.get_name(message))
+        self.callbacks['alert'](self.get_name(message)
+                                .format(*format_args, **format_kwargs))
 
     def display(self, data):
         """display data to the user"""
@@ -193,9 +197,11 @@ class LuaUIInteraction(LuaObject):
         data_spec = ((k, self.get_name(k), v) for k, v in cli2.table_to_data(data_spec))
         return cli2.data_to_table(self.runtime, self.callbacks['get_data'](data_spec))
 
-    def get_name(self, internal):
+    @lupa.unpacks_lua_table_method
+    def get_name(self, internal, *format_args, **format_kwargs):
         """provide access to utils.get_name from Lua code"""
-        return utils.get_name(self.script_prefix + internal)
+        return (utils.get_name(self.script_prefix + internal)
+                .format(*format_args, **format_kwargs))
 
 
 class LuaBS4Interface(LuaObject):
