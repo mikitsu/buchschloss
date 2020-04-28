@@ -1,29 +1,25 @@
 --[[
 Leseclub management
 ]]--
+-- TODO: add some kind off error handling
+
+local borrow_weeks = 2 -- TODO: provide config access
 
 local R = {}
 
-function R.borrow(book, person, weeks)
-    data = ui.get_data{book='int', person='int'}
-    if storage.pending_borrows[book] then
-        ui.alert('book_already_borrowed')
-        return
-    end
-    Borrow:new(data.book, data.person, weeks)
-    storage.pending_borrows[data.book] = true
+function R.borrow()
+    local data = ui.get_data{book='int', person='int'}
+    Borrow:new(data.book, data.person, borrow_weeks)
 end
 
-function R.restitute(book, person, points)
-    if not buchschloss.storage.pending_borrows[book] then
-        ui.alert('book_not_borrowed')
-    end
+function R.restitute()
+    local data = ui.get_data{book='int', person='int', points='int'}
     local ret = Borrow:restitute(book, person)
     storage.read_books[person] = (storage.read_books[person] or 0) + points
     ui.alert(ret)
 end
 
-local function get_results()
+function R.get_results()
     local r = {}
     for k, v in pairs(storage.read_books) do
         r[Person[k].__str__] = v
@@ -31,12 +27,12 @@ local function get_results()
     ui.display(r)
 end
 
-local function start_leseclub()
+function R.start_leseclub()
     storage.pending_borrows = {}
     storage.read_books = {}
 end
 
-local function end_leseclub()
+function R.end_leseclub()
     if not ui.ask('really_end_leseclub') then
         return
     end
@@ -44,11 +40,5 @@ local function end_leseclub()
     storage.read_books = nil
 end
 
-if storage.pending_borrows and storage.read_books then
-    R.end_leseclub = end_leseclub
-    R.get_results = get_results
-else
-    R.start_leseclub = start_leseclub
-end
 
 return R
