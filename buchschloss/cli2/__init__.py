@@ -45,7 +45,7 @@ def table_to_data(table):
 
 
 with open(os.path.join(os.path.dirname(__file__), 'builtins.lua')) as f:
-    STDLIB_CODE = f.read()
+    BUILTINS_CODE = f.read()
 
 
 def lua_set(obj, name, value):
@@ -109,14 +109,21 @@ def prepare_runtime(login_context: core.LoginContext, *,
         ``add_storage`` may be an object consisting of basic values, dicts and tuples/lists
         ``add_requests`` indicates whether the script may perform web requests
     """
+    ans_extended_funcs = {
+        'Group': ('activate',),
+        'Borrow': ('restitute',),
+        'Member': ('change_password',),
+        'Script': ('execute',),
+    }
     # noinspection PyArgumentList
     runtime = lupa.LuaRuntime(attribute_handlers=(lua_get, lua_set))
     restrict_runtime(runtime, config.cli2.whitelist.mapping)
     runtime.globals()['buchschloss'] = runtime.table_from({
         k: objects.LuaActionNS(getattr(core, k),
                                login_context=login_context,
+                               extra_get_allowed=ans_extended_funcs.get(k, ()),
                                runtime=runtime)
-        for k in 'Book Person Group Library Borrow Member'.split()
+        for k in 'Book Person Group Library Borrow Member Script'.split()
     })
     if add_ui:
         runtime.globals()['ui'] = objects.LuaUIInteraction(*add_ui, runtime=runtime)
@@ -124,7 +131,7 @@ def prepare_runtime(login_context: core.LoginContext, *,
         runtime.globals()['storage'] = data_to_table(runtime, add_storage)
     if add_requests:
         runtime.globals()['requests'] = objects.LuaRequestsInterface(runtime=runtime)
-    for k, v in dict(runtime.execute(STDLIB_CODE)).items():
+    for k, v in dict(runtime.execute(BUILTINS_CODE)).items():
         runtime.globals()[k] = v
     return runtime
 

@@ -114,12 +114,11 @@ def test_ui_interaction(monkeypatch):
             return return_val
         func.calls = []
         return func
-    get_name_flag = object()
     display = save_arg()
     get_data = save_arg()
     ask = save_arg()
     alert = save_arg()
-    get_name = save_arg(get_name_flag)
+    get_name = save_arg('get_name_flag')
     monkeypatch.setattr(utils, 'get_name', get_name)
     rt = lupa.LuaRuntime()
     default_cb = {'display': display, 'get_data': get_data}
@@ -131,11 +130,11 @@ def test_ui_interaction(monkeypatch):
         {**default_cb, 'alert': alert}, 'prefix::', runtime=rt)
     rt.execute('no_alert.ask("msg")')
     assert (len(ask.calls) == 1
-            and ask.calls[-1] is get_name_flag
+            and ask.calls[-1] is 'get_name_flag'
             and get_name.calls[-1] == 'prefix::msg')
     rt.execute('no_ask.alert("msg-2")')
     assert (len(alert.calls) == 1
-            and alert.calls[-1] is get_name_flag
+            and alert.calls[-1] is 'get_name_flag'
             and get_name.calls[-1] == 'prefix::msg-2')
     rt.execute('defaults.display{this="a table", with={"sub", "tables"}}')
     assert (len(display.calls) == 1

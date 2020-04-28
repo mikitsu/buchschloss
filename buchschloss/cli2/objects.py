@@ -70,22 +70,31 @@ class LuaActionNS(LuaObject):
     """wrap an ActionNamespace for use with Lua"""
     get_allowed = ('new', 'view_ns', 'edit', 'search')
 
-    def __init__(self, action_ns: T.Type[core.ActionNamespace], login_context, **kwargs):
+    def __init__(self, action_ns: T.Type[core.ActionNamespace],
+                 login_context: core.LoginContext,
+                 extra_get_allowed: T.Tuple[str, ...] = (),
+                 **kwargs):
         super().__init__(**kwargs)
+        self.get_allowed += extra_get_allowed
         self.login_context = login_context
         self.action_ns = action_ns
         self.data_ns = LuaDataNS.specific_class[action_ns]
 
     def lua_get(self, name):
-        """Allow access to names stored in self.data_ns"""
+        """Allow access to names stored in self.action_ns"""
         with CheckLuaAccessForbidden():
             return super().lua_get(name)
         # noinspection PyUnreachableCode
         val = getattr(self.action_ns, name)
         if callable(val):
-            val = lupa.unpacks_lua_table(
-                functools.partial(val, login_context=self.login_context))
-        return val
+            @lupa.unpacks_lua_table
+            def func(*args, **kwargs):
+                args = map(cli2.table_to_data, args)
+                kwargs = {k: cli2.table_to_data(v) for k, v in kwargs.items()}
+                return val(*args, login_context=self.login_context, **kwargs)
+            return func
+        else:
+            return val
 
     def search(self, condition):
         """transform the Lua table into a tuple"""
@@ -272,3 +281,4 @@ LuaDataNS.add_specific(core.Borrow,
                        ('id', 'return_date', 'is_back'),
                        wrap_data_ns={'book': core.Book, 'person': core.Person})
 LuaDataNS.add_specific(core.Member, ('name', 'level'))
+LuaDataNS.add_specific(core.Script, ('code', 'setlevel', 'name'))

@@ -11,7 +11,10 @@ function ActionNS_meta.__index(tbl, key)
     if val ~= nil then
         return val
     end
-    return new_data_ns(tbl.backend.view_ns(key), tbl.backend, key)
+    return new_data_ns(tbl.backend.view_ns(key),
+                       tbl.backend,
+                       (rawget(tbl, 'delegate') or {}),
+                       key)
 end
 
 function ActionNS_meta.__call(tbl, query)
@@ -22,10 +25,13 @@ function ActionNS:new(options)
     return self.backend.new(options)
 end
 
-function new_data_ns(data_ns, backend, id)
+function new_data_ns(data_ns, backend, delegate, id)
     local function index(tbl, key)
-        if key == 'edit' then
-            return function(self, options) options[1] = id; backend.edit(options) end
+        if delegate[key] then
+            return function(self, options)
+                table.insert(options, 1, id)
+                return backend[key](options)
+            end
         else
             return data_ns[key]
         end
@@ -33,11 +39,16 @@ function new_data_ns(data_ns, backend, id)
     return setmetatable({}, {__index=index})
 end
 
+local Borrow = setmetatable({backend=buchschloss.Borrow}, ActionNS_meta)
+
+function Borrow:restitute(book, person)
+    return self.backend.restitute(book, person)
+end
+
 return {
     Book=setmetatable({backend=buchschloss.Book}, ActionNS_meta),
-    Borrow=setmetatable({backend=buchschloss.Borrow}, ActionNS_meta),
+    Borrow=Borrow,
     Person=setmetatable({backend=buchschloss.Person}, ActionNS_meta),
     Library=setmetatable({backend=buchschloss.Library}, ActionNS_meta),
-    Group=setmetatable({backend=buchschloss.Group}, ActionNS_meta),
-    Member=setmetatable({backend=buchschloss.Member}, ActionNS_meta),
+    Group=setmetatable({backend=buchschloss.Group, delegate={activate=true}}, ActionNS_meta),
 }
