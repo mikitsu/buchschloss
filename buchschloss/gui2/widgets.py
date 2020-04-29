@@ -104,6 +104,7 @@ class OptionsFromSearch(mtk.OptionChoiceWidget):
                       width=config.gui2.info_widget.width)
 class InfoWidget(mtk.ContainingWidget):
     def __init__(self, master, data):
+        wraplength = config.gui2.info_widget.width/2
         widgets = []
         for k, v in data.items():
             widgets.append((Label, {'text': k}))
@@ -111,12 +112,17 @@ class InfoWidget(mtk.ContainingWidget):
                 widgets.append((Label, {}))
             elif isinstance(v, str):
                 widgets.append((Label, {
-                    'text': v, 'wraplength': config.gui2.info_widget.width/2}))
+                    'text': v, 'wraplength': wraplength}))
             elif isinstance(v, abc.Sequence):
                 if len(v) and isinstance(v[0], type) and issubclass(v[0], tk.Widget):
+                    if 'text' in v[1]:
+                        v[1].setdefault('wraplength', wraplength)
                     widgets.append(v)
                 else:
-                    widgets.extend(v)
+                    for w in v:
+                        if 'text' in w[1]:
+                            w[1].setdefault('wraplength', wraplength)
+                        widgets.append(w)
                     if not len(v) % 2:
                         widgets.append((Label, {}))  # padding to keep `k` on left
             else:
