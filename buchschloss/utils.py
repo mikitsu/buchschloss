@@ -259,33 +259,6 @@ def get_level(number: int = None):
         return config.utils.names.level_names[number]
 
 
-def break_string(text, size, break_char=string.punctuation, cut_char=string.whitespace):
-    """Insert newlines every `size` characters.
-
-        Insert '\n' before the given amount of characters
-        if a character in `break_char` is encountered.
-        If the character is in `cut_char`, it is replaced by the newline.
-    """
-    # TODO: move to misc
-    break_char += cut_char
-    r = []
-    while len(text) > size:
-        i = size
-        cut = False
-        while i:
-            if text[i] in break_char:
-                cut = text[i] in cut_char
-                break
-            i -= 1
-        else:
-            i = size - 1
-        i += 1
-        r.append(text[:i - cut])
-        text = text[i:]
-    r.append(text)
-    return '\n'.join(r)
-
-
 def get_book_data(isbn: int):
     """Attempt to get book data via the ISBN from the DB, if that fails,
         try the DNB (https://portal.dnb.de)"""
