@@ -35,11 +35,12 @@ def test_optionlist():
 
 def test_base64bytes():
     assert config_val.is_base64bytes(base64.b64encode(b'\x00\t').decode()) == b'\x00\t'
-    assert config_val.is_base64bytes(base64.b64encode(b'\x00\a').decode(), length=2) == b'\x00\a'
+    assert (config_val.is_base64bytes(base64.b64encode(b'\x00\a').decode(), length=2)
+            == b'\x00\a')
     with pytest.raises(validate.ValidateError):
         config_val.is_base64bytes(base64.b64encode(b'\x00\a\t').decode(), length=2)
     with pytest.raises(validate.ValidateError):
-        config_val.is_base64bytes(base64.b64encode(b'\x00\t\a').decode()+'a')
+        config_val.is_base64bytes(base64.b64encode(b'\x00\t\a').decode() + 'a')
     with pytest.raises(validate.ValidateError):
         config_val.is_base64bytes(['a', 'b'])
     with pytest.raises(validate.ValidateError):

@@ -16,7 +16,7 @@ __all__ exports:
 import inspect
 from hashlib import pbkdf2_hmac
 from functools import wraps, partial
-from datetime import datetime, timedelta, date
+from datetime import timedelta, date
 from os import urandom
 import sys
 import warnings
@@ -41,7 +41,7 @@ from . import utils
 from . import models
 
 __all__ = [
-    'BuchSchlossBaseError', 'DummyErrorFile', 'misc_data', 'ComplexSearch',
+    'BuchSchlossBaseError', 'misc_data', 'ComplexSearch',
     'Person', 'Book', 'Member', 'Borrow', 'Library', 'Group',
     'login',
 ]
