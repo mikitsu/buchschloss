@@ -100,11 +100,11 @@ class OptionsFromSearch(mtk.OptionChoiceWidget):
         super().__init__(master, values=values, **kwargs)
 
 
-@mtk.ScrollableWidget(height=config.gui2.info_widget.height,
-                      width=config.gui2.info_widget.width)
+@mtk.ScrollableWidget(height=config.gui2.widget_size.main.height,
+                      width=config.gui2.widget_size.main.width)
 class InfoWidget(mtk.ContainingWidget):
     def __init__(self, master, data):
-        wraplength = config.gui2.info_widget.width/2
+        wraplength = config.gui2.widget_size.main.width/2
         widgets = []
         for k, v in data.items():
             widgets.append((Label, {'text': k}))
@@ -229,6 +229,7 @@ class SearchMultiChoice(MultiChoicePopup):
                  action_ns: core.ActionNamespace,
                  attribute='name',
                  **kwargs):
+        kwargs.setdefault('wraplength', config.gui2.widget_size.main.width/2)
         options = [(getattr(o, attribute), str(o)) for o in
                    action_ns.search((), login_context=core.internal_lc)]
         super().__init__(master, cnf, options=options, **kwargs)
@@ -254,9 +255,7 @@ class SearchMultiChoice(MultiChoicePopup):
 
     def set_text(self):
         """set the text to the displays separated by semicolons"""
-        self['text'] = utils.break_string(
-            ';'.join(self.displays[i] for i in self.active),
-            30)  # 30 is default Label length
+        self['text'] = ';'.join(self.displays[i] for i in self.active)
 
 
 class Header:
@@ -279,15 +278,15 @@ class Header:
         return getattr(self.container, name)
 
 
-@mtk.ScrollableWidget(height=config.gui2.search_result_widget.height,
-                      width=config.gui2.search_result_widget.width)
+@mtk.ScrollableWidget(height=config.gui2.widget_size.main.height,
+                      width=config.gui2.widget_size.main.width)
 class SearchResultWidget(mtk.ContainingWidget):
     def __init__(self, master, results, view_func):
         widgets = [(Label, {'text': utils.get_name('{}_results').format(len(results))})]
         for r in results:
             widgets.append((Button, {
                 'text': r,
-                'wraplength': config.gui2.search_result_widget.width,
+                'wraplength': config.gui2.widget_size.main.width,
                 'command': partial(view_func, r.id)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))
 
