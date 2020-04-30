@@ -28,7 +28,6 @@ import requests
 import logging
 import re
 import bs4
-import string
 
 try:
     from cryptography import fernet

@@ -15,7 +15,6 @@ from . import forms
 from . import widgets
 from .. import core
 from .. import utils
-from .. import config
 
 
 def show_BSE(e):

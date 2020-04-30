@@ -104,7 +104,7 @@ class OptionsFromSearch(mtk.OptionChoiceWidget):
                       width=config.gui2.widget_size.main.width)
 class InfoWidget(mtk.ContainingWidget):
     def __init__(self, master, data):
-        wraplength = config.gui2.widget_size.main.width/2
+        wraplength = config.gui2.widget_size.main.width / 2
         widgets = []
         for k, v in data.items():
             widgets.append((Label, {'text': k}))
@@ -229,7 +229,7 @@ class SearchMultiChoice(MultiChoicePopup):
                  action_ns: core.ActionNamespace,
                  attribute='name',
                  **kwargs):
-        kwargs.setdefault('wraplength', config.gui2.widget_size.main.width/2)
+        kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
         options = [(getattr(o, attribute), str(o)) for o in
                    action_ns.search((), login_context=core.internal_lc)]
         super().__init__(master, cnf, options=options, **kwargs)
