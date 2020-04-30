@@ -6,13 +6,19 @@ import datetime
 import json
 from collections.abc import Mapping
 import pprint
+import typing as T
 
 import configobj
 
 from .validation import validator
 
 MODULE_DIR = os.path.split(__file__)[0]
+INCLUDE_NAME = 'include'  # I'd love to make this configurable...
 config_data = None
+
+
+class ConfigError(Exception):
+    """configuration error"""
 
 
 class DummyErrorFile:
@@ -71,22 +77,78 @@ class AttrAccess:
         return val
 
 
+def load_file(path: T.Union[str, os.PathLike]) \
+        -> T.Tuple[configobj.ConfigObj, T.Set[T.Union[str, os.PathLike]]]:
+    """recursively load a config file. Return (<ConfigObj>, <set of invalid paths>)
+
+        The invalid paths returned may be nonexistent or unparseable
+    """
+    def include_config(section: configobj.Section):
+        """recursively read included files and merge"""
+        for k, v in section.items():
+            if k == INCLUDE_NAME:
+                if isinstance(v, str):
+                    v = [v]
+                elif isinstance(v, configobj.Section):
+                    continue  # could also raise an error or add some filename to errors
+                elif not isinstance(v, T.Sequence):
+                    v = [str(v)]
+                del section[k]
+                for new_file in v:
+                    new_section, new_errors = load_file(new_file)
+                    section.merge(new_section)
+                    errors.update(new_errors)
+            elif isinstance(v, configobj.Section):
+                include_config(v)
+
+    errors = set()
+    try:
+        config = configobj.ConfigObj(path, file_error=True)
+    except (configobj.ConfigObjError, OSError):
+        return configobj.ConfigObj({}), {path}
+    include_config(config)
+    return config, errors
+
+
+def load_names(config):
+    """Load the name file"""
+    def convert_name_data(data):
+        if isinstance(data, str):
+            return data
+        else:
+            return {k.lower(): convert_name_data(v) for k, v in data.items()}
+
+    name_format = config['utils']['names']['format']
+    try:
+        with open(config['utils']['names']['file']) as f:
+            name_text = f.read()
+    except OSError:
+        raise ConfigError('error reading name file')
+    if name_format == 'json':
+        try:
+            name_data = json.loads(name_text)
+        except json.JSONDecodeError:
+            raise ConfigError('error parsing name file')
+    else:
+        raise AssertionError
+
+    return convert_name_data(name_data)
+
+
 def start(noisy_success=True):
     """load the config file specified in the BUCHSCHLOSS_CONFIG environment variable
         and validate the settings"""
     try:
         filename = os.environ['BUCHSCHLOSS_CONFIG']
     except KeyError:
-        raise Exception('environment variable BUCHSCHLOSS_CONFIG not found') from None
-    try:
-        config = configobj.ConfigObj(
-            filename, configspec=os.path.join(MODULE_DIR, 'configspec.cfg'),
-            file_error=True)
-    except (configobj.ConfigObjError, IOError) as e:
-        raise Exception('error reading main config file {}: {}'
-                        .format(filename, e)) from None
+        raise ConfigError('environment variable BUCHSCHLOSS_CONFIG not found') from None
+    config, invalid_files = load_file(filename)
+    config = configobj.ConfigObj(
+        config, configspec=os.path.join(MODULE_DIR, 'configspec.cfg'))
     val = config.validate(validator)
     if isinstance(val, Mapping):  # True if successful, dict if not
+        _old_stdout = sys.stdout
+        sys.stdout = sys.stderr
         print('--- ERROR IN CONFIG FILE FORMAT ---\n')
 
         def pprint_errors(errors, nesting=''):
@@ -100,26 +162,13 @@ def start(noisy_success=True):
 
         pprint_errors(val)
         print('\n\nSee the confspec.cfg file for information on how the data has to be')
-        raise Exception
+        if invalid_files:
+            print('\nThe following configuration files could not be loaded:')
+            print('\n'.join(invalid_files))
+        sys.stdout = _old_stdout
+        sys.exit(1)
     else:
-        # since this can get quite large, it is an external file
-        name_format = config['utils']['names']['format']
-        try:
-            with open(config['utils']['names']['file']) as f:
-                if name_format == 'json':
-                    name_data = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            raise Exception('error reading name file')
-        else:
-            def convert_name_data(data):
-                if isinstance(data, str):
-                    return data
-                else:
-                    return {k.lower(): convert_name_data(v) for k, v in data.items()}
-
-            name_data = convert_name_data(name_data)
-            config['utils']['names'].update(name_data)
-
+        config['utils']['names'].update(load_names(config))
         # multiline defaults aren't allowed (AFAIK)
         if config['gui2']['intro']['text'] is None:
             config['gui2']['intro']['text'] = \
@@ -127,9 +176,14 @@ def start(noisy_success=True):
 
         if ((config['utils']['email']['smtp']['username'] is None)
                 ^ (config['utils']['email']['smtp']['password'] is None)):
-            raise Exception('smtp.username and smtp.password must both be given or omitted')
+            raise ConfigError(
+                'smtp.username and smtp.password must both be given or omitted')
         if noisy_success:
             print('YAY, no configuration errors found')
+        if invalid_files:
+            print('\nThe following configuration files could not be loaded:')
+            print('\n'.join(invalid_files))
+            print()
             if (config['debug']
                     and input('Do you want to see the current settings? ')
                     .lower().startswith('y')):

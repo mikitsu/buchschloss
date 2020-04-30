@@ -4,6 +4,7 @@ import datetime
 import base64
 from configobj import validate
 import pytest
+from buchschloss import config
 from buchschloss.config import validation as config_val
 
 
@@ -46,3 +47,18 @@ def test_base64bytes():
 
 
 # test tasklist later when it's more than just an optionlist wrapper
+
+
+def test_load_file(tmpdir):
+    """test config.load_file"""
+    f1 = tmpdir.join('f1')
+    f2 = tmpdir.join('f2')
+    f3 = tmpdir.join('f3')
+    f4 = tmpdir.join('f4')
+    f1.write('a = 1\ninclude = {}'.format(f2))
+    f2.write('b = 1\n[sec]\na = 2\ninclude = {},{}'.format(f3, f4))
+    f3.write('b = 2')
+    f4.write('invalid config file')
+    co, errors = config.load_file(f1)
+    assert errors == {str(f4)}
+    assert co.dict() == {'a': '1', 'b': '1', 'sec': {'a': '2', 'b': '2'}}
