@@ -16,6 +16,35 @@ MODULE_DIR = os.path.split(__file__)[0]
 config_data = None
 
 
+class DummyErrorFile:
+    """Revert errors to log.
+
+    Attributes:
+        error_happened: True if write() was called
+        error_file: the log file name
+        error_texts: list of the error messages wrote to the log file for later use
+            e.g. display, email, ..."""
+
+    def __init__(self, error_file='error.log'):
+        self.error_happened = False
+        self.error_texts = []
+        self.error_file = 'error.log'
+        with open(error_file, 'a', encoding='UTF-8') as f:
+            f.write('\n\nSTART: ' + str(datetime.datetime.now()) + '\n')
+
+    def write(self, msg):
+        self.error_happened = True
+        self.error_texts.append(msg)
+        while True:
+            try:
+                with open(self.error_file, 'a', encoding='UTF-8') as f:
+                    f.write(msg)
+            except OSError:
+                pass
+            else:
+                break
+
+
 def is_timedelta(value):
     """create timedeltas"""
     if isinstance(value, (int, float)):
@@ -127,7 +156,8 @@ def start(noisy_success=True):
             filename, configspec=os.path.join(MODULE_DIR, 'configspec.cfg'),
             file_error=True)
     except (configobj.ConfigObjError, IOError) as e:
-        raise Exception('error reading {}: {}'.format(filename, e))
+        raise Exception('error reading main config file {}: {}'
+                        .format(filename, e)) from None
     val = config.validate(validator)
     if isinstance(val, Mapping):  # True if successful, dict if not
         print('--- ERROR IN CONFIG FILE FORMAT ---\n')
@@ -177,6 +207,7 @@ def start(noisy_success=True):
                     and input('Do you want to see the current settings? ')
                     .lower().startswith('y')):
                 pprint.pprint(config)
+        sys.stderr = DummyErrorFile()
         return config
 
 
