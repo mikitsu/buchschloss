@@ -15,7 +15,7 @@ migrate.migrate(
 )
 
 db.execute_sql("""
-UPDATE person 
+UPDATE person
     SET borrow_permission = date(borrow_permission, "364 days")
     WHERE borrow_permission IS NOT NULL
 """)
