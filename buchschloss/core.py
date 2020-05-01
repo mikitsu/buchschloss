@@ -666,8 +666,8 @@ class Person(ActionNamespace):
         """Edit a Person based on the arguments given.
 
         See Person.__doc__ for more information on the arguments
-        `pay` may be passed as argument with a truthy model to increment
-            `borrow_permission` by 52 weeks. (assuming a value of today if None)
+        if ``pay`` is True, ``borrow_permission`` will be incremented
+            by 52 weeks. (assuming a value of today if None)
 
         raise a BuchSchlossBaseError if the Person isn't found.
         Return a set of errors found during updating the person's libraries
