@@ -635,8 +635,8 @@ def test_borrow_new(db):
     create_book('test-lib')
     create_book('no-pay')
     p = create_person(123, max_borrow=1,
-                      pay_date=(datetime.date.today()
-                                - datetime.timedelta(weeks=52, days=-1)),
+                      borrow_permission=(datetime.date.today()
+                                         + datetime.timedelta(days=1)),
                       libraries=['main', 'no-pay'])
     ctxt = core.LoginType.INTERNAL(0)
     borrow_new = partial(core.Borrow.new, login_context=ctxt)
@@ -665,7 +665,7 @@ def test_borrow_new(db):
     borrow_new(3, 123, weeks)
     restitute(2)
     # respects pay_required and accepts keyword arguments
-    p.pay_date = datetime.date.today() - datetime.timedelta(weeks=52, days=1)
+    p.borrow_permission = datetime.date.today() - datetime.timedelta(days=1)
     p.save()
     with pytest.raises(core.BuchSchlossBaseError):
         borrow_new(person=123, book=2, weeks=weeks)

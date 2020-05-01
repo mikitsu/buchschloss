@@ -966,8 +966,8 @@ class Borrow(ActionNamespace):
         if book.library not in person.libraries:
             raise BuchSchlossError('Borrow', 'Borrow::{person}_not_in_Library_{library}',
                                    person=person, library=book.library.name)
-        if (book.library.pay_required and (person.pay_date or date.min)
-                + timedelta(weeks=52) < date.today()):
+        if (book.library.pay_required
+                and (person.borrow_permission or date.min) < date.today()):
             raise BuchSchlossError('Borrow', 'Borrow::Library_{}_needs_payment', book.library)
         if len(person.borrows) >= person.max_borrow:
             raise BuchSchlossError('Borrow', 'Borrow::{}_reached_max_borrow', person)
