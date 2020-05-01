@@ -127,25 +127,24 @@ def test_person_new(db):
     assert p.last_name == 'last'
     assert p.max_borrow == 3
     assert len(p.libraries) == 0
-    assert p.pay_date is None
+    assert p.borrow_permission is None
     with pytest.raises(core.BuchSchlossBaseError):
         person_new(id_=123, first_name='first', last_name='last', class_='cls')
     with pytest.raises(core.BuchSchlossBaseError):
         person_new(id_=124, first_name='first', last_name='last', class_='cls',
                    max_borrow=5, pay=True)
     ctxt.level = 4
-    old_today = datetime.date.today()  # in case this is run around midnight...
     person_new(id_=124, first_name='first', last_name='last', class_='cls',
                max_borrow=5, pay=True)
     p = models.Person.get_by_id(124)
     assert p.id == 124
     assert p.max_borrow == 5
-    assert p.pay_date in (datetime.date.today(), old_today)
+    assert p.borrow_permission == datetime.date.today() + datetime.timedelta(weeks=52)
     person_new(id_=125, first_name='first', last_name='last', class_='cls',
-               pay_date=datetime.date(1956, 1, 31))
+               borrow_permission=datetime.date(1956, 1, 31))
     p = models.Person.get_by_id(125)
     assert p.id == 125
-    assert p.pay_date == datetime.date(1956, 1, 31)
+    assert p.borrow_permission == datetime.date(1956, 1, 31)
     models.Library.create(name='main')
     person_new(id_=126, first_name='first', last_name='last', class_='cls')
     p = models.Person.get_by_id(126)
@@ -156,18 +155,18 @@ def test_person_new(db):
 def test_person_edit(db):
     """test Person.edit"""
     models.Person.create(id=123, first_name='first', last_name='last', class_='cls',
-                         max_borrow=3, pay_date=datetime.date(1956, 1, 31))
+                         max_borrow=3, borrow_permission=datetime.date(1956, 1, 31))
     ctxt = for_levels(partial(core.Person.edit, 123), 3)
     person_edit = partial(core.Person.edit, login_context=ctxt)
     person_edit(123, first_name='other_value')
     assert models.Person.get_by_id(123).first_name == 'other_value'
-    person_edit(123, last_name='value_for_last', pay_date=None)
+    person_edit(123, last_name='value_for_last', borrow_permission=None)
     p = models.Person.get_by_id(123)
     assert p.last_name == 'value_for_last'
-    assert p.pay_date is None
-    old_today = datetime.date.today()
+    assert p.borrow_permission is None
     person_edit(123, pay=True)
-    assert models.Person.get_by_id(123).pay_date in (datetime.date.today(), old_today)
+    assert (models.Person.get_by_id(123).borrow_permission
+            == datetime.date.today() + datetime.timedelta(weeks=52))
     models.Library.create(name='lib_1')
     models.Library.create(name='lib_2')
     e = person_edit(123, libraries=('lib_1', 'lib_does_not_exist'))
@@ -185,7 +184,7 @@ def test_person_edit(db):
 def test_person_view_str(db):
     """test Person.view_str"""
     p = models.Person.create(id=123, first_name='first', last_name='last', class_='cls',
-                             max_borrow=3, pay_date=datetime.date(1956, 1, 31))
+                             max_borrow=3, borrow_permission=datetime.date(1956, 1, 31))
     ctxt = for_levels(partial(core.Person.view_str, 123), 1)
     person_view = partial(core.Person.view_str, login_context=ctxt)
     with pytest.raises(core.BuchSchlossBaseError):
@@ -196,7 +195,7 @@ def test_person_view_str(db):
         'last_name': 'last',
         'class_': 'cls',
         'max_borrow': '3',
-        'pay_date': str(utils.FormattedDate.fromdate(datetime.date(1956, 1, 31))),
+        'borrow_permission': str(utils.FormattedDate.fromdate(datetime.date(1956, 1, 31))),
         'borrows': (),
         'borrow_book_ids': [],
         'libraries': '',
