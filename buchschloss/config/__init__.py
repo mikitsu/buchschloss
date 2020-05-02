@@ -1,9 +1,9 @@
 """Get configuration settings"""
-
 import os
 import sys
 import datetime
 import json
+import contextlib
 from collections.abc import Mapping
 import pprint
 import typing as T
@@ -91,8 +91,6 @@ def load_file(path: T.Union[str, os.PathLike]) \
                     v = [v]
                 elif isinstance(v, configobj.Section):
                     continue  # could also raise an error or add some filename to errors
-                elif not isinstance(v, T.Sequence):
-                    v = [str(v)]
                 del section[k]
                 for new_file in v:
                     new_section, new_errors = load_file(new_file)
@@ -115,8 +113,10 @@ def load_names(config):
     def convert_name_data(data):
         if isinstance(data, str):
             return data
-        else:
+        elif isinstance(data, dict):
             return {k.lower(): convert_name_data(v) for k, v in data.items()}
+        else:
+            raise ConfigError('invalid type in name file: "{}"'.format(type(data)))
 
     name_format = config['utils']['names']['format']
     try:
@@ -147,25 +147,23 @@ def start(noisy_success=True):
         config, configspec=os.path.join(MODULE_DIR, 'configspec.cfg'))
     val = config.validate(validator)
     if isinstance(val, Mapping):  # True if successful, dict if not
-        _old_stdout = sys.stdout
-        sys.stdout = sys.stderr
-        print('--- ERROR IN CONFIG FILE FORMAT ---\n')
+        with contextlib.redirect_stdout(sys.stderr):
+            print('--- ERROR IN CONFIG FILE FORMAT ---\n')
 
-        def pprint_errors(errors, nesting=''):
-            """display errors"""
-            for k, v in errors.items():
-                if isinstance(v, dict):
-                    print(nesting + '\\_', k)
-                    pprint_errors(v, nesting + ' |')
-                else:
-                    print(nesting, k, 'OK' if v else 'INVALID')
+            def pprint_errors(errors, nesting=''):
+                """display errors"""
+                for k, v in errors.items():
+                    if isinstance(v, dict):
+                        print(nesting + '\\_', k)
+                        pprint_errors(v, nesting + ' |')
+                    else:
+                        print(nesting, k, 'OK' if v else 'INVALID')
 
-        pprint_errors(val)
-        print('\n\nSee the confspec.cfg file for information on how the data has to be')
-        if invalid_files:
-            print('\nThe following configuration files could not be loaded:')
-            print('\n'.join(invalid_files))
-        sys.stdout = _old_stdout
+            pprint_errors(val)
+            print('\n\nSee the confspec.cfg file for information on how the data has to be')
+            if invalid_files:
+                print('\nThe following configuration files could not be loaded:')
+                print('\n'.join(invalid_files))
         sys.exit(1)
     else:
         config['utils']['names'].update(load_names(config))
