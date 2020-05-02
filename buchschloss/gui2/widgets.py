@@ -111,20 +111,16 @@ class InfoWidget(mtk.ContainingWidget):
             if v is None:
                 widgets.append((Label, {}))
             elif isinstance(v, str):
-                widgets.append((Label, {
-                    'text': v, 'wraplength': wraplength}))
+                widgets.append((Label, {'text': v, 'wraplength': wraplength}))
             elif isinstance(v, abc.Sequence):
                 if len(v) and isinstance(v[0], type) and issubclass(v[0], tk.Widget):
-                    if 'text' in v[1]:
-                        v[1].setdefault('wraplength', wraplength)
-                    widgets.append(v)
-                else:
-                    for w in v:
-                        if 'text' in w[1]:
-                            w[1].setdefault('wraplength', wraplength)
-                        widgets.append(w)
-                    if not len(v) % 2:
-                        widgets.append((Label, {}))  # padding to keep `k` on left
+                    v = [v]
+                for w in v:
+                    if 'text' in w[1]:
+                        w[1].setdefault('wraplength', wraplength)
+                    widgets.append(w)
+                if not len(v) % 2:
+                    widgets.append((Label, {}))  # padding to keep `k` on left
             else:
                 raise ValueError('`{}` could not be handled'.format(v))
         super().__init__(master, *widgets, horizontal=2)
