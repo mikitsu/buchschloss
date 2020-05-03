@@ -13,7 +13,7 @@ import configobj
 
 from .validation import validator
 
-MODULE_DIR = os.path.split(__file__)[0]
+MODULE_DIR = os.path.dirname(__file__)
 INCLUDE_NAME = 'include'  # I'd love to make this configurable...
 config_data = None
 ExceptSpec = T.Union[T.Type[BaseException], T.Tuple[T.Type[BaseException], ...]]
