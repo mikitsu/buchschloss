@@ -15,7 +15,6 @@ from . import forms
 from . import widgets
 from .. import core
 from .. import utils
-from .. import config
 
 
 def show_BSE(e):
@@ -270,8 +269,7 @@ class ShowInfoNS:
         NSWithLogin(core.Book).view_str,
         {'borrowed_by': lambda d: (
             utils.get_name('borrowed_by'), (widgets.Button, {
-                'text': utils.break_string(str(d['borrowed_by']),
-                                           config.gui2.info_widget.item_length),
+                'text': d['borrowed_by'],
                 'command': (partial(ShowInfoNS.person, d['borrowed_by_id'])
                             if d['borrowed_by_id'] is not None else None)
             }))
@@ -283,7 +281,7 @@ class ShowInfoNS:
         NSWithLogin(core.Person).view_str,
         {'borrows': lambda d: (
             [(widgets.Button, {
-                'text': utils.break_string(t, config.gui2.info_widget.item_length),
+                'text': t,
                 'command': partial(ShowInfoNS.book, i)})
              for t, i in zip(d['borrows'], d['borrow_book_ids'])],
         )
@@ -295,14 +293,12 @@ class ShowInfoNS:
         NSWithLogin(core.Borrow).view_str,
         {'person': lambda d: (
             (widgets.Button, {
-                'text': utils.break_string(d['person'],
-                                           config.gui2.info_widget.item_length),
+                'text': d['person'],
                 'command': partial(ShowInfoNS.person, d['person_id'])
             }),),
          'book': lambda d: (
              (widgets.Button, {
-                 'text': utils.break_string(d['book'],
-                                            config.gui2.info_widget.item_length),
+                 'text': d['book'],
                  'command': partial(ShowInfoNS.book, d['book_id'])
              }),),
          'is_back': lambda d: (
