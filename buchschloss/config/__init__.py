@@ -113,17 +113,17 @@ def load_names(config):
     def convert_name_data(data):
         if isinstance(data, str):
             return data
-        elif isinstance(data, dict):
+        elif isinstance(data, T.Mapping):
             return {k.lower(): convert_name_data(v) for k, v in data.items()}
         else:
             raise ConfigError('invalid type in name file: "{}"'.format(type(data)))
 
-    name_format = config['utils']['names']['format']
     try:
         with open(config['utils']['names']['file']) as f:
             name_text = f.read()
     except OSError:
         raise ConfigError('error reading name file')
+    name_format = config['utils']['names']['format']
     if name_format == 'json':
         try:
             name_data = json.loads(name_text)
