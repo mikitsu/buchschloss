@@ -629,7 +629,7 @@ class Person(ActionNamespace):
     @level_required(3)
     def new(*, id_: int, first_name: str, last_name: str, class_: str,
             max_borrow: int = 3, libraries: T.Iterable[str] = ('main',),
-            pay: bool = None, pay_date: date = None,
+            pay: bool = None, borrow_permission: date = None,
             login_context):
         """Attempt to create a new Person with the given arguments.
 
@@ -637,15 +637,16 @@ class Person(ActionNamespace):
         Silently ignore nonexistent libraries
 
         See Person for details on arguments
-        If ``pay`` is True and ``pay_date`` is None,
-            set the pay_date to ``datetime.date.today()``
+        If ``pay`` is True and ``borrow_permission`` is None,
+            set the borrow_permission to ``today + 52 weeks``
         """
-        if pay_date is None and pay:
-            pay_date = date.today()
+        if borrow_permission is None and pay:
+            borrow_permission = date.today() + timedelta(weeks=52)
         if max_borrow > 3 and not login_context.level >= 4:
             raise BuchSchlossPermError(4)
         p = models.Person(id=id_, first_name=first_name, last_name=last_name,
-                          class_=class_, max_borrow=max_borrow, pay_date=pay_date)
+                          class_=class_, max_borrow=max_borrow,
+                          borrow_permission=borrow_permission)
         p.libraries = libraries
         try:
             p.save(force_insert=True)
@@ -655,7 +656,8 @@ class Person(ActionNamespace):
             else:
                 raise
         else:
-            logging.info('{} created {} with pay={}'.format(login_context, p, pay))
+            logging.info('{} created {} with borrow_permission={}'
+                         .format(login_context, p, borrow_permission))
 
     @staticmethod
     @level_required(3)
@@ -664,8 +666,8 @@ class Person(ActionNamespace):
         """Edit a Person based on the arguments given.
 
         See Person.__doc__ for more information on the arguments
-        `pay` may be passed as argument with a truthy model to set
-            `pay_date` to `datetime.date.today()`
+        if ``pay`` is True, ``borrow_permission`` will be incremented
+            by 52 weeks. (assuming a value of today if None)
 
         raise a BuchSchlossBaseError if the Person isn't found.
         Return a set of errors found during updating the person's libraries
@@ -678,7 +680,8 @@ class Person(ActionNamespace):
         if kwargs.get('max_borrow', 0) > 3 and not login_context.level >= 4:
             raise BuchSchlossPermError(4)
         if kwargs.pop('pay', False):
-            kwargs['pay_date'] = date.today()
+            kwargs['borrow_permission'] = ((person.borrow_permission or date.today())
+                                           + timedelta(weeks=52))
         errors = set()
         lib = set(kwargs.pop('libraries', ()))
         errors.update(_update_library_group(models.Library, person.libraries, lib))
@@ -686,7 +689,8 @@ class Person(ActionNamespace):
             setattr(person, k, v)
         person.save()
         logging.info('{} edited {}'.format(login_context, person)
-                     + (' setting pay_date to {}'.format(kwargs['pay_date'])
+                     + (' setting borrow_permission to {}'
+                        .format(kwargs['borrow_permission'])
                         if 'pay_date' in kwargs else ''))
         return errors
 
@@ -697,14 +701,14 @@ class Person(ActionNamespace):
         """Return data about a Person.
 
         Return a dict consisting of the following items as strings:
-            - id, first_name, last_name, class_ max_borrow, pay_date attributes
+            - id, first_name, last_name, class_ max_borrow, borrow_permission attributes
             - libraries as a string, individual libraries separated by ;
             - borrows as a tuple of strings representing the borrows
             - __str__ , the string representation
         and 'borrow_book_ids', a sequence of the IDs of the borrowed books
             in the same order their representations appear in 'borrows'"""
         r = {k: str(getattr(person, k) or '') for k in
-             'id first_name last_name class_ max_borrow pay_date'.split()}
+             'id first_name last_name class_ max_borrow borrow_permission'.split()}
         borrows = person.borrows
         r['borrows'] = tuple(map(str, borrows))
         r['borrow_book_ids'] = [b.book.id for b in borrows]
@@ -962,8 +966,8 @@ class Borrow(ActionNamespace):
         if book.library not in person.libraries:
             raise BuchSchlossError('Borrow', 'Borrow::{person}_not_in_Library_{library}',
                                    person=person, library=book.library.name)
-        if (book.library.pay_required and (person.pay_date or date.min)
-                + timedelta(weeks=52) < date.today()):
+        if (book.library.pay_required
+                and (person.borrow_permission or date.min) < date.today()):
             raise BuchSchlossError('Borrow', 'Borrow::Library_{}_needs_payment', book.library)
         if len(person.borrows) >= person.max_borrow:
             raise BuchSchlossError('Borrow', 'Borrow::{}_reached_max_borrow', person)
