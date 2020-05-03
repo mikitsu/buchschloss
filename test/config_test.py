@@ -2,6 +2,8 @@
 
 import datetime
 import base64
+import json
+
 from configobj import validate
 import pytest
 from buchschloss import config
@@ -61,5 +63,20 @@ def test_load_file(tmpdir):
     f3.write('b = 2')
     f4.write('invalid config file')
     co, errors = config.load_file(f1)
+    assert errors == {str(f4)}
+    assert co.dict() == {'a': '1', 'b': '1', 'sec': {'a': '2', 'b': '2'}}
+
+
+def test_load_file_json(tmpdir):
+    """test config.load_file"""
+    f1 = tmpdir.join('f1')
+    f2 = tmpdir.join('f2')
+    f3 = tmpdir.join('f3')
+    f4 = tmpdir.join('f4')
+    f1.write('{"a": "1", "include": "%s"}' % (f2,))
+    f2.write('{"b": "1", "sec": {"a": "2", "include": ["%s", "%s"]}}' % (f3, f4))
+    f3.write('{"b": "2"}')
+    f4.write('invalid config file')
+    co, errors = config.load_file(f1, json.load, json.JSONDecodeError)
     assert errors == {str(f4)}
     assert co.dict() == {'a': '1', 'b': '1', 'sec': {'a': '2', 'b': '2'}}

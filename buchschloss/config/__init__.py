@@ -1,4 +1,5 @@
 """Get configuration settings"""
+
 import os
 import sys
 import datetime
