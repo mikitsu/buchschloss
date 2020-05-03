@@ -16,7 +16,7 @@ __all__ exports:
 import inspect
 from hashlib import pbkdf2_hmac
 from functools import wraps, partial
-from datetime import datetime, timedelta, date
+from datetime import timedelta, date
 from os import urandom
 import sys
 import warnings
@@ -41,7 +41,7 @@ from . import utils
 from . import models
 
 __all__ = [
-    'BuchSchlossBaseError', 'DummyErrorFile', 'misc_data', 'ComplexSearch',
+    'BuchSchlossBaseError', 'misc_data', 'ComplexSearch',
     'Person', 'Book', 'Member', 'Borrow', 'Library', 'Group',
     'login',
 ]
@@ -253,35 +253,6 @@ class Dummy:  # TODO: move this out to misc
             return self._items[item]
         except (KeyError, IndexError, AttributeError):
             return self._default
-
-
-class DummyErrorFile:
-    """Revert errors to log.
-
-    Attributes:
-        error_happened: True if write() was called
-        error_file: the log file name
-        error_texts: list of the error messages wrote to the log file for later use
-            e.g. display, email, ..."""
-
-    def __init__(self, error_file='error.log'):
-        self.error_happened = False
-        self.error_texts = []
-        self.error_file = 'error.log'
-        with open(error_file, 'a', encoding='UTF-8') as f:
-            f.write('\n\nSTART: ' + str(datetime.now()) + '\n')
-
-    def write(self, msg):
-        self.error_happened = True
-        self.error_texts.append(msg)
-        while True:
-            try:
-                with open(self.error_file, 'a', encoding='UTF-8') as f:
-                    f.write(msg)
-            except OSError:
-                pass
-            else:
-                break
 
 
 class LibraryGroupAction(enum.Enum):

@@ -100,8 +100,6 @@ class App:
         font_conf = {'family': config.gui2.font.family, 'size': config.gui2.font.size}
         for font_name in ('Default', 'Text', 'Menu'):
             tk_font.nametofont(font_name.join(('Tk', 'Font'))).config(**font_conf)
-        if not config.debug:
-            sys.stderr = core.DummyErrorFile()
         self.current_login = core.guest_lc
         self.queue = queue.Queue()
         self.on_next_reset = []
