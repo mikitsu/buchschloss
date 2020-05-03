@@ -15,7 +15,7 @@ from .validation import validator
 MODULE_DIR = os.path.split(__file__)[0]
 INCLUDE_NAME = 'include'  # I'd love to make this configurable...
 config_data = None
-ExceptSpec = T.Union[T.Type[BaseException], T.Tuple[T.Type[BaseException, ...]]]
+ExceptSpec = T.Union[T.Type[BaseException], T.Tuple[T.Type[BaseException], ...]]
 ActuallyPathLike = T.Union[bytes, str, os.PathLike]
 
 
@@ -122,31 +122,30 @@ def load_file(path: ActuallyPathLike,
     return config, errors
 
 
-def load_names(config):
-    """Load the name file"""
+def load_names(name_file: ActuallyPathLike,
+               name_format: str
+               ) -> T.Mapping:
+    """Load the name file with inclusions ignoring errors"""
     def convert_name_data(data):
         if isinstance(data, str):
             return data
         elif isinstance(data, T.Mapping):
             return {k.lower(): convert_name_data(v) for k, v in data.items()}
         else:
-            raise ConfigError('invalid type in name file: "{}"'.format(type(data)))
+            return ''
 
-    try:
-        with open(config['utils']['names']['file']) as f:
-            name_text = f.read()
-    except OSError:
-        raise ConfigError('error reading name file')
-    name_format = config['utils']['names']['format']
-    if name_format == 'json':
-        try:
-            name_data = json.loads(name_text)
-        except json.JSONDecodeError:
-            raise ConfigError('error parsing name file')
-    else:
-        raise AssertionError
-
-    return convert_name_data(name_data)
+    loaders = {
+        'json': (json.load, json.JSONDecodeError),
+        'configobj': (configobj.ConfigObj, configobj.ConfigObjError),
+    }
+    name_data, __ = load_file(name_file, *loaders[name_format])
+    # special case the only list
+    level_list = name_data.pop('level names', ())
+    if len(level_list) != 5:
+        level_list = ['level_{}'.format(i) for i in range(5)]
+    processed_data = convert_name_data(name_data)
+    processed_data['level names'] = level_list
+    return processed_data
 
 
 def start(noisy_success=True):
@@ -180,7 +179,8 @@ def start(noisy_success=True):
                 print('\n'.join(invalid_files))
         sys.exit(1)
     else:
-        config['utils']['names'].update(load_names(config))
+        config['utils']['names'] = load_names(
+            config['utils']['names']['file'], config['utils']['names']['format'])
         # multiline defaults aren't allowed (AFAIK)
         if config['gui2']['intro']['text'] is None:
             config['gui2']['intro']['text'] = \
