@@ -142,7 +142,7 @@ def load_names(name_file: ActuallyPathLike,
     name_data, __ = load_file(name_file, *loaders[name_format])
     # special case the only list
     level_list = name_data.pop('level names', ())
-    if len(level_list) != 5:
+    if not isinstance(level_list, T.Sequence) or len(level_list) != 5:
         level_list = ['level_{}'.format(i) for i in range(5)]
     processed_data = convert_name_data(name_data)
     processed_data['level names'] = level_list

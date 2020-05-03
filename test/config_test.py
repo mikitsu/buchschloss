@@ -10,6 +10,12 @@ from buchschloss import config
 from buchschloss.config import validation as config_val
 
 
+def get_temp_files(tmpdir, number):
+    """get ``number`` temporary files"""
+    for i in range(number):
+        yield tmpdir.join('f' + str(i))
+
+
 def test_timedelta():
     assert config_val.is_timedelta('1') == datetime.timedelta(days=1)
     assert config_val.is_timedelta('1:1') == datetime.timedelta(days=1, hours=1)
@@ -54,10 +60,7 @@ def test_base64bytes():
 
 def test_load_file(tmpdir):
     """test config.load_file"""
-    f1 = tmpdir.join('f1')
-    f2 = tmpdir.join('f2')
-    f3 = tmpdir.join('f3')
-    f4 = tmpdir.join('f4')
+    f1, f2, f3, f4 = get_temp_files(tmpdir, 4)
     f1.write('a = 1\ninclude = {}'.format(f2))
     f2.write('b = 1\n[sec]\na = 2\ninclude = {},{}'.format(f3, f4))
     f3.write('b = 2')
@@ -69,10 +72,7 @@ def test_load_file(tmpdir):
 
 def test_load_file_json(tmpdir):
     """test config.load_file"""
-    f1 = tmpdir.join('f1')
-    f2 = tmpdir.join('f2')
-    f3 = tmpdir.join('f3')
-    f4 = tmpdir.join('f4')
+    f1, f2, f3, f4 = get_temp_files(tmpdir, 4)
     f1.write('{"a": "1", "include": "%s"}' % (f2,))
     f2.write('{"b": "1", "sec": {"a": "2", "include": ["%s", "%s"]}}' % (f3, f4))
     f3.write('{"b": "2"}')
