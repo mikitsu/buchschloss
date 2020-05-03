@@ -15,6 +15,8 @@ from .validation import validator
 MODULE_DIR = os.path.split(__file__)[0]
 INCLUDE_NAME = 'include'  # I'd love to make this configurable...
 config_data = None
+ExceptSpec = T.Union[T.Type[BaseException], T.Tuple[T.Type[BaseException, ...]]]
+ActuallyPathLike = T.Union[bytes, str, os.PathLike]
 
 
 class ConfigError(Exception):
@@ -77,11 +79,15 @@ class AttrAccess:
         return val
 
 
-def load_file(path: T.Union[str, os.PathLike]) \
-        -> T.Tuple[configobj.ConfigObj, T.Set[T.Union[str, os.PathLike]]]:
-    """recursively load a config file. Return (<ConfigObj>, <set of invalid paths>)
+def load_file(path: ActuallyPathLike,
+              loader: T.Callable[[T.TextIO], T.MutableMapping] = configobj.ConfigObj,
+              load_error: ExceptSpec = configobj.ConfigObjError,
+              ) -> T.Tuple[configobj.ConfigObj, T.Set[ActuallyPathLike]]:
+    """recursively load a file as ConfigObj. Return (<ConfigObj>, <set of invalid paths>)
 
         The invalid paths returned may be nonexistent or unparseable
+        ``loader`` specifies how to load the file
+        ``load_error`` is used to catch exceptions while loading the file
     """
     def include_config(section: configobj.Section):
         """recursively read included files and merge"""
@@ -93,7 +99,7 @@ def load_file(path: T.Union[str, os.PathLike]) \
                     continue  # could also raise an error or add some filename to errors
                 del section[k]
                 for new_file in v:
-                    new_section, new_errors = load_file(new_file)
+                    new_section, new_errors = load_file(new_file, loader, load_error)
                     section.merge(new_section)
                     errors.update(new_errors)
             elif isinstance(v, configobj.Section):
@@ -101,9 +107,17 @@ def load_file(path: T.Union[str, os.PathLike]) \
 
     errors = set()
     try:
-        config = configobj.ConfigObj(path, file_error=True)
-    except (configobj.ConfigObjError, OSError):
+        f = open(path)
+    except OSError:
         return configobj.ConfigObj({}), {path}
+    try:
+        config = loader(f)
+    except load_error:
+        return configobj.ConfigObj({}), {path}
+    finally:
+        f.close()
+    if not isinstance(config, configobj.ConfigObj):
+        config = configobj.ConfigObj(config)
     include_config(config)
     return config, errors
 
