@@ -193,13 +193,14 @@ def start(noisy_success=True):
         if noisy_success:
             print('YAY, no configuration errors found')
         if invalid_files:
-            print('\nThe following configuration files could not be loaded:')
-            print('\n'.join(invalid_files))
-            print()
-            if (config['debug']
-                    and input('Do you want to see the current settings? ')
-                    .lower().startswith('y')):
-                pprint.pprint(config)
+            with contextlib.redirect_stdout(sys.stderr):
+                print('\nThe following configuration files could not be loaded:')
+                print('\n'.join(invalid_files))
+                print()
+        if (config['debug']
+                and input('Do you want to see the current settings? ')
+                .lower().startswith('y')):
+            pprint.pprint(config)
         sys.stderr = DummyErrorFile()
         return config
 
