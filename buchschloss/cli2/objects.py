@@ -170,7 +170,7 @@ class LuaDataNS(LuaObject):
 
 class LuaUIInteraction(LuaObject):
     """Provide Lua code a way to interact with the user interface"""
-    get_allowed = ('ask', 'display', 'get_data', 'get_name')
+    get_allowed = ('ask', 'alert', 'display', 'get_data', 'get_name')
 
     def __init__(self, callbacks, script_prefix, **kwargs):
         """provide the callbacks and script-specific prefix for get_name"""
