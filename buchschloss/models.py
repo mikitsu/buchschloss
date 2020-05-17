@@ -96,6 +96,7 @@ class Person(Model):
         - class_
         - max_borrow: max. number of borrowings allowed simultaneously
         - borrows: current borrows
+        - borrow_permission: date until borrowing from restricted libraries is allowed
         - libraries: libraries allowed
     """
     id: T.Union[int, IntegerField] = IntegerField(primary_key=True)
@@ -103,7 +104,7 @@ class Person(Model):
     last_name: T.Union[str, CharField] = CharField()
     class_: T.Union[str, CharField] = CharField()
     max_borrow: T.Union[int, IntegerField] = IntegerField()
-    pay_date: T.Union[datetime.date, DateField] = FormattedDateField(null=True)
+    borrow_permission: T.Union[datetime.date, DateField] = FormattedDateField(null=True)
     libraries: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # libraries as backref
 
     @property

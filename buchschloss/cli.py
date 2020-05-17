@@ -175,8 +175,6 @@ def ask(question):
 
 def start():
     """Entry point. Provide a REPL"""
-    if not config.debug:
-        sys.stderr = core.DummyErrorFile()
     print(config.gui2.intro.text, end='\n\n')  # TODO: have a separate config section
     try:
         while True:
