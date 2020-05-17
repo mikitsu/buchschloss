@@ -187,7 +187,7 @@ def start():
         if isinstance(e, EOFError):
             # make the terminal prompt go onto a new line
             print()
-        if not config.debug and sys.stderr.error_happened:
+        if isinstance(sys.stderr, config.DummyErrorFile) and sys.stderr.error_happened:
             if ask('send_error_report'):
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
