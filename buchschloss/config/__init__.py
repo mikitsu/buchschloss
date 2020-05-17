@@ -199,10 +199,12 @@ def start(noisy_success=True):
                 print('\n'.join(invalid_files))
                 print()
         if (config['debug']
+                and noisy_success
                 and input('Do you want to see the current settings? ')
                 .lower().startswith('y')):
             pprint.pprint(config)
-        sys.stderr = DummyErrorFile()
+        if not config['debug']:
+            sys.stderr = DummyErrorFile()
         return config
 
 

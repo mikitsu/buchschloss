@@ -151,7 +151,7 @@ class App:
         """execute when the user exits the application"""
         if tk_msg.askokcancel(utils.get_name('actions::exit_app'),
                               utils.get_name('interactive_question::really_exit_app')):
-            if (isinstance(sys.stderr, core.DummyErrorFile)
+            if (isinstance(sys.stderr, config.DummyErrorFile)
                     and sys.stderr.error_happened
                     and tk_msg.askokcancel(
                         None, utils.get_name('interactive_question::send_error_report'))):
