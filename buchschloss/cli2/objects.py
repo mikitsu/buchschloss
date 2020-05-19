@@ -120,7 +120,7 @@ class LuaDataNS(LuaObject):
         super().__init__(**kwargs)
         self.data_ns = data_ns
 
-    def __str__(self):
+    def __repr__(self):
         return str(self.data_ns)
 
     @classmethod
