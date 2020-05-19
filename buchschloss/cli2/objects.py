@@ -219,7 +219,7 @@ class LuaUIInteraction(LuaObject):
         """register a user action callback"""
         self.ui_actions.append(callback)
         safe_callback = functools.partial(self.execute_ui_action, len(self.ui_actions))
-        self.callbacks['register_action'](name, safe_callback)
+        self.callbacks['register_action'](self.get_name(name), safe_callback)
 
     def execute_ui_action(self, action_id):
         """execute the registered UI action with the given ID"""
