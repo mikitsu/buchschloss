@@ -136,6 +136,16 @@ def prepare_runtime(login_context: core.LoginContext, *,
     return runtime
 
 
+def execute_script(code: str, login_context: core.LoginContext, **kwargs):
+    """execute the given code in a new runtime.
+        See prepare_runtime for arguments"""
+    rt = prepare_runtime(login_context, **kwargs)
+    try:
+        rt.execute(code)
+    except lupa.LuaError:
+        traceback.print_exc()
+
+
 def start():
     """provide a REPL"""
     username = input(utils.get_name('interactive_question::username'))

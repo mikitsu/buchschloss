@@ -1189,7 +1189,8 @@ class Script(ActionNamespace):
         script_lc = LoginType.SCRIPT(
             script_lc_level, name=script.name, invoker=login_context)
         get_name_prefix = 'script-data::{}::'.format(script.name)
-        rt = cli2.prepare_runtime(
+        cli2.execute_script(
+            script.code,
             script_lc,
             add_ui=((cls.callbacks, get_name_prefix)
                     if cls.callbacks is not None
@@ -1199,7 +1200,6 @@ class Script(ActionNamespace):
                          else None),
             add_requests=(ScriptPermissions.REQUESTS in script.permissions),
         )
-        rt.execute(script.code)
 
 
 def search(o: T.Type[models.Model], condition: T.Tuple = None,
