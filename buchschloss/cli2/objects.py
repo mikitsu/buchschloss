@@ -47,7 +47,7 @@ class LuaObject(abc.ABC):
     def lua_get(self, name):
         """provide the requested attribute
 
-            raise AttributeError if not allowed
+            raise LuaAccessForbidden if not allowed
             this default implementation checks whether
             the name is present in self.get_allowed
         """
@@ -58,12 +58,12 @@ class LuaObject(abc.ABC):
     def lua_set(self, name, value):
         """set the requested attribute
 
-            raise an AttributeError if not allowed
+            raise LuaAccessForbidden if not allowed
             this default implementation checks whether
             the name is present in self.set_allowed
         """
         if name not in self.set_allowed:
-            raise LuaAccessForbidden
+            raise LuaAccessForbidden(self, name)
         return setattr(self, name, value)
 
 
@@ -225,7 +225,7 @@ class LuaUIInteraction(LuaObject):
         """execute the registered UI action with the given ID"""
         try:
             self.ui_actions[action_id]()
-        except (lupa.LuaError, TypeError):
+        except (lupa.LuaError, LuaAccessForbidden, TypeError):
             traceback.print_exc()
 
 
