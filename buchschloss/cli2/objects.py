@@ -3,6 +3,7 @@
 import abc
 import functools
 import itertools
+import traceback
 import typing as T
 import warnings
 
@@ -170,13 +171,14 @@ class LuaDataNS(LuaObject):
 
 class LuaUIInteraction(LuaObject):
     """Provide Lua code a way to interact with the user interface"""
-    get_allowed = ('ask', 'alert', 'display', 'get_data', 'get_name')
+    get_allowed = ('ask', 'alert', 'display', 'get_data', 'get_name', 'register_action')
 
     def __init__(self, callbacks, script_prefix, **kwargs):
         """provide the callbacks and script-specific prefix for get_name"""
         super().__init__(**kwargs)
         self.script_prefix = script_prefix
         self.callbacks = callbacks
+        self.ui_actions = []
 
         if 'ask' not in callbacks:  # yes, after the assignment
             def ask(question):
@@ -184,6 +186,7 @@ class LuaUIInteraction(LuaObject):
                 return callbacks['get_data']((question, 'key', 'bool'))['key']
             callbacks['ask'] = ask
         callbacks.setdefault('alert', callbacks['display'])
+        callbacks.setdefault('register_action', lambda name, cb_id: None)
 
     @lupa.unpacks_lua_table_method
     def ask(self, question, *format_args, **format_kwargs):
@@ -211,6 +214,19 @@ class LuaUIInteraction(LuaObject):
         """provide access to utils.get_name from Lua code"""
         return (utils.get_name(self.script_prefix + internal)
                 .format(*format_args, **format_kwargs))
+
+    def register_action(self, name, callback):
+        """register a user action callback"""
+        self.ui_actions.append(callback)
+        safe_callback = functools.partial(self.execute_ui_action, len(self.ui_actions))
+        self.callbacks['register_action'](name, safe_callback)
+
+    def execute_ui_action(self, action_id):
+        """execute the registered UI action with the given ID"""
+        try:
+            self.ui_actions[action_id]()
+        except (lupa.LuaError, TypeError):
+            traceback.print_exc()
 
 
 class LuaBS4Interface(LuaObject):
