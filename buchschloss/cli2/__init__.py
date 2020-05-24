@@ -27,7 +27,7 @@ def data_to_table(runtime, data):
     if isinstance(data, T.Sequence):
         return runtime.table(*[data_to_table(runtime, d) for d in data])
     elif isinstance(data, T.Mapping):
-        return runtime.table(**{k: data_to_table(runtime, v) for k, v in data.items()})
+        return runtime.table_from({k: data_to_table(runtime, v) for k, v in data.items()})
     else:
         raise TypeError("can't handle '{}'".format(type(data)))
 
