@@ -11,10 +11,7 @@ function ActionNS_meta.__index(tbl, key)
     if val ~= nil then
         return val
     end
-    return new_data_ns(tbl.backend.view_ns(key),
-                       tbl.backend,
-                       (rawget(tbl, 'delegate') or {}),
-                       key)
+    return new_data_ns(tbl.backend, (rawget(tbl, 'delegate') or {}), key)
 end
 
 function ActionNS_meta.__call(tbl, query)
@@ -25,14 +22,18 @@ function ActionNS:new(options)
     return self.backend.new(options)
 end
 
-function new_data_ns(data_ns, backend, delegate, id)
+function new_data_ns(backend, delegate, id)
+    local data_ns
     local function index(tbl, key)
-        if delegate[key] then
+        if key == 'edit' or delegate[key] then
             return function(self, options)
                 table.insert(options, 1, id)
                 return backend[key](options)
             end
         else
+            if not data_ns then
+                data_ns = backend.view_ns(id)
+            end
             return data_ns[key]
         end
     end
@@ -41,8 +42,8 @@ end
 
 local Borrow = setmetatable({backend=buchschloss.Borrow}, ActionNS_meta)
 
-function Borrow:restitute(book, person)
-    return self.backend.restitute(book, person)
+function Borrow:restitute(options)
+    return self.backend.restitute(options)
 end
 
 return {
