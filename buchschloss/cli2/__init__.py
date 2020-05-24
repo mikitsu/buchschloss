@@ -144,6 +144,7 @@ def execute_script(code: str, login_context: core.LoginContext, **kwargs):
         rt.execute(code)
     except (lupa.LuaError, objects.LuaAccessForbidden):
         traceback.print_exc()
+    return table_to_data(rt.globals()['storage'])
 
 
 def start():
