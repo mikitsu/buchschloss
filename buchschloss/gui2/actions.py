@@ -416,3 +416,17 @@ def handle_cli2_get_data(data_spec):
         return mtkd.FormDialog.ask(main.app.root, form)
     except mtkd.UserExitedDialog:
         return None
+
+
+def handle_cli2_register_action(name, func):
+    """provide the register_callback callback"""
+    def wrapper():
+        try:
+            func()
+        except core.BuchSchlossBaseError as e:
+            show_BSE(e)
+    action_base = main.action_tree
+    *path, last = name.split(':')
+    for component in path:
+        action_base = getattr(action_base, component)
+    setattr(action_base, last, wrapper)

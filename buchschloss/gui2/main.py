@@ -272,4 +272,5 @@ core.Script.callbacks = {
     'alert': partial(tk_msg.showinfo, None),
     'display': actions.display_cli2_data,
     'get_data': actions.handle_cli2_get_data,
+    'register_action': actions.handle_cli2_register_action,
 }
