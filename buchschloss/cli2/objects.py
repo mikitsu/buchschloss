@@ -206,7 +206,8 @@ class LuaUIInteraction(LuaObject):
 
     def get_data(self, data_spec):
         """get input from the user. Includes acceptable types (int, str, bool)"""
-        data_spec = ((k, self.get_name(k), v) for k, v in cli2.table_to_data(data_spec))
+        data_spec = ((k, self.get_name(k), v) for k, v in
+                     cli2.table_to_data(data_spec).items())
         return cli2.data_to_table(self.runtime, self.callbacks['get_data'](data_spec))
 
     @lupa.unpacks_lua_table_method
@@ -217,8 +218,8 @@ class LuaUIInteraction(LuaObject):
 
     def register_action(self, name, callback):
         """register a user action callback"""
-        self.ui_actions.append(callback)
         safe_callback = functools.partial(self.execute_ui_action, len(self.ui_actions))
+        self.ui_actions.append(callback)
         self.callbacks['register_action'](self.get_name(name), safe_callback)
 
     def execute_ui_action(self, action_id):
