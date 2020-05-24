@@ -1,21 +1,23 @@
 --[[
 Leseclub management
 ]]--
--- TODO: add some kind off error handling
+-- TODO: add some kind of error handling
 
 local borrow_weeks = 2 -- TODO: provide config access
 
-local R = {}
+local storage = buchschloss.get_storage()
 
 function borrow()
     local data = ui.get_data{book='int', person='int'}
-    Borrow:new(data.book, data.person, borrow_weeks)
+    data.weeks = borrow_weeks
+    Borrow:new(data)
 end
 
 function restitute()
     local data = ui.get_data{book='int', person='int', points='int'}
-    local ret = Borrow:restitute(book, person)
-    storage.read_books[person] = (storage.read_books[person] or 0) + points
+    local ret = Borrow:restitute{book=data.book, person=data.person}
+    storage.read_books[person] = (storage.read_books[person] or 0) + data.points
+    buchschloss.set_storage(storage)
     ui.alert(ret)
 end
 
@@ -30,6 +32,8 @@ end
 function start_leseclub()
     storage.pending_borrows = {}
     storage.read_books = {}
+    buchschloss.set_storage(storage)
+    ui.alert('leseclub_started')
 end
 
 function end_leseclub()
@@ -38,13 +42,15 @@ function end_leseclub()
     end
     storage.pending_borrows = nil
     storage.read_books = nil
+    buchschloss.set_storage(storage)
+    ui.alert('leseclub_ended')
 end
 
 ui.register_action('borrow', borrow)
 ui.register_action('restitute', restitute)
-ui.register_action('get_results', get_results)
 if storage.pending_borrows and storage.read_books then
     ui.register_action('end_leseclub', end_leseclub)
+    ui.register_action('get_results', get_results)
 else if not (storage.pending_borrows or storage.read_books) then
     ui.register_action('start_leseclub', start_leseclub)
 else
