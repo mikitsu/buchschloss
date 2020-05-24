@@ -408,7 +408,7 @@ def handle_cli2_get_data(data_spec):
     }
     name_data = {}
     cls_body = {'get_name': name_data.__getitem__}
-    for name, k, v in data_spec:
+    for k, name, v in data_spec:
         cls_body[k] = mtkf.Element(type_widget_map[v])
         name_data[k] = name
     form = type('Cli2DataForm', (mtkf.Form,), cls_body)
