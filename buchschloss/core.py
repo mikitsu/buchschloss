@@ -1189,18 +1189,23 @@ class Script(ActionNamespace):
         script_lc = LoginType.SCRIPT(
             script_lc_level, name=script.name, invoker=login_context)
         get_name_prefix = 'script-data::{}::'.format(script.name)
-        script.storage = cli2.execute_script(
+        if ScriptPermissions.STORE in script.permissions:
+            edit_func = partial(Script.edit, script.name, login_context=internal_lc)
+            add_storage = (
+                lambda: Script.view_ns(script.name, login_context=login_context).storage,
+                lambda data: edit_func(storage=data),
+            )
+        else:
+            add_storage = None
+        cli2.execute_script(
             script.code,
             script_lc,
             add_ui=((cls.callbacks, get_name_prefix)
                     if cls.callbacks is not None
                     else None),
-            add_storage=(script.storage
-                         if ScriptPermissions.STORE in script.permissions
-                         else None),
+            add_storage=add_storage,
             add_requests=(ScriptPermissions.REQUESTS in script.permissions),
         )
-        script.save()
 
 
 def search(o: T.Type[models.Model], condition: T.Tuple = None,

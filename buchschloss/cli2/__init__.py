@@ -106,7 +106,8 @@ def prepare_runtime(login_context: core.LoginContext, *,
 
     Optional modifiers:
         ``add_ui`` may be (<dict of callbacks>, <script prefix for get_name>)
-        ``add_storage`` may be an object consisting of basic values, dicts and tuples/lists
+        ``add_storage`` may be (<getter>, <setter>).
+            The objects may consist of basic values, dicts and tuples/lists
         ``add_requests`` indicates whether the script may perform web requests
     """
     ans_extended_funcs = {
@@ -118,7 +119,8 @@ def prepare_runtime(login_context: core.LoginContext, *,
     # noinspection PyArgumentList
     runtime = lupa.LuaRuntime(attribute_handlers=(lua_get, lua_set))
     restrict_runtime(runtime, config.cli2.whitelist.mapping)
-    runtime.globals()['buchschloss'] = runtime.table_from({
+    g = runtime.globals()
+    g['buchschloss'] = runtime.table_from({
         k: objects.LuaActionNS(getattr(core, k),
                                login_context=login_context,
                                extra_get_allowed=ans_extended_funcs.get(k, ()),
@@ -126,13 +128,15 @@ def prepare_runtime(login_context: core.LoginContext, *,
         for k in 'Book Person Group Library Borrow Member Script'.split()
     })
     if add_ui:
-        runtime.globals()['ui'] = objects.LuaUIInteraction(*add_ui, runtime=runtime)
+        g['ui'] = objects.LuaUIInteraction(*add_ui, runtime=runtime)
     if add_storage is not None:
-        runtime.globals()['storage'] = data_to_table(runtime, add_storage)
+        getter, setter = add_storage
+        g['buchschloss']['get_storage'] = lambda: data_to_table(runtime, getter())
+        g['buchschloss']['set_storage'] = lambda d: setter(table_to_data(d))
     if add_requests:
-        runtime.globals()['requests'] = objects.LuaRequestsInterface(runtime=runtime)
+        g['requests'] = objects.LuaRequestsInterface(runtime=runtime)
     for k, v in dict(runtime.execute(BUILTINS_CODE)).items():
-        runtime.globals()[k] = v
+        g[k] = v
     return runtime
 
 
@@ -144,7 +148,6 @@ def execute_script(code: str, login_context: core.LoginContext, **kwargs):
         rt.execute(code)
     except (lupa.LuaError, objects.LuaAccessForbidden):
         traceback.print_exc()
-    return table_to_data(rt.globals()['storage'])
 
 
 def start():
