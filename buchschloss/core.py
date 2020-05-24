@@ -1176,7 +1176,7 @@ class Script(ActionNamespace):
         }
 
     @classmethod
-    @from_db(models.Script)
+    @from_db(script=models.Script)
     def execute(cls, script: T.Union[models.Script, str], *, login_context):
         """Execute a script"""
         # avoid problems with circular import
