@@ -49,4 +49,4 @@ else if not (storage.pending_borrows or storage.read_books) then
     ui.register_action('start_leseclub', start_leseclub)
 else
     error('storage corrupt')
-end
+end end
