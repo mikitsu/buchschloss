@@ -77,9 +77,8 @@ def test_specials(monkeypatch):
     monkeypatch.setitem(objects.LuaDataNS.specific_class, group_dummy, lambda *a, **kw: None)
     flag = object()
     rt = cli2.prepare_runtime(flag)
-    assert rt.eval('Borrow:restitute(123, 456)') == 'A4'
+    assert rt.eval('Borrow:restitute{123, 456}') == 'A4'
     assert borrow_dummy.calls['restitute'][0] == ((123, 456), {'login_context': flag})
     assert rt.eval('Group.g_name:activate{{"1", "2", "3"}, "dest"}') is None
-    assert group_dummy.calls['view_ns'][0] == (('g_name',), {'login_context': flag})
     assert (group_dummy.calls['activate'][0]
             == (('g_name', ['1', '2', '3'], 'dest'), {'login_context': flag}))

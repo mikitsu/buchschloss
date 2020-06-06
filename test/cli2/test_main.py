@@ -37,15 +37,18 @@ def test_table_conversion():
 def test_prepare_runtime():
     lc = core.LoginType.INTERNAL(5)
     rt = cli2.prepare_runtime(lc)
-    assert not set(rt.globals()) & {'ui', 'storage', 'requests'}
+    assert not set(rt.globals()) & {'ui', 'requests'}
+    def storage_setter(v): storage_setter.v = v  # noqa
     rt = cli2.prepare_runtime(
         lc,
         add_ui=({'display': lambda x: None}, 'prefix::'),
-        add_storage={'x': 123},
+        add_storage=(lambda: {'x': 123}, storage_setter),
         add_requests=True,
     )
-    assert len(set(rt.globals()) & {'ui', 'storage', 'requests'}) == 3
-    assert rt.eval('storage.x') == 123
+    assert len(set(rt.globals()) & {'ui', 'requests'}) == 2
+    assert rt.eval('buchschloss.get_storage().x') == 123
+    rt.execute('buchschloss.set_storage({a=1})')
+    assert storage_setter.v == {'a': 1}  # noqa
     assert isinstance(rt.globals()['ui'], objects.LuaUIInteraction)
     assert rt.globals()['ui'].runtime is rt
     assert isinstance(rt.globals()['requests'], objects.LuaRequestsInterface)
