@@ -752,6 +752,35 @@ def test_script_edit(db):
         script_edit('unknown', code='blah')
 
 
+def test_script_execute(db, monkeypatch):
+    """test Script.execute"""
+    script = models.Script.create(name='name', code='code', setlevel=None, storage={},
+                                  permissions=core.ScriptPermissions(0))
+    ctxt = core.LoginType.INTERNAL(0)
+    script_execute = partial(core.Script.execute, 'name', login_context=ctxt)
+    calls = []
+    monkeypatch.setattr('buchschloss.cli2.execute_script',
+                        lambda *a, **kw: calls.append(kw))
+    monkeypatch.setattr(core.Script, 'callbacks', 'cls-cb-flag')
+    script_execute(callbacks='callback-flag')
+    assert calls[-1].pop('add_ui') == ('callback-flag', 'script-data::name::')
+    script.permissions |= core.ScriptPermissions.REQUESTS
+    script.save()
+    script_execute()
+    assert calls[-1].pop('add_ui') == ('cls-cb-flag', 'script-data::name::')
+    script.permissions |= core.ScriptPermissions.STORE
+    script.save()
+    monkeypatch.setattr(core.Script, 'callbacks', None)
+    script_execute()
+    getter, setter = calls[-1].pop('add_storage')
+    assert callable(getter) and callable(setter)
+    assert calls == [
+        {'add_storage': None, 'add_requests': False},
+        {'add_storage': None, 'add_requests': True},
+        {'add_requests': True, 'add_ui': None},
+    ]
+
+
 def test_script_view_str(db):
     """test Script.view_str"""
     script = models.Script.create(name='name', code='code', setlevel=None, storage={},

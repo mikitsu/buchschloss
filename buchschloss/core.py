@@ -1177,7 +1177,8 @@ class Script(ActionNamespace):
 
     @classmethod
     @from_db(script=models.Script)
-    def execute(cls, script: T.Union[models.Script, str], *, login_context):
+    def execute(cls, script: T.Union[models.Script, str], *,
+                callbacks=None, login_context):
         """Execute a script"""
         # avoid problems with circular import
         # core -> cli2.__init__ -> cli2.objects -> core
@@ -1188,6 +1189,7 @@ class Script(ActionNamespace):
             script_lc_level = login_context.level
         script_lc = LoginType.SCRIPT(
             script_lc_level, name=script.name, invoker=login_context)
+        ui_callbacks = callbacks or cls.callbacks
         get_name_prefix = 'script-data::{}::'.format(script.name)
         if ScriptPermissions.STORE in script.permissions:
             edit_func = partial(Script.edit, script.name, login_context=internal_lc)
@@ -1200,9 +1202,7 @@ class Script(ActionNamespace):
         cli2.execute_script(
             script.code,
             script_lc,
-            add_ui=((cls.callbacks, get_name_prefix)
-                    if cls.callbacks is not None
-                    else None),
+            add_ui=(None if ui_callbacks is None else (ui_callbacks, get_name_prefix)),
             add_storage=add_storage,
             add_requests=(ScriptPermissions.REQUESTS in script.permissions),
         )
