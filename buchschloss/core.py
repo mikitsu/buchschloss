@@ -14,6 +14,7 @@ __all__ exports:
 """
 
 import inspect
+import string
 from hashlib import pbkdf2_hmac
 from functools import wraps, partial
 from datetime import timedelta, date
@@ -1111,8 +1112,7 @@ class Member(ActionNamespace):
 class Script(ActionNamespace):
     """namespace for Script-related functions"""
     model = models.Script
-    # I'll probably only ever use max. 2 of those, but why not reserve them all
-    reserved_chars = set('!"#$%&\'*+/:;<=>?@[\\]^`{|}~')
+    allowed_chars = set(string.ascii_letters + string.digits + ' _-')
     callbacks = None
 
     @classmethod
@@ -1129,9 +1129,9 @@ class Script(ActionNamespace):
         raise a BuchSchlossError if a script with the names name already exists
         see models.Script for details on arguments
         """
-        if cls.reserved_chars & set(name):
+        if not (name and set(name) <= cls.allowed_chars):
             raise ValueError("Name contains illegal characters {}"
-                             .format(''.join(cls.reserved_chars & set(name))))
+                             .format(''.join(set(name) - cls.allowed_chars)))
         try:
             new = models.Script.create(
                 name=name, code=code, setlevel=setlevel,
