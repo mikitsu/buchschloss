@@ -39,10 +39,26 @@ def is_optionlist(value, *options):
     return val
 
 
-def is_task_list(value, _tasks=('backup', 'ftp_backup', 'late_books', 'http_backup')):
-    """check whether the value is a list of tasks"""
-    # TODO: make ``_tasks`` a mapping directly to the functions
-    return validator.check('optionlist{}'.format(_tasks), value)
+def is_script_spec(value, with_time=False):
+    """check whether the value is syntactically a script spec and return components"""
+    spec_regex = r'^\s*(?P<name>[-\w ]+)(?:!(?P<type>py|cli2))?'
+    if with_time:
+        spec_regex += r'@(?P<time>\d+(?::\d+(?::\d+)?)?)'
+    spec_regex = re.compile(spec_regex + r'\s*$')
+    if isinstance(value, str):
+        value = value.split(',')
+    r = []
+    for v in value:
+        m = spec_regex.match(v)
+        if m is None:
+            raise validate.VdtValueError('"{}" is not a script spec'.format(v))
+        else:
+            script_data = m.groupdict()
+            script_data['type'] = script_data['type'] or 'cli2'
+            if 'invocation' in script_data:
+                script_data['invocation'] = is_timedelta(script_data['invocation'])
+            r.append(script_data)
+    return r
 
 
 def is_file(value):
@@ -83,7 +99,7 @@ def is_regex(value):
 validator = validate.Validator({
     'timedelta': is_timedelta,
     'optionlist': is_optionlist,
-    'task_list': is_task_list,
+    'script_spec': is_script_spec,
     'file': is_file,
     'base64bytes': is_base64bytes,
     'regex': is_regex,
