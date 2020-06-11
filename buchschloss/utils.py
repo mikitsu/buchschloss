@@ -1,7 +1,7 @@
 """Utilities. Mostly periodic checks. Everything that is neither core nor gui
 
 contents (for use):
-    - run() -- call once on startup. takes care of all automatic tasks
+    - get_runner() -- get a task running function
     - send_email() -- send an email
     - get_name() -- get a pretty name
     - get_book_data() -- attempt to get data about a book based on the ISBN
@@ -11,30 +11,19 @@ to add late handlers, append them to late_handlers.
 they will receive arguments as specified in late_books
 """
 
-import base64
 import collections
 import functools
 import operator
-import tempfile
 import email
 import smtplib
 import ssl
-from datetime import datetime, timedelta, date
+from datetime import datetime, date
 import time
-import threading
-import os
-import ftplib
-import ftputil
 import requests
 import logging
 import re
 import sched
 import bs4
-
-try:
-    from cryptography import fernet
-except ImportError:
-    fernet = None
 
 from buchschloss import core, config, py_scripts
 
@@ -77,96 +66,6 @@ def late_books():
             warn.append(b)
     for h in late_handlers:
         h(late, warn)
-
-
-def backup():
-    """Local backups.
-
-    Run backup_shift and copy "name" db to "name.1",
-    encrypting if a key is given in config
-    """
-    backup_shift(os, config.utils.tasks.backup_depth)
-    data = get_database_bytes()
-    with open(config.core.database_name + '.1', 'wb') as f:
-        f.write(data)
-
-
-def get_database_bytes():
-    """get the contents of the database file,
-        encrypted if a key is specified in config"""
-    with open(config.core.database_name, 'rb') as f:
-        plain = f.read()
-    if config.utils.tasks.secret_key is None:
-        return plain
-    if fernet is None:
-        raise RuntimeError('encryption requested, but no cryptography available')
-    key = base64.urlsafe_b64encode(config.utils.tasks.secret_key)
-    cipher = fernet.Fernet(key).encrypt(plain)
-    return base64.urlsafe_b64decode(cipher)
-
-
-def ftp_backup():
-    """Remote backups via FTP.
-
-    Run backup_shift and upload "name" DB as "name.1",
-    encrypted if a key is given in config
-    """
-    conf = config.utils
-    if conf.tasks.secret_key is None:
-        # get_database_bytes handles encryption,
-        # but this saves copying a file
-        upload_path = config.core.database_name
-        file = None
-    else:
-        file = tempfile.NamedTemporaryFile(delete=False)
-        file.write(get_database_bytes())
-        file.close()
-        upload_path = file.name
-
-    factory = ftplib.FTP_TLS if conf.ftp.tls else ftplib.FTP
-    # noinspection PyDeprecation
-    with ftputil.FTPHost(conf.ftp.host, conf.ftp.username, conf.ftp.password,
-                         session_factory=factory, use_list_a_option=False) as host:
-        backup_shift(host, conf.tasks.web_backup_depth)
-        host.upload(upload_path, config.core.database_name + '.1')
-    if file is not None:
-        os.unlink(file.name)
-
-
-def http_backup():
-    """remote backups via HTTP"""
-    conf = config.utils.http
-    data = get_database_bytes()
-    options: 'dict' = {}
-    if conf.Basic_authentication.username:
-        options['auth'] = (conf.Basic_authentication.username,
-                           conf.Basic_authentication.password)
-    if conf.POST_authentication.username or conf.POST_authentication.password:
-        options.setdefault('data', {})['username'] = conf.POST_authentication.username
-        options['data']['password'] = conf.POST_authentication.password
-    try:
-        r = requests.post(conf.url, files={conf.file_name: data}, **options)
-    except requests.RequestException as e:
-        logging.error('exception during HTTP request: ' + str(e))
-        return
-    if r.status_code != 200:
-        logging.error('received unexpected status code {} during HTTP backup'
-                      .format(r.status_code))
-
-
-def backup_shift(fs, depth):
-    """shift all name.number up one number to the given depth
-        in the given filesystem (os or remote FTP host)"""
-    number_name = lambda n: '.'.join((config.core.database_name, str(n)))  # noqa
-    try:
-        fs.remove(number_name(depth))
-    except FileNotFoundError:
-        pass
-    for f in range(depth, 1, -1):
-        try:
-            fs.rename(number_name(f - 1), number_name(f))
-        except FileNotFoundError:
-            pass
 
 
 def send_email(subject, text):
