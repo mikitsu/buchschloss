@@ -478,7 +478,27 @@ class ActionNamespace(abc.ABC):
                *,
                login_context
                ):
-        """search for records. see search for details on arguments"""
+        """search for records.
+
+        ``condition`` is a tuple of the form (<a>, <op>, <b>)
+            with <op> being a logical operation ("and" or "or") and <a>
+                and <b> in that case being condition tuples
+            or a comparison operation ("contains", "eq", "ne", "gt", "ge",
+                "lt" or "le")
+                in which case <a> is a (possibly dotted) string corresponding
+                to the attribute name and <b> is the value to compare to.
+            It (condition) may be empty, in which case it has no effect, i.e. is True
+                when used with an 'and' and False when used with an 'or'
+            If the top-level condition is empty, all existing values are returned
+        ``complex_params`` is a sequence of ComplexSearch instances to apply after
+            executing the SQL SELECT
+        ``complex_action`` is "and" or "or" and specifies how to handle multiple
+            complex cases. If finer granularity is needed, it can be achieved with
+            bitwise operators, providing bools are used.
+
+        Note: for ``condition``, there is no "not" available.
+            Use the inverse comparision operator instead
+        """
         check_level(login_context, cls.view_level, cls.__name__ + '.search')
         return search(cls.model, condition, *complex_params,
                       complex_action=complex_action)
@@ -1101,29 +1121,7 @@ class Member(ActionNamespace):
 def search(o: T.Type[models.Model], condition: T.Tuple = None,
            *complex_params: 'ComplexSearch', complex_action: str = 'or',
            ):
-    """THIS IS AN INTERNAL FUNCTION -- for user searches, use *.search
-
-        Search for objects.
-
-        `condition` is a tuple of the form (<a>, <op>, <b>)
-            with <op> being a logical operation ("and" or "or") and <a>
-                and <b> in that case being condition tuples
-            or a comparison operation ("contains", "eq", "ne", "gt", "ge",
-                "lt" or "le")
-                in which case <a> is a (possibly dotted) string corresponding
-                to the attribute name and <b> is the model to compare to.
-            It may be empty, in which case it has no effect, i.e. is True
-                when used with an 'and' and False when used with an 'or'
-            If the top-level condition is empty, all existing values are returned
-        `complex_params` is a sequence of ComplexSearch instances to apply after
-            executing the SQL SELECT
-        `complex_action` is "and" or "or" and specifies how to handle multiple
-            complex cases. If finer granularity is needed, it can be achieved with
-            bitwise operators, providing bools are used.
-
-        Note: for `condition`, there is no "not" available.
-            Use the inverse comparision operator instead
-    """
+    """Search for objects. See ActionNamespace.search for details"""
 
     def follow_path(path, q):
         def handle_many_to_many():
