@@ -6,14 +6,16 @@ import enum
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import forms as mtkf
 
-from buchschloss import config
-from buchschloss.utils import get_name
+from .. import config
+from .. import core
+from .. import utils
+from ..utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
-                      IntEntry, NullREntry, ListEntry, ListREntry,
+                      IntEntry, NullREntry, ListEntry,
                       IntListEntry, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
-                      SeriesEntry)
+                      SeriesEntry, OptionsFromSearch, SearchMultiChoice)
 
 
 class ElementGroup(enum.Enum):
@@ -27,6 +29,7 @@ class GroupElement:
     ONLY_EDIT = mtkf.Element(groups=[ElementGroup.EDIT], opt='in')
     ONLY_NEW = mtkf.Element(groups=[ElementGroup.NEW], opt='in')
     NO_SEARCH = mtkf.Element(groups=[ElementGroup.SEARCH])
+    ONLY_SEARCH = mtkf.Element(groups=[ElementGroup.SEARCH], opt="in")
 
 
 class PasswordFormWidget(mtkf.FormWidget):
@@ -36,24 +39,55 @@ class PasswordFormWidget(mtkf.FormWidget):
     def clean_data(self):
         super().clean_data()
         if self.data[self.password_name] != self.data[self.password2_name]:
-            self.errors[self.password2_name].add(get_name('error_password_match'))
+            self.errors[self.password2_name].add(get_name('error::no_password_match'))
             self.widget_dict[self.password_name].delete(0, tk.END)
             self.widget_dict[self.password2_name].delete(0, tk.END)
         del self.data[self.password2_name]
 
 
+def form_get_name(form_name):
+    """adapt utils.get_name to forms"""
+    def inner(name):
+        """adapt utils.get_name to forms"""
+        if name.endswith('_search_alt'):
+            name = name[:-len('_search_alt')]
+        return get_name('::'.join(('form', form_name, name)))
+    return inner
+
+
 class BaseForm(mtkf.Form, template=True):
+    """Base class for forms.
+
+        handles autocompletes and appropriate get_name handling
+    """
+    def __init_subclass__(cls, *, template=None, **kwargs):
+        form_name = cls.__name__.replace('Form', '')
+        cls.get_name = form_get_name(form_name)
+        autocompletes = config.gui2.get('autocomplete').get(form_name)
+        for k, v in vars(cls).items():
+            if isinstance(v, tuple) and len(v) == 2:
+                c, o = v
+            else:
+                c = v
+                o = {}
+            if isinstance(c, type) and issubclass(c, tk.Entry):
+                values = autocompletes.get(k).mapping
+                if values:
+                    c = type('Autocompleted' + c.__name__, (mtk.AutocompleteEntry, c), {})
+                    o['autocompletes'] = values
+                    setattr(cls, k, (c, o))
+        super().__init_subclass__(template=template, **kwargs)
+
     class FormWidget:
         take_focus = True
-        submit_on_return = mtkf.FormWidget.SubmitOnReturn.ALL
+        submit_on_return = mtkf.FormWidget.SubmitOnReturn.NOT_FIRST
         submit_button = {'text': get_name('btn_do')}
         # workaround, this isn't needed if we decide to update misc
         error_display_options = {'popup_field_name_resolver': get_name}
 
-    get_name = get_name
 
-
-class SearchableForm(BaseForm, template=True):
+class SearchForm(BaseForm, template=True):
+    """Base class for forms that offer search functionality"""
     class FormWidget(mtkf.FormWidget):
         def submit_action(self, event=None):
             if 'search_mode' in self.widget_dict:
@@ -65,15 +99,20 @@ class SearchableForm(BaseForm, template=True):
                     if not (value or isinstance(value, bool)
                             or k in ['exact_match', 'search_mode']):
                         w.remove(self.widget_dict.pop(k))
+                        continue
+                    if k.endswith('_search_alt'):
+                        del self.widget_dict[k]
+                        k = k[:-len('_search_alt')]
+                        self.widget_dict[k] = v
                 self.widgets = tuple(w)
             super().submit_action(event)
 
-    search_mode: mtkf.Element(groups=[ElementGroup.SEARCH], opt="in") = (
+    search_mode: GroupElement.ONLY_SEARCH = (
         mtk.RadioChoiceWidget, {'*args': [(c, get_name(c)) for c in ['and', 'or']]})
-    exact_match: mtkf.Element(groups=[ElementGroup.SEARCH], opt='in') = CheckbuttonWithVar
+    exact_match: GroupElement.ONLY_SEARCH = CheckbuttonWithVar
 
 
-class BookForm(SearchableForm):
+class BookForm(SearchForm):
     class FormWidget(mtkf.FormWidget):
         default_content = config.gui2.get('entry defaults').get('Book').mapping
 
@@ -85,10 +124,16 @@ class BookForm(SearchableForm):
         def clean_data(self):
             """separate series and series_number"""
             super().clean_data()
+            if 'series' not in self.data:  # search may remove things
+                del self.data['series_number']
+                return
             if self.data['series'] is None:
                 self.data['series_number'] = None
             else:
                 self.data['series'], self.data['series_number'] = self.data['series']
+            # TODO: remove this ASAP
+            if 'search_mode' in self.widget_dict and self.data['series_number'] is None:
+                del self.data['series_number']
 
     id: GroupElement.ONLY_EDIT = IntEntry
 
@@ -96,34 +141,30 @@ class BookForm(SearchableForm):
     author: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-author'})
     title: mtkf.Element = NonEmptyEntry
     series: mtkf.Element = SeriesEntry
-    language: mtkf.Element = NonEmptyEntry
-    publisher: mtkf.Element = NonEmptyEntry
+    language: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-language'})
+    publisher: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-publisher'})
     concerned_people: mtkf.Element = (NullREntry, {'rem_key': 'book-cpeople'})
     year: mtkf.Element = IntEntry
-    medium: mtkf.Element = NonEmptyEntry
+    medium: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-medium'})
     genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
 
-    library: mtkf.Element = NonEmptyEntry
-    groups: mtkf.Element = (ListREntry, {'rem_key': 'book-groups'})
+    library: GroupElement.NO_SEARCH = (OptionsFromSearch, {'action_ns': core.Library})
+    library_search_alt: GroupElement.ONLY_SEARCH = (
+        OptionsFromSearch, {'action_ns': core.Library, 'allow_none': True})
+    groups: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Group})
     shelf: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-shelf'})
 
 
-class PersonForm(SearchableForm):
+class PersonForm(SearchForm):
     class FormWidget:
         default_content = config.gui2.get('entry defaults').get('Person').mapping
 
-    def get_name(name: str):
-        if name == 'id':
-            return get_name('s_nr')
-        else:
-            return get_name(name)
-
-    id: GroupElement.NO_SEARCH = IntEntry
+    id_: GroupElement.NO_SEARCH = IntEntry
     first_name: mtkf.Element = NonEmptyEntry
     last_name: mtkf.Element = NonEmptyEntry
     class_: mtkf.Element = ClassEntry
     max_borrow: mtkf.Element = IntEntry
-    libraries: mtkf.Element = ListEntry
+    libraries: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
     pay: GroupElement.NO_SEARCH = CheckbuttonWithVar
 
 
@@ -132,14 +173,14 @@ class MemberForm(BaseForm):
         def clean_data(self):
             try:
                 super().clean_data()
-            except KeyError as e:
+            except KeyError:
                 pass
             if 'edit_password_button' in self.data:
                 del self.data['edit_password_button']
 
     name: mtkf.Element = NonEmptyEntry
     level: mtkf.Element = (mtk.OptionChoiceWidget,
-                           {'values': get_name('level_list'),
+                           {'values': utils.get_level(),
                             'default': 1})
     current_password: mtkf.Element = NonEmptyPasswordEntry
     password: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
@@ -166,8 +207,9 @@ class LibraryGroupCommon(BaseForm, template=True):
     name: mtkf.Element = NonEmptyEntry
     books: mtkf.Element = IntListEntry
     # not as element to allow Library to have a nice order
-    action = (mtk.RadioChoiceWidget, {'*args': [(a, get_name(a)) for a in
-                                                ['add', 'remove', 'delete']]})
+    action = (mtk.RadioChoiceWidget, {
+        '*args': [(a, get_name('form::LibraryGroupCommon' + a))
+                  for a in ['add', 'remove', 'delete']]})
 
 
 class GroupForm(LibraryGroupCommon):
@@ -184,9 +226,9 @@ class LibraryForm(LibraryGroupCommon):
 
 
 class GroupActivationForm(BaseForm):
-    name: mtkf.Element = NonEmptyEntry
-    src: mtkf.Element = ListEntry
-    dest: mtkf.Element = Entry
+    name: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Group})
+    src: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
+    dest: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
 
 
 class BorrowRestCommonForm(BaseForm, template=True):
@@ -203,21 +245,21 @@ class BorrowRestCommonForm(BaseForm, template=True):
 
 class BorrowForm(BorrowRestCommonForm):
     class FormWidget:
-        default_content = {'borrow_time': '4'}
+        default_content = {'weeks': '4'}
 
-    borrow_time: mtkf.Element = IntEntry
+    weeks: mtkf.Element = IntEntry
 
 
 class RestituteForm(BorrowRestCommonForm):
     pass
 
 
-class BorrowSearchForm(SearchableForm):
+class BorrowSearchForm(SearchForm):
     book__id: mtkf.Element = IntEntry
     book__library: mtkf.Element = Entry
     book__groups: mtkf.Element = Entry
 
-    person__s_nr: mtkf.Element = IntEntry
+    person__id: mtkf.Element = IntEntry
     person__first_name: mtkf.Element = Entry
     person__last_name: mtkf.Element = Entry
     person__class_: mtkf.Element = ClassEntry

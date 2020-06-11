@@ -53,10 +53,12 @@ class FormWidget(mtk.ContainingWidget):
             NONE: do not bind
             LAST: bind to the last form element
             ALL: bind to all form elements
+            NOT_FIRST: bind to all form elements except the first
         """
         NONE = enum.auto()
         LAST = enum.auto()
         ALL = enum.auto()
+        NOT_FIRST = enum.auto()
 
     def __init__(self, master, *widgets,
                  error_handle=ErrorHandle.LABEL | ErrorHandle.POPUP,
@@ -94,14 +96,16 @@ class FormWidget(mtk.ContainingWidget):
             `default_content` is a mapping from field names to
                 their default content for this form. The fields must
                 have a setting method recognized by misc.tkstuff.get_setter.
+                Nonexistent fields are ignored
             `take_focus` specifies if the first form element should take focus
-            `submit_on_return` is an element of FormWIdget.SubmitOnReturn.
-                see its __doc__ for destails
+            `submit_on_return` is an element of FormWidget.SubmitOnReturn.
+                see its __doc__ for details
             `container_options` are passed along to ContainingWidget
 
             By default, the direction for the ContainingWidget is set to `tk.BOTTOM`
 
-            See ContainingWidget.__init__ for more detais"""
+            See ContainingWidget.__init__ for more details
+        """
         self.ERROR_LABEL_ID = object()
         self.error_handle = error_handle
         self.onsubmit = onsubmit
@@ -132,12 +136,15 @@ class FormWidget(mtk.ContainingWidget):
         super().__init__(master, *pass_widgets, **options)
         self.widget_dict = {k: w for k, w in zip(widget_keys, self.widgets)}
 
-        for k, v in default_content.items():
-            mtk.get_setter(self.widget_dict[k])(v)
+        for k in default_content.keys() & self.widget_dict.keys():
+            mtk.get_setter(self.widget_dict[k])(default_content[k])
         if submit_on_return is FormWidget.SubmitOnReturn.LAST:
             self.widgets[-1].bind('<Return>', self.submit_action)
         elif submit_on_return is FormWidget.SubmitOnReturn.ALL:
             for w in self.widgets:
+                w.bind('<Return>', self.submit_action)
+        elif submit_on_return is FormWidget.SubmitOnReturn.NOT_FIRST:
+            for w in self.widgets[1:]:
                 w.bind('<Return>', self.submit_action)
         if take_focus:
             self.widgets[0].focus()
