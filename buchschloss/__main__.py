@@ -24,6 +24,6 @@ except ImportError:
 
 if args.do_tasks:
     from . import utils
-    Thread(target=utils.run).start()
+    Thread(target=utils.get_runner()).start()
 mod.start()
 sys.exit()

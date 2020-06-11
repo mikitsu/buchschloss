@@ -5,21 +5,7 @@ from functools import partial
 
 import pytest
 
-from buchschloss import config
-
-config.core.mapping['database name'] = ':memory:'
-
-from buchschloss import core, models, utils  # noqa
-
-
-@pytest.fixture
-def db():
-    """bind the models to the test database"""
-    # since in-memory databases clear data when closing,
-    # we don't need an explicit drop_tables
-    models.db.create_tables(models.models)
-    with models.db:
-        yield
+from buchschloss import config, core, models, utils
 
 
 def create_book(library='main', **options):
@@ -626,7 +612,6 @@ def test_borrow_new(db):
         b.is_back = True
         b.save()
 
-    models.Misc.create(pk='latest_borrowers', data=[])
     models.Library.create(name='main')
     test_lib = models.Library.create(name='test-lib')
     models.Library.create(name='no-pay', pay_required=False)

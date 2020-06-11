@@ -12,6 +12,7 @@ they will receive arguments as specified in late_books
 """
 
 import base64
+import collections
 import functools
 import operator
 import tempfile
@@ -27,6 +28,7 @@ import ftputil
 import requests
 import logging
 import re
+import sched
 import bs4
 
 try:
@@ -34,7 +36,7 @@ try:
 except ImportError:
     fernet = None
 
-from buchschloss import core, config
+from buchschloss import core, config, py_scripts
 
 
 class FormattedDate(date):
@@ -54,16 +56,6 @@ class FormattedDate(date):
     def todate(self):
         """transform self to a datetime.date"""
         return date(self.year, self.month, self.day)
-
-
-def run_checks():
-    """Run stuff to do as specified by times set in config"""
-    while True:
-        if datetime.now() > core.misc_data.check_date + timedelta(minutes=45):
-            for stuff in stuff_to_do:
-                threading.Thread(target=stuff).start()
-            core.misc_data.check_date = datetime.now() + config.utils.tasks.repeat_every
-        time.sleep(5 * 60 * 60)
 
 
 def late_books():
@@ -320,11 +312,51 @@ def get_book_data(isbn: int):
     return results
 
 
-def run():
-    """handling function."""
-    for k in config.utils.tasks.startup:
-        threading.Thread(target=globals()[k], daemon=True).start()
-    threading.Thread(target=run_checks, daemon=True).start()
+def get_script_target(spec, *, ui_callbacks=None, login_context):
+    """get a script target function"""
+    if spec['type'] == 'py':
+        if spec['name'] in py_scripts.__all__:
+            return functools.partial(getattr(py_scripts, spec['name']),
+                                     callbacks=ui_callbacks,
+                                     login_context=login_context)
+        return functools.partial(logging.error, 'no such script: {}!py'.format(spec['name']))
+    elif spec['type'] == 'cli2':
+        def target(_name=spec['name']):
+            try:
+                core.Script.execute(
+                    _name, callbacks=ui_callbacks, login_context=login_context)
+            except Exception as e:
+                logging.error('error while executing script {}!cli2: {}'.format(_name, e))
+        return target
+    else:
+        raise AssertionError("spec['type'] == {0[type]!r} not in ('py', 'cli2')"
+                             .format(spec))
+
+
+def get_runner():
+    """return a function that runs all startup tasks and schedules repeating tasks"""
+    scheduler = sched.scheduler(timefunc=time.time)
+    for spec in config.scripts.startup:
+        scheduler.enter(0, 0, get_script_target(spec, login_context=core.internal_lc))
+
+    last_invocations = collections.defaultdict(
+        lambda: datetime.fromtimestamp(0), core.misc_data.last_script_invocations)
+    for spec in config.scripts.repeating:
+        target = get_script_target(spec, login_context=core.internal_lc)
+        script_id = '{0[name]}!{0[type]}'.format(spec)
+        invoke_time: datetime = last_invocations[script_id] + spec['invocation']
+
+        def target_wrapper(_f, _t=target, _id=script_id, _delay=spec['invocation'].total_seconds()):
+            _t()
+            last_invs = core.misc_data.last_script_invocations
+            last_invs[_id] = datetime.now()
+            core.misc_data.last_script_invocations = last_invs
+            scheduler.enter(_delay, 0, functools.partial(_f, _f))
+
+        scheduler.enterabs(invoke_time.timestamp(), 0,
+                           functools.partial(target_wrapper, target_wrapper))
+
+    return scheduler.run
 
 
 def _default_late_handler(late, warn):
@@ -337,5 +369,10 @@ def _default_late_handler(late, warn):
         f.write('\n'.join(str(w) for w in warn))
 
 
+def run_ui_scripts(callbacks):
+    """run the UI scripts specified in the config file"""
+    for spec in config.scripts.ui:
+        get_script_target(spec, ui_callbacks=callbacks, login_context=core.internal_lc)()
+
+
 late_handlers = [_default_late_handler]
-stuff_to_do = [globals()[k] for k in config.utils.tasks.recurring]

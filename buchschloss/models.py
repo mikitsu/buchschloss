@@ -270,7 +270,7 @@ if __name__ == '__main__':
         sys.exit()
     db.create_tables(models)
     print('created tables...')
-    Misc.create(pk='check_date', data=datetime.datetime.now())
+    Misc.create(pk='last_script_invocations', data={})
     Misc.create(pk='latest_borrowers', data=[])
     Member.create(name='SAdmin',
                   password=b'\xd2Kf\xef#o\xba\xe2\x84i\x896\x13\x99\x80\x94P\xd4'
