@@ -203,7 +203,12 @@
   },
   "script-data": {
     "leseclub": {
-      "really_end_leseclub": "Do you really want to ent the LeseClub?"
+      "really_end_leseclub": "Do you really want to end the LeseClub? All related data will be deleted and you will not ba able to retrieve results.",
+      "borrow":  "leseclub:borrow",
+      "restitute": "leseclub:restitute",
+      "get_results": "leseclub:results",
+      "end_leseclub": "leseclub:end",
+      "start_leseclub": "leseclub:start"
     }
   }
 }
