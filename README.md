@@ -40,13 +40,13 @@ The actual files are in the ``buchschloss`` directory. Inside, there is:
     - ``__init__.py`` glue
 - ``cli2/`` work in progress
 
-### <del>Documentation</del> <small>TODO</small>
+### Documentation
 
-Currently, old documentation specific to my setup in German for the user interfaces is available in LaTeX.
-The code is documented in docstrings. I hope to write easy-to-find documentation sometime in the future
+I am more-or-less in the process of documenting the internal parts (see ``doc/``).
+
 
 ### Tests
 
-As of now, only some basic functions are tested. I will try to add relevant tests whenever I change something.
-
-### 
+As of now, only some basic functions are tested, 
+notably excluding (in the sense of not being tested) the GUI.
+I will try to add relevant tests whenever I change something.
