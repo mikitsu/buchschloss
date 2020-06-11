@@ -8,8 +8,8 @@ Introduction
 This document explains the internal structure. It aims to give an overview of
 the whole program and specifically of the API required for writing a UI.
 
-Note on books, Books and ``Book``s
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Note on books, Books and ``Book`` s
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When capitalized, Book, Person, Library etc. will refer to the program's representation
 of their real-world counterparts (written in lower case). When referring to variables,
@@ -32,16 +32,15 @@ BuchSchloss includes the following submodules:
     It is a very thin layer above the ``core`` API
 - ``gui2`` provides the only (and ugly) graphical user interface.
     It provides more abstraction that ``cli`` and seems to be easier to use.
-- ``cli2`` was ment to be a better command-line interface and has morphed
+- ``cli2`` was meant to be a better command-line interface and has morphed
     into scriptability for BuchSchloss using Lua_. I am still developing it
     in cli2-lua_, so I won't discuss it here.
 - ``misc`` is just a copy of my misc_ project. I should probably include it
-    as a `git submodule`_ when I find some time.
+    as a git submodule when I find some time.
 
-.. _Lua: https://lua.org
+.. _Lua: https://www.lua.org
 .. _cli2-lua: https://github.com/mik2k2/buchschloss/tree/cli2-lua
 .. _misc: https://github.com/mik2k2/misc
-.. _git submodule: https://git-scm.com/book/en/v2/Git-Tools-Submodules
 
 Generally, ``__main__.py`` loads a UI, which then imports ``core`` to actually do stuff.
 Note that circular imports are used quite a lot (I have no idea on how to change
@@ -93,7 +92,7 @@ data types have specific functions. Every function also takes a keyword-only
 ``login_context`` argument that will not be listed here. See the section on permissions
 and authentication/authorization for more information on it.
 
-The data type independent interface for all ``ActionNamespace``s is:
+The data type independent interface for all ``ActionNamespace`` s is:
 
 - ``view_ns(id, /)`` for getting a namespace with all data saved about a specific instance.
 - ``view_str(id, /)`` for getting a dictionary with string keys and string values
@@ -111,7 +110,7 @@ and ``Member.change_password``.
 
 Next to the action namespaces, the ``core`` module exposes the ``login`` function
 for Members (not in the ``Member`` namespace) and ``BuchSchlossBaseError`` for
-errors. Every UI should catch ``BuchSchlossBaseError``s and display them to the
+errors. Every UI should catch ``BuchSchlossBaseError`` s and display them to the
 user in some way.
 
 permissions, authentication and authorization
