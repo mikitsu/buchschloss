@@ -79,5 +79,3 @@ def test_script_exec(db, monkeypatch):
     runner(False)
     assert invokes == {'test_3'}
     invokes.clear()
-    utils.run_ui_scripts(callbacks=callbacks)
-    assert invokes == {utils.get_name('script-data::test-1::it works')}

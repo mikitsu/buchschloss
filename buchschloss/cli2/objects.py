@@ -171,7 +171,7 @@ class LuaDataNS(LuaObject):
 
 class LuaUIInteraction(LuaObject):
     """Provide Lua code a way to interact with the user interface"""
-    get_allowed = ('ask', 'alert', 'display', 'get_data', 'get_name', 'register_action')
+    get_allowed = ('ask', 'alert', 'display', 'get_data', 'get_name')
 
     def __init__(self, callbacks, script_prefix, **kwargs):
         """provide the callbacks and script-specific prefix for get_name"""
@@ -215,19 +215,6 @@ class LuaUIInteraction(LuaObject):
         """provide access to utils.get_name from Lua code"""
         return (utils.get_name(self.script_prefix + internal)
                 .format(*format_args, **format_kwargs))
-
-    def register_action(self, name, callback):
-        """register a user action callback"""
-        safe_callback = functools.partial(self.execute_ui_action, len(self.ui_actions))
-        self.ui_actions.append(callback)
-        self.callbacks['register_action'](self.get_name(name), safe_callback)
-
-    def execute_ui_action(self, action_id):
-        """execute the registered UI action with the given ID"""
-        try:
-            self.ui_actions[action_id]()
-        except (lupa.LuaError, LuaAccessForbidden, TypeError):
-            traceback.print_exc()
 
 
 class LuaBS4Interface(LuaObject):

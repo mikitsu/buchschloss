@@ -268,10 +268,4 @@ def _default_late_handler(late, warn):
         f.write('\n'.join(str(w) for w in warn))
 
 
-def run_ui_scripts(callbacks):
-    """run the UI scripts specified in the config file"""
-    for spec in config.scripts.ui:
-        get_script_target(spec, ui_callbacks=callbacks, login_context=core.internal_lc)()
-
-
 late_handlers = [_default_late_handler]
