@@ -101,7 +101,7 @@ def restrict_runtime(runtime, whitelist):
 
 
 def prepare_runtime(login_context: core.LoginContext, *,
-                    add_ui=None, add_storage=None, add_requests=False):
+                    add_ui=None, add_storage=None, add_requests=False, add_config=None):
     """create and initialize a new Lua runtime
 
     Optional modifiers:
@@ -109,6 +109,8 @@ def prepare_runtime(login_context: core.LoginContext, *,
         ``add_storage`` may be (<getter>, <setter>).
             The objects may consist of basic values, dicts and tuples/lists
         ``add_requests`` indicates whether the script may perform web requests
+        ``add_config`` may be a combination of basic values, dicts
+            and tuples/lists. It will be assigned to a global variable
     """
     ans_extended_funcs = {
         'Group': ('activate',),
@@ -135,6 +137,8 @@ def prepare_runtime(login_context: core.LoginContext, *,
         g['buchschloss']['set_storage'] = lambda d: setter(table_to_data(d))
     if add_requests:
         g['requests'] = objects.LuaRequestsInterface(runtime=runtime)
+    if add_config is not None:
+        g['config'] = data_to_table(runtime, add_config)
     for k, v in dict(runtime.execute(BUILTINS_CODE)).items():
         g[k] = v
     return runtime

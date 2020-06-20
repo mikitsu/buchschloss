@@ -1191,6 +1191,7 @@ class Script(ActionNamespace):
             script_lc_level, name=script.name, invoker=login_context)
         ui_callbacks = callbacks or cls.callbacks
         get_name_prefix = 'script-data::{}::'.format(script.name)
+        script_config = config.scripts.cli2.get(script.name).mapping
         if ScriptPermissions.STORE in script.permissions:
             edit_func = partial(Script.edit, script.name, login_context=internal_lc)
             add_storage = (
@@ -1205,6 +1206,7 @@ class Script(ActionNamespace):
             add_ui=(None if ui_callbacks is None else (ui_callbacks, get_name_prefix)),
             add_storage=add_storage,
             add_requests=(ScriptPermissions.REQUESTS in script.permissions),
+            add_config=script_config,
         )
 
 

@@ -747,6 +747,7 @@ def test_script_execute(db, monkeypatch):
     monkeypatch.setattr('buchschloss.cli2.execute_script',
                         lambda *a, **kw: calls.append(kw))
     monkeypatch.setattr(core.Script, 'callbacks', 'cls-cb-flag')
+    monkeypatch.setitem(config.scripts.cli2.mapping, 'name', {'key': 'value'})
     script_execute(callbacks='callback-flag')
     assert calls[-1].pop('add_ui') == ('callback-flag', 'script-data::name::')
     script.permissions |= core.ScriptPermissions.REQUESTS
@@ -756,13 +757,14 @@ def test_script_execute(db, monkeypatch):
     script.permissions |= core.ScriptPermissions.STORE
     script.save()
     monkeypatch.setattr(core.Script, 'callbacks', None)
+    monkeypatch.delitem(config.scripts.cli2.mapping, 'name')
     script_execute()
     getter, setter = calls[-1].pop('add_storage')
     assert callable(getter) and callable(setter)
     assert calls == [
-        {'add_storage': None, 'add_requests': False},
-        {'add_storage': None, 'add_requests': True},
-        {'add_requests': True, 'add_ui': None},
+        {'add_storage': None, 'add_requests': False, 'add_config': {'key': 'value'}},
+        {'add_storage': None, 'add_requests': True, 'add_config': {'key': 'value'}},
+        {'add_requests': True, 'add_ui': None, 'add_config': {}},
     ]
 
 
