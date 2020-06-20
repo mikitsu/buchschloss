@@ -5,7 +5,6 @@ import datetime
 import json
 import contextlib
 from collections.abc import Mapping
-import pprint
 import typing as T
 
 import configobj
@@ -16,7 +15,6 @@ CONFIG_FILE_ENV = 'BUCHSCHLOSS_CONFIG'
 MODULE_DIR = os.path.dirname(__file__)
 INCLUDE_NAME = 'include'  # I'd love to make this configurable...
 UI_SECTIONS = ('cli', 'gui2')
-config_data = None
 ExceptSpec = T.Union[T.Type[BaseException], T.Tuple[T.Type[BaseException], ...]]
 ActuallyPathLike = T.Union[bytes, str, os.PathLike]
 
@@ -179,7 +177,7 @@ def get_config():
 
 def config_error(error_spec, invalid_files):
     """print error information to STDERR"""
-    def pprint_errors(errors, nesting=' '):
+    def pprint_errors(errors, nesting=''):
         """display errors"""
         for k, v in errors.items():
             if isinstance(v, dict):
@@ -238,4 +236,9 @@ def redirect_stderr(config):
 
 
 pre_validation = [merge_ui]
-post_validation = (insert_name_data, apply_ui_intro_text_default, check_smtp_auth_data)
+post_validation = (
+    insert_name_data,
+    apply_ui_intro_text_default,
+    check_smtp_auth_data,
+    redirect_stderr,
+)

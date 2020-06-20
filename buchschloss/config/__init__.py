@@ -7,7 +7,7 @@ _config_data = _main.get_config()
 
 
 def start():
-    """load config data and provide feedback to STDOUT"""
+    """provide config feedback to STDOUT"""
     print('No configuration errors found.')
     if (_config_data['debug']
             and input('Do you want to see the current settings? ')
