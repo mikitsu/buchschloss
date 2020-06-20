@@ -3,7 +3,7 @@ Leseclub management
 ]]--
 -- TODO: add some kind of error handling
 
-local borrow_weeks = 2 -- TODO: provide config access
+local borrow_weeks = config['borrow weeks']
 
 local storage = buchschloss.get_storage()
 

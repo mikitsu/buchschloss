@@ -22,7 +22,7 @@ def local_backup():
     Then copy the current database to <DB name>.1,
     encrypting if encryption is enabled
     """
-    conf = config.scripts.script_config.local_backup
+    conf = config.scripts.python.local_backup
 
     number_name = lambda n: '.'.join((config.core.database_name, str(n)))  # noqa
     try:
@@ -55,7 +55,7 @@ def get_database_bytes(key):
 
 def http_backup():
     """remote backups via HTTP"""
-    conf = config.scripts.script_config.http_backup
+    conf = config.scripts.python.http_backup
     data = get_database_bytes(conf.secret_key)
     options: 'dict' = {}
     if conf.Basic_authentication.username:
