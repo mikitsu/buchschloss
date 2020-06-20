@@ -1,5 +1,5 @@
 """CLI for buchschloss"""
-
+import collections
 import shlex
 import argparse
 import ast
@@ -62,7 +62,8 @@ def execute(command, args, kwargs):
         display encountered errors
     """
     func = COMMANDS[command]
-    kwargs['login_context'] = current_login
+    if command in EXTERNAL_COMMANDS:
+        kwargs['login_context'] = current_login
     try:
         f_args = inspect.signature(func).parameters.keys()
     except (TypeError, ValueError):
@@ -267,9 +268,7 @@ def foreach(iterable):
             handle_user_input(ui)
 
 
-COMMANDS = {
-    'login': login,
-    'logout': logout,
+EXTERNAL_COMMANDS = {
     'new_person': core.Person.new,
     'edit_person': core.Person.edit,
     'view_person': core.Person.view_str,
@@ -292,6 +291,10 @@ COMMANDS = {
     'restitute': core.Borrow.restitute,
     'view_borrow': core.Borrow.view_str,
     'search_borrow': core.Borrow.search,
+}
+INTERNAL_COMMANDS = {
+    'login': login,
+    'logout': logout,
     'help': help,
     'list': lambda x: tuple(x),
     'build_list': lambda *a: a,
@@ -303,6 +306,7 @@ COMMANDS = {
     'vars': lsvars,
     'foreach': foreach,
 }
+COMMANDS = collections.ChainMap(EXTERNAL_COMMANDS, INTERNAL_COMMANDS)
 variables = {}
 current_login = core.guest_lc
 
