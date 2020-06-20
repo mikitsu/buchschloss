@@ -149,7 +149,7 @@ def execute_script(code: str, login_context: core.LoginContext, **kwargs):
         See prepare_runtime for arguments"""
     rt = prepare_runtime(login_context, **kwargs)
     try:
-        rt.execute(code)
+        return rt.execute(code)
     except (lupa.LuaError, objects.LuaAccessForbidden):
         traceback.print_exc()
 

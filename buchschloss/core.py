@@ -1176,10 +1176,26 @@ class Script(ActionNamespace):
         }
 
     @classmethod
-    @from_db(script=models.Script)
-    def execute(cls, script: T.Union[models.Script, str], *,
+    def execute(cls, script: str, *,
                 callbacks=None, login_context):
-        """Execute a script"""
+        """Execute a script
+
+        :param script: is a script name, optionally postfixed with
+            ``':func_name'``, ``func_name`` being the name of a function in the
+            script that takes no arguments. The function will be called.
+        :param callbacks: may be an alternative UI callback
+            dictionary to the default one
+        """
+        if ':' in script:
+            script_name, func_name = script.split(':')
+        else:
+            script_name = script
+            func_name = None
+        with models.db:
+            try:
+                script = models.Script.get_by_id(script_name)
+            except models.Script.DoesNotExist:
+                raise BuchSchlossNotFoundError('Script', script_name)
         # avoid problems with circular import
         # core -> cli2.__init__ -> cli2.objects -> core
         from . import cli2
@@ -1200,7 +1216,7 @@ class Script(ActionNamespace):
             )
         else:
             add_storage = None
-        cli2.execute_script(
+        ns = cli2.execute_script(
             script.code,
             script_lc,
             add_ui=(None if ui_callbacks is None else (ui_callbacks, get_name_prefix)),
@@ -1208,6 +1224,15 @@ class Script(ActionNamespace):
             add_requests=(ScriptPermissions.REQUESTS in script.permissions),
             add_config=script_config,
         )
+        if func_name is not None:
+            try:
+                func = ns[func_name]
+            except KeyError:
+                raise BuchSchlossError('Script.execute', 'no_valid_function_{}', func_name)
+            try:
+                func()
+            except TypeError:
+                raise BuchSchlossError('Script.execute', 'no_valid_function_{}', func_name)
 
 
 def search(o: T.Type[models.Model], condition: T.Tuple = None,

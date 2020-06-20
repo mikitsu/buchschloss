@@ -743,9 +743,17 @@ def test_script_execute(db, monkeypatch):
                                   permissions=core.ScriptPermissions(0))
     ctxt = core.LoginType.INTERNAL(0)
     script_execute = partial(core.Script.execute, 'name', login_context=ctxt)
+    script_execute_noname = partial(core.Script.execute, login_context=ctxt)
     calls = []
-    monkeypatch.setattr('buchschloss.cli2.execute_script',
-                        lambda *a, **kw: calls.append(kw))
+
+    def cli2_execute(*args, **kwargs):
+        calls.append(kwargs)
+        return {
+            'func': lambda: calls.append('func'),
+            'bad': lambda x: None,
+        }
+
+    monkeypatch.setattr('buchschloss.cli2.execute_script', cli2_execute)
     monkeypatch.setattr(core.Script, 'callbacks', 'cls-cb-flag')
     monkeypatch.setitem(config.scripts.cli2.mapping, 'name', {'key': 'value'})
     script_execute(callbacks='callback-flag')
@@ -758,9 +766,19 @@ def test_script_execute(db, monkeypatch):
     script.save()
     monkeypatch.setattr(core.Script, 'callbacks', None)
     monkeypatch.delitem(config.scripts.cli2.mapping, 'name')
-    script_execute()
+    script_execute_noname('name:func')
+    assert calls.pop() == 'func'
     getter, setter = calls[-1].pop('add_storage')
     assert callable(getter) and callable(setter)
+    with pytest.raises(core.BuchSchlossBaseError):
+        script_execute_noname('name:bad')
+    calls.pop()
+    with pytest.raises(core.BuchSchlossBaseError):
+        script_execute_noname('name:nonexistent')
+    calls.pop()
+    with pytest.raises(core.BuchSchlossBaseError):
+        # since this doesn't use @from_db, test for access as well
+        script_execute_noname('nonexistent')
     assert calls == [
         {'add_storage': None, 'add_requests': False, 'add_config': {'key': 'value'}},
         {'add_storage': None, 'add_requests': True, 'add_config': {'key': 'value'}},
