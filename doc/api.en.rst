@@ -113,6 +113,8 @@ for Members (not in the ``Member`` namespace) and ``BuchSchlossBaseError`` for
 errors. Every UI should catch ``BuchSchlossBaseError`` s and display them to the
 user in some way.
 
+See the :ref:`core reference` for details.
+
 permissions, authentication and authorization
 ---------------------------------------------
 

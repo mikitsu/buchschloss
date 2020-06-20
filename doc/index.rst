@@ -11,6 +11,7 @@ Welcome to BuchSchloss's documentation!
    :caption: Contents:
 
    api.en
+   core-ref
 
 Indices and tables
 ==================
