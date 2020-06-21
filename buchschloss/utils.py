@@ -220,10 +220,10 @@ def get_script_target(spec, *, ui_callbacks=None, login_context):
                                      login_context=login_context)
         return functools.partial(logging.error, 'no such script: {}!py'.format(spec['name']))
     elif spec['type'] == 'cli2':
-        def target(_name=spec['name']):
+        def target(_name=spec['name'], _func=spec['function']):
             try:
                 core.Script.execute(
-                    _name, callbacks=ui_callbacks, login_context=login_context)
+                    _name, _func, callbacks=ui_callbacks, login_context=login_context)
             except Exception as e:
                 logging.error('error while executing script {}!cli2: {}'.format(_name, e))
         return target
