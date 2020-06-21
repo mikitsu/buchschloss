@@ -20,6 +20,7 @@ except ImportError:
 from .. import core
 from .. import utils
 from .. import config
+from ..config.main import DummyErrorFile
 from . import forms
 from . import widgets
 from . import actions
@@ -46,7 +47,7 @@ class ActionTree:
         return self.subactions[name]
 
     def __setattr__(self, name, value):
-        if isinstance(value, __class__):
+        if isinstance(value, __class__):  # noqa
             self.subactions[name] = value
         else:
             self.subactions[name] = type(self)(value)
@@ -151,7 +152,7 @@ class App:
         """execute when the user exits the application"""
         if tk_msg.askokcancel(utils.get_name('actions::exit_app'),
                               utils.get_name('interactive_question::really_exit_app')):
-            if (isinstance(sys.stderr, config.DummyErrorFile)
+            if (isinstance(sys.stderr, DummyErrorFile)
                     and sys.stderr.error_happened
                     and tk_msg.askokcancel(
                         None, utils.get_name('interactive_question::send_error_report'))):
