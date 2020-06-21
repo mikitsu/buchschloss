@@ -227,6 +227,8 @@ def get_script_target(spec, *, ui_callbacks=None, login_context, propagate_bse=F
             except Exception as e:
                 if isinstance(e, core.BuchSchlossBaseError) and propagate_bse:
                     raise
+                elif config.debug:
+                    raise
                 else:
                     logging.error('error while executing script {}!cli2: {}'.format(_name, e))
         return target
