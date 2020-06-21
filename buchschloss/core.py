@@ -1220,7 +1220,7 @@ class Script(ActionNamespace):
         if function is not None:
             try:
                 func = ns[function]
-            except KeyError:
+            except (KeyError, TypeError):
                 raise BuchSchlossError('Script.execute', 'no_valid_function_{}', function)
             func()
 
