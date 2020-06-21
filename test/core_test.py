@@ -766,15 +766,15 @@ def test_script_execute(db, monkeypatch):
     script.save()
     monkeypatch.setattr(core.Script, 'callbacks', None)
     monkeypatch.delitem(config.scripts.cli2.mapping, 'name')
-    script_execute_noname('name:func')
+    script_execute_noname('name', 'func')
     assert calls.pop() == 'func'
     getter, setter = calls[-1].pop('add_storage')
     assert callable(getter) and callable(setter)
     with pytest.raises(core.BuchSchlossBaseError):
-        script_execute_noname('name:bad')
+        script_execute_noname('name', 'bad')
     calls.pop()
     with pytest.raises(core.BuchSchlossBaseError):
-        script_execute_noname('name:nonexistent')
+        script_execute_noname('name', 'nonexistent')
     calls.pop()
     with pytest.raises(core.BuchSchlossBaseError):
         # since this doesn't use @from_db, test for access as well
