@@ -421,8 +421,16 @@ def handle_cli2_get_data(data_spec):
 def get_script_action(script_spec):
     """prepare a cli2 script action"""
     # login_context must be passed at call time
-    return lambda: (utils.get_script_target(
-            script_spec,
-            ui_callbacks=main.cli2_callbacks,
-            login_context=main.app.current_login
-        )(), main.app.reset())
+    def action():
+        try:
+            utils.get_script_target(
+                script_spec,
+                ui_callbacks=main.cli2_callbacks,
+                login_context=main.app.current_login,
+                propagate_bse=True,
+            )()
+        except core.BuchSchlossBaseError as e:
+            show_BSE(e)
+        main.app.reset()
+
+    return action
