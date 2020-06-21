@@ -1222,10 +1222,7 @@ class Script(ActionNamespace):
                 func = ns[function]
             except KeyError:
                 raise BuchSchlossError('Script.execute', 'no_valid_function_{}', function)
-            try:
-                func()
-            except TypeError:
-                raise BuchSchlossError('Script.execute', 'no_valid_function_{}', function)
+            func()
 
 
 def search(o: T.Type[models.Model], condition: T.Tuple = None,
