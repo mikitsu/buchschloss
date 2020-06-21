@@ -41,9 +41,10 @@ def is_optionlist(value, *options):
 
 def is_script_spec(value, with_time=False):
     """check whether the value is syntactically a script spec and return components"""
-    spec_regex = r'^\s*(?P<name>[-\w ]+)(?:!(?P<type>py|cli2))?'
+    spec_regex = (r'^\s*(?P<name>[-\w ]+)(?::(?P<function>\w+))?'
+                  r'(?:!(?P<type>py|cli2))?')  # language=PythonRegExp
     if with_time:
-        spec_regex += r'@(?P<time>\d+(?::\d+(?::\d+)?)?)'
+        spec_regex += r'@(?P<invocation>\d+(?::\d+(?::\d+)?)?)'
     spec_regex = re.compile(spec_regex + r'\s*$')
     if isinstance(value, str):
         value = value.split(',')
@@ -51,7 +52,7 @@ def is_script_spec(value, with_time=False):
     for v in value:
         m = spec_regex.match(v)
         if m is None:
-            raise validate.VdtValueError('"{}" is not a script spec'.format(v))
+            raise validate.VdtValueError(v)
         else:
             script_data = m.groupdict()
             script_data['type'] = script_data['type'] or 'cli2'
