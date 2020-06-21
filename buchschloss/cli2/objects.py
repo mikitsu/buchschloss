@@ -191,14 +191,12 @@ class LuaUIInteraction(LuaObject):
     @lupa.unpacks_lua_table_method
     def ask(self, question, *format_args, **format_kwargs):
         """ask the user a yes/no question"""
-        return self.callbacks['ask'](self.get_name(question)
-                                     .format(*format_args, **format_kwargs))
+        return self.callbacks['ask'](self.get_name(question, *format_args, **format_kwargs))
 
     @lupa.unpacks_lua_table_method
     def alert(self, message, *format_args, **format_kwargs):
         """display a short text message"""
-        self.callbacks['alert'](self.get_name(message)
-                                .format(*format_args, **format_kwargs))
+        self.callbacks['alert'](self.get_name(message, *format_args, **format_kwargs))
 
     def display(self, data):
         """display data to the user"""
