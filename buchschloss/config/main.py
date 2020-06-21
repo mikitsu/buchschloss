@@ -226,7 +226,7 @@ def check_smtp_auth_data(config):
     """check SMTP auth data"""
     # once optional sections are supported, this can go away
     if ((config['utils']['email']['smtp']['username'] is None)
-            == (config['utils']['email']['smtp']['password'] is None)):
+            != (config['utils']['email']['smtp']['password'] is None)):
         raise ConfigError(
             'smtp.username and smtp.password must both be given or omitted')
 
