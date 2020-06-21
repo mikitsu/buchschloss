@@ -750,7 +750,6 @@ def test_script_execute(db, monkeypatch):
         calls.append(kwargs)
         return {
             'func': lambda: calls.append('func'),
-            'bad': lambda x: None,
         }
 
     monkeypatch.setattr('buchschloss.cli2.execute_script', cli2_execute)
@@ -770,9 +769,6 @@ def test_script_execute(db, monkeypatch):
     assert calls.pop() == 'func'
     getter, setter = calls[-1].pop('add_storage')
     assert callable(getter) and callable(setter)
-    with pytest.raises(core.BuchSchlossBaseError):
-        script_execute_noname('name', 'bad')
-    calls.pop()
     with pytest.raises(core.BuchSchlossBaseError):
         script_execute_noname('name', 'nonexistent')
     calls.pop()

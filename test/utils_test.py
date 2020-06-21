@@ -50,15 +50,19 @@ def test_get_name():
 def test_script_exec(db, monkeypatch):
     """test correct execution of task scripts"""
     invokes = set()
-    monkeypatch.setitem(config.scripts.mapping, 'ui', ({'type': 'cli2', 'name': 'test-1'},))
-    monkeypatch.setitem(config.scripts.mapping, 'startup', ({'type': 'py', 'name': 'test_2'},))
+    monkeypatch.setitem(config.scripts.mapping, 'startup', (
+        {'type': 'py', 'name': 'test_2', 'function': None},
+        {'type': 'cli2', 'name': 'test-5', 'function': 'test'},))
     monkeypatch.setitem(config.scripts.mapping, 'repeating', (
-        {'type': 'py', 'name': 'test_3', 'invocation': datetime.timedelta(seconds=1)},
-        {'type': 'cli2', 'name': 'test-4', 'invocation': datetime.timedelta(minutes=300)},
+        {'type': 'py', 'name': 'test_3', 'function': None,
+         'invocation': datetime.timedelta(seconds=1)},
+        {'type': 'cli2', 'name': 'test-4', 'function': None,
+         'invocation': datetime.timedelta(minutes=300)},
     ))
     common = dict(permissions=core.ScriptPermissions(0), storage={})
-    models.Script.create(name='test-1', code='ui.alert("it works")', **common)
     models.Script.create(name='test-4', code='ui.alert("shouldn\'t happen")', **common)
+    models.Script.create(
+        name='test-5', code='return {test=function()ui.alert("yep")end}', **common)
     get_py_func = lambda name: (lambda callbacks, login_context: invokes.add(name))  # noqa
     monkeypatch.setattr(py_scripts, '__all__', ['test_2', 'test_3'])
     monkeypatch.setattr(py_scripts, 'test_2', get_py_func('test_2'), raising=False)
@@ -73,7 +77,7 @@ def test_script_exec(db, monkeypatch):
     runner = utils.get_runner()
     runner(False)
     runner(False)
-    assert invokes == {'test_2', 'test_3'}
+    assert invokes == {'test_2', 'test_3', 'script-data::test-5::yep'}
     invokes.clear()
     time.sleep(1.5)
     runner(False)
