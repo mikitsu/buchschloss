@@ -4,10 +4,8 @@ Handles access to the database and provides high-level interfaces for all operat
 __all__ exports:
     - BuchSchlossBaseError: the error raised in this module.
         Instances come with a nice description of what exactly failed.
-    - DummyErrorFile: a dummy error file (for sys.stderr) that writes errors to log
-        and provides access to them e.g. for display or ending
     - misc_data: provide easy access to data stored in Misc by attribute lookup
-    - login, logout: to log  user in or out
+    - login: to get a LoginContext for a user
     - Book, Person, Borrow, Member, Library, Group: namespaces for functions
         dealing with the respective objects
     - ComplexSearch: for very complex search queries

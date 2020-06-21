@@ -42,11 +42,9 @@ The actual files are in the ``buchschloss`` directory. Inside, there is:
 
 ### <del>Documentation</del> <small>TODO</small>
 
-Currently, old documentation specific to my setup in German for the user interfaces is available in LaTeX.
-The code is documented in docstrings. I hope to write easy-to-find documentation sometime in the future
+I am more or less in the process of writing documentation. See the documentation branch
+(specifically the doc/ directory) for what I have written up to now.
 
 ### Tests
 
 As of now, only some basic functions are tested. I will try to add relevant tests whenever I change something.
-
-### 
