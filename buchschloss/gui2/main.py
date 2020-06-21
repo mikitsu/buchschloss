@@ -215,6 +215,18 @@ def new_book_autofill(form):
     isbn_field.bind('<FocusOut>', filler)
 
 
+def get_script_actions(spec):
+    """return a dict of script actions"""
+    r = {}
+    for k, v in spec.items():
+        # check whether this is a subdict or a script spec
+        if v and isinstance(v.get('type'), str):
+            r[k] = actions.get_script_action(v)
+        else:
+            r[k] = get_script_actions(v)
+    return r
+
+
 app = App()
 
 FORMS = {
@@ -231,7 +243,7 @@ wrapped_action_ns = {
     for k in ('book', 'person', 'group', 'library', 'borrow', 'member')
 }
 
-action_tree = ActionTree.from_map({
+action_tree = ActionTree.from_map({**{
     'new': {  # TODO: add an AddDict to misc to be able to insert the stuff here
         k: generic_formbased_action('new', FORMS[k], wrapped_action_ns[k].new)
         for k in ('book', 'person', 'library', 'group', 'member')
@@ -256,7 +268,7 @@ action_tree = ActionTree.from_map({
         forms.BorrowForm, wrapped_action_ns['borrow'].new),
     'restitute': actions.borrow_restitute(
         forms.RestituteForm, wrapped_action_ns['borrow'].restitute),
-})
+}, **get_script_actions(config.gui2.script_actions.mapping)})
 action_tree.new.book = generic_formbased_action(
     'new', FORMS['book'], actions.new_book, post_init=new_book_autofill)
 action_tree.edit.change_password = generic_formbased_action(
