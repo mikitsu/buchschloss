@@ -290,7 +290,7 @@ def from_db(*arguments: T.Type[models.Model], **keyword_arguments: T.Type[models
         @wraps(f)
         def wrapper(*args: T.Any, **kwargs):
             bound = signature.bind(*args, **kwargs)
-            with models.db:
+            with models.db.atomic():
                 for k, m in keyword_arguments.items():
                     arg = bound.arguments[k]
                     if not isinstance(arg, m):  # allow direct passing
