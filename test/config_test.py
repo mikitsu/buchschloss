@@ -6,7 +6,7 @@ import json
 
 from configobj import validate
 import pytest
-from buchschloss import config
+from buchschloss.config import main
 from buchschloss.config import validation as config_val
 
 
@@ -65,7 +65,7 @@ def test_load_file(tmpdir):
     f2.write('b = 1\n[sec]\na = 2\ninclude = {},{}'.format(f3, f4))
     f3.write('b = 2')
     f4.write('invalid config file')
-    co, errors = config.load_file(f1)
+    co, errors = main.load_file(f1)
     assert errors == {str(f4)}
     assert co.dict() == {'a': '1', 'b': '1', 'sec': {'a': '2', 'b': '2'}}
 
@@ -77,6 +77,6 @@ def test_load_file_json(tmpdir):
     f2.write('{"b": "1", "sec": {"a": "2", "include": ["%s", "%s"]}}' % (f3, f4))
     f3.write('{"b": "2"}')
     f4.write('invalid config file')
-    co, errors = config.load_file(f1, json.load, json.JSONDecodeError)
+    co, errors = main.load_file(f1, json.load, json.JSONDecodeError)
     assert errors == {str(f4)}
     assert co.dict() == {'a': '1', 'b': '1', 'sec': {'a': '2', 'b': '2'}}

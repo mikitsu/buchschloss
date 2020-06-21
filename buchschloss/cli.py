@@ -169,14 +169,17 @@ def handle_user_input(ui):
 
 def ask(question):
     """Ask a yes/no question"""
-    print(utils.get_name('cli::interactive_question::' + question))
-    r = input()
-    return r and r[0].lower() in 'yj'  # TODO: make this configurable
+    r = ''
+    valid_answers = config.cli.answers.yes + config.cli.answers.no
+    while not r or r.lower() not in valid_answers:
+        print(utils.get_name('cli::interactive_question::' + question))
+        r = input().lower()
+    return r.lower() in config.cli.answers.yes
 
 
 def start():
     """Entry point. Provide a REPL"""
-    print(config.gui2.intro.text, end='\n\n')  # TODO: have a separate config section
+    print(config.cli.intro.text, end='\n\n')
     try:
         while True:
             try:
