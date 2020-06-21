@@ -39,7 +39,7 @@ def is_optionlist(value, *options):
     return val
 
 
-def is_script_spec(value, with_time=False):
+def is_script_spec(value, with_time=False, single=False):
     """check whether the value is syntactically a script spec and return components"""
     spec_regex = (r'^\s*(?P<name>[-\w ]+)(?::(?P<function>\w+))?'
                   r'(?:!(?P<type>py|cli2))?')  # language=PythonRegExp
@@ -59,6 +59,10 @@ def is_script_spec(value, with_time=False):
             if 'invocation' in script_data:
                 script_data['invocation'] = is_timedelta(script_data['invocation'])
             r.append(script_data)
+    if single:
+        if len(r) != 1:
+            raise validate.VdtTypeError(value)
+        r = r[0]
     return r
 
 
