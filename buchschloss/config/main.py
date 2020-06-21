@@ -12,6 +12,9 @@ import configobj
 from .validation import validator
 
 CONFIG_FILE_ENV = 'BUCHSCHLOSS_CONFIG'
+DEFAULT_INTRO_TEXT = """Buchschloss
+
+https://github.com/mik2k2/buchschloss"""
 MODULE_DIR = os.path.dirname(__file__)
 INCLUDE_NAME = 'include'  # I'd love to make this configurable...
 UI_SECTIONS = ('cli', 'gui2')
@@ -216,15 +219,14 @@ def apply_ui_intro_text_default(config):
         sec = config[ui_sec]
         # multiline defaults aren't allowed (AFAIK)
         if sec['intro']['text'] is None:
-            sec['intro']['text'] = \
-                'Buchschloss\n\nhttps://github.com/mik2k2/buchschloss'
+            sec['intro']['text'] = DEFAULT_INTRO_TEXT
 
 
 def check_smtp_auth_data(config):
     """check SMTP auth data"""
     # once optional sections are supported, this can go away
     if ((config['utils']['email']['smtp']['username'] is None)
-            ^ (config['utils']['email']['smtp']['password'] is None)):
+            == (config['utils']['email']['smtp']['password'] is None)):
         raise ConfigError(
             'smtp.username and smtp.password must both be given or omitted')
 
