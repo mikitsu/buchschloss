@@ -211,7 +211,7 @@ def get_book_data(isbn: int):
     return results
 
 
-def get_script_target(spec, *, ui_callbacks=None, login_context):
+def get_script_target(spec, *, ui_callbacks=None, login_context, propagate_bse=False):
     """get a script target function"""
     if spec['type'] == 'py':
         if spec['name'] in py_scripts.__all__:
@@ -225,7 +225,10 @@ def get_script_target(spec, *, ui_callbacks=None, login_context):
                 core.Script.execute(
                     _name, _func, callbacks=ui_callbacks, login_context=login_context)
             except Exception as e:
-                logging.error('error while executing script {}!cli2: {}'.format(_name, e))
+                if isinstance(e, core.BuchSchlossBaseError) and propagate_bse:
+                    raise
+                else:
+                    logging.error('error while executing script {}!cli2: {}'.format(_name, e))
         return target
     else:
         raise AssertionError("spec['type'] == {0[type]!r} not in ('py', 'cli2')"
