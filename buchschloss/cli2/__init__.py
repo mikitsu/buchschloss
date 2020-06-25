@@ -129,6 +129,8 @@ def prepare_runtime(login_context: core.LoginContext, *,
                                runtime=runtime)
         for k in 'Book Person Group Library Borrow Member Script'.split()
     })
+    wrapped_lc = objects.LuaLoginContext(login_context, runtime=runtime)
+    g['buchschloss']['login_context'] = wrapped_lc
     if add_ui:
         g['ui'] = objects.LuaUIInteraction(*add_ui, runtime=runtime)
     if add_storage is not None:

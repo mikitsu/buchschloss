@@ -1,4 +1,5 @@
 """test cli2/objects.py"""
+import functools
 
 import lupa
 import pytest
@@ -104,6 +105,30 @@ def test_data_ns():
     assert ldn.lua_get('c').lua_get('a') == '1'
     with pytest.raises(AttributeError):
         ldn.lua_get('e')
+
+
+def test_login_context():
+    """test LuaLoginContext"""
+    rt = lupa.LuaRuntime()
+    llc = functools.partial(objects.LuaLoginContext, runtime=rt)
+    rt.globals()['guest_lc'] = llc(core.guest_lc)
+    rt.globals()['internal_lc'] = llc(core.internal_lc)
+    rt.globals()['member_lc'] = llc(
+        core.LoginType.MEMBER(name='asdf', level=3))
+    rt.globals()['script_lc'] = llc(
+        core.LoginType.SCRIPT(name='qwert', level=2, invoker=core.guest_lc)
+    )
+    assert rt.eval('guest_lc.type == "GUEST"')
+    assert rt.eval('internal_lc.level == 5')
+    assert rt.eval('member_lc.name == "asdf"')
+    assert rt.eval('guest_lc.name == nil')
+    assert rt.eval('internal_lc.invoker == nil')
+    with pytest.raises(AttributeError):
+        rt.eval('guest_lc.doesnotexist')
+    assert rt.eval('script_lc.level == 2')
+    assert rt.eval('script_lc.invoker.type == "GUEST"')
+    assert rt.eval('script_lc.invoker.level == 0')
+    assert rt.eval('script_lc.invoker.name == nil')
 
 
 def test_ui_interaction(monkeypatch):

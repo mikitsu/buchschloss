@@ -169,6 +169,23 @@ class LuaDataNS(LuaObject):
             return getattr(self.data_ns, name)
 
 
+class LuaLoginContext(LuaObject):
+    """wrap a LoginContext for consumption by Lua scripts"""
+    get_allowed = ('level', 'type', 'name', 'invoker')
+
+    def __init__(self, login_context: core.LoginContext, **kwargs):
+        super().__init__(**kwargs)
+        self.type = login_context.type.name
+        self.level = login_context.level
+        self.name = getattr(login_context, 'name', None)
+        try:
+            inv = login_context.invoker  # noqa
+        except AttributeError:
+            self.invoker = None
+        else:
+            self.invoker = type(self)(inv, **kwargs)
+
+
 class LuaUIInteraction(LuaObject):
     """Provide Lua code a way to interact with the user interface"""
     get_allowed = ('ask', 'alert', 'display', 'get_data', 'get_name')
