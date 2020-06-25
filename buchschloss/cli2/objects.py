@@ -188,7 +188,7 @@ class LuaLoginContext(LuaObject):
 
 class LuaUIInteraction(LuaObject):
     """Provide Lua code a way to interact with the user interface"""
-    get_allowed = ('ask', 'alert', 'display', 'get_data', 'get_name')
+    get_allowed = ('ask', 'alert', 'display', 'get_data', 'get_name', 'get_level')
 
     def __init__(self, callbacks, script_prefix, **kwargs):
         """provide the callbacks and script-specific prefix for get_name"""
@@ -230,6 +230,8 @@ class LuaUIInteraction(LuaObject):
         """provide access to utils.get_name from Lua code"""
         return (utils.get_name(self.script_prefix + internal)
                 .format(*format_args, **format_kwargs))
+
+    get_level = staticmethod(utils.get_level)
 
 
 class LuaBS4Interface(LuaObject):
