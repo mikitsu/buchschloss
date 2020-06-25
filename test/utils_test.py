@@ -55,7 +55,7 @@ def test_script_exec(db, monkeypatch):
         {'type': 'cli2', 'name': 'test-5', 'function': 'test'},))
     monkeypatch.setitem(config.scripts.mapping, 'repeating', (
         {'type': 'py', 'name': 'test_3', 'function': None,
-         'invocation': datetime.timedelta(seconds=1)},
+         'invocation': datetime.timedelta(seconds=0.1)},
         {'type': 'cli2', 'name': 'test-4', 'function': None,
          'invocation': datetime.timedelta(minutes=300)},
     ))
@@ -79,7 +79,7 @@ def test_script_exec(db, monkeypatch):
     runner(False)
     assert invokes == {'test_2', 'test_3', 'script-data::test-5::yep'}
     invokes.clear()
-    time.sleep(1.5)
+    time.sleep(0.15)
     runner(False)
     assert invokes == {'test_3'}
     invokes.clear()
