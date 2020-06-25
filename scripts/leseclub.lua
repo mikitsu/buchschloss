@@ -1,7 +1,6 @@
 --[[
 Leseclub management
 ]]--
--- TODO: add some kind of error handling
 
 local borrow_weeks = tonumber(config['borrow weeks'])
 if borrow_weeks == nil then
@@ -45,6 +44,7 @@ end
 local function borrow()
     if check_leseclub_active(true) then return end
     local data = ui.get_data{book='int', person='int'}
+    if not data then return end
     if check_book_in_lc_library(data.book) then return end
     data.weeks = borrow_weeks
     Borrow:new(data)
@@ -53,6 +53,7 @@ end
 local function restitute()
     if check_leseclub_active(true) then return end
     local data = ui.get_data{book='int', person='int', points='int'}
+    if not data then return end
     if check_book_in_lc_library(data.book) then return end
     local person = data.person
     local ret = Borrow:restitute{book=data.book, person=person}
