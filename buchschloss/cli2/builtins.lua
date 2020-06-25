@@ -46,10 +46,20 @@ function Borrow:restitute(options)
     return self.backend.restitute(options)
 end
 
+
+function check_level(required, do_alert)
+    local r = buchschloss.login_context.invoker.level < required
+    if r and (do_alert or no_alert == nil) then
+        ui.alert('must_be_{}', ui.get_level(required))
+    end
+    return r
+end
+
 return {
     Book=setmetatable({backend=buchschloss.Book}, ActionNS_meta),
     Borrow=Borrow,
     Person=setmetatable({backend=buchschloss.Person}, ActionNS_meta),
     Library=setmetatable({backend=buchschloss.Library}, ActionNS_meta),
     Group=setmetatable({backend=buchschloss.Group, delegate={activate=true}}, ActionNS_meta),
+    check_level=check_level,
 }
