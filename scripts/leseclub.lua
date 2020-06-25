@@ -72,6 +72,7 @@ local function get_results()
 end
 
 local function start_leseclub()
+    if check_level(3) then return end
     if check_leseclub_active(false) then return end
     storage.pending_borrows = {}
     storage.read_books = {}
@@ -80,6 +81,7 @@ local function start_leseclub()
 end
 
 local function end_leseclub()
+    if check_level(3) then return end
     if check_leseclub_active(true) then return end
     if not ui.ask('really_end_leseclub') then
         return
