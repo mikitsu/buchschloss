@@ -373,7 +373,7 @@ def new_book(**kwargs):
 def display_cli2_data(data):
     """provide a callback for cli2's display"""
     popup = tk.Toplevel(main.app.root)
-    popup.transient()
+    popup.transient(main.app.root)
     popup.grab_set()
     widget_cls, kwargs = get_cli2_data_widget(popup, data)
     # TODO: make scrolled?
