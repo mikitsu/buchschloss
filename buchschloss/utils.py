@@ -152,63 +152,31 @@ def get_level(number: int = None):
 def get_book_data(isbn: int):
     """Attempt to get book data via the ISBN from the DB, if that fails,
         try the DNB (https://portal.dnb.de)"""
+    def get_data_from_script(script_spec):
+        get_script_target(
+            script_spec,
+            ui_callbacks={
+                'get_data': lambda __: {'isbn': isbn},
+                'display': data.update,
+            },
+            login_context=core.internal_lc,
+        )()
+
+    data = {}
+    for spec in config.utils.book_data_scripts:
+        get_data_from_script(spec)
     try:
         book = next(iter(core.Book.search(
             ('isbn', 'eq', isbn), login_context=core.internal_lc)))
     except StopIteration:
-        pass  # actually, I could put the whole rest of the function here
+        pass
     else:
-        data = core.Book.view_str(book.id, login_context=core.internal_lc)
-        del data['id'], data['status'], data['return_date'], data['borrowed_by']
-        del data['borrowed_by_id'], data['__str__']
-        return data
+        new_data = core.Book.view_str(book.id, login_context=core.internal_lc)
+        del new_data['id'], new_data['status'], new_data['return_date']
+        del new_data['borrowed_by_id'], new_data['__str__'], new_data['borrowed_by']
+        data.update(new_data)
 
-    try:
-        r = requests.get('https://portal.dnb.de/opac.htm?query=isbn%3D'
-                         + str(isbn) + '&method=simpleSearch&cqlMode=true')
-        r.raise_for_status()
-    except requests.exceptions.RequestException:
-        raise core.BuchSchlossError('book_data::no_connection', 'book_data::no_connection')
-
-    person_re = re.compile(r'(\w*, \w*) \((\w*)\)')
-    results = {'concerned_people': []}
-
-    page = bs4.BeautifulSoup(r.text)
-    table = page.select_one('#fullRecordTable')
-    if table is None:
-        # see if we got multiple results
-        link_to_first = page.select_one('#recordLink_0')
-        if link_to_first is None:
-            raise core.BuchSchlossError(
-                'book_data::Book_not_found', 'book_data::Book_with_ISBN_{}_not_in_DNB', isbn)
-        r = requests.get('https://portal.dnb.de' + link_to_first['href'])
-        page = bs4.BeautifulSoup(r.text)
-        table = page.select_one('#fullRecordTable')
-
-    for tr in table.select('tr'):
-        td = [x.get_text('\n').strip() for x in tr.select('td')]
-        if len(td) == 2:
-            if td[0] == 'Titel':
-                results['title'] = td[1].split('/')[0].strip()
-            elif td[0] == 'Person(en)':
-                for p in td[1].split('\n'):
-                    g = person_re.search(p)
-                    if g is None:
-                        continue
-                    g = g.groups()
-                    if g[1] == 'Verfasser':
-                        results['author'] = g[0]
-                    else:
-                        results['concerned_people'].append(g[1] + ': ' + g[0])
-            elif td[0] == 'Verlag':
-                results['publisher'] = td[1].split(':')[1].strip()
-            elif td[0] == 'Zeitliche Einordnung':
-                results['year'] = td[1].split(':')[1].strip()
-            elif td[0] == 'Sprache(n)':
-                results['language'] = td[1].split(',')[0].split()[0].strip()
-
-    results['concerned_people'] = '; '.join(results['concerned_people'])
-    return results
+    return data
 
 
 def get_script_target(spec, *, ui_callbacks=None, login_context, propagate_bse=False):
