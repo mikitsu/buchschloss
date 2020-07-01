@@ -274,7 +274,10 @@ class LuaRequestsInterface(LuaObject):
         """wrap requests.get"""
         if config.cli2.requests.url_regex.search(url) is None:
             return None
-        r = requests.get(url)
+        try:
+            r = requests.get(url)
+        except requests.RequestException:
+            raise core.BuchSchlossError('no_connection', 'no_connection')
         if result == 'auto':
             result = r.headers.get('Content-Type', '').split('/')[-1]
         if result in ('html', 'xml'):
