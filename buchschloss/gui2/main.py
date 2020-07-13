@@ -255,7 +255,7 @@ action_tree = ActionTree.from_map({**{
         'person': ShowInfoNS.person,
     },
     'edit': {k: generic_formbased_action('edit', FORMS[k], wrapped_action_ns[k].edit,
-                                         fill_data=wrapped_action_ns[k].view_str)
+                                         fill_data=wrapped_action_ns[k].view_ns)
              for k in ('book', 'person', 'member', 'script')
     },  # noqa
     'search': {k: actions.search(f, wrapped_action_ns[k].search, getattr(ShowInfoNS, k))

@@ -110,9 +110,10 @@ def generic_formbased_action(form_type, form_cls, callback,
                     tk_msg.showerror(e.title, e.message)
                     id_field.focus()
                 else:
-                    for k, v in data.items():
-                        if k in form.widget_dict:
-                            mtk.get_setter(form.widget_dict[k])(v)
+                    for k, w in form.widget_dict.items():
+                        v = getattr(data, k, None)
+                        if v is not None:
+                            mtk.get_setter(w)(v)
             id_field.bind('<FocusOut>', fill_fields)
         form.widgets[0].focus()
         form.pack()
