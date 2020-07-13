@@ -1,5 +1,7 @@
 """widgets"""
-
+import enum
+import functools
+import operator
 import tkinter as tk
 from tkinter import Entry, Label, Button
 from functools import partial
@@ -177,7 +179,7 @@ class ScrolledListbox(tk.Listbox):
 
 class MultiChoicePopup(tk.Button):
     """Button that displays a multi-choice listbox popup dialog on click"""
-    # TODO: move to misc
+    sep = ';'
 
     def __init__(self, master, cnf={}, options=(), **kwargs):
         """create a new MultiChoicePopup
@@ -187,6 +189,7 @@ class MultiChoicePopup(tk.Button):
                 <display> will be shown to the user, while <code>
                 will be used when .get is called
         """
+        kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
         super().__init__(master, cnf, command=self.action, **kwargs)
         if not options or isinstance(options[0], str):
             self.codes = self.displays = options
@@ -201,9 +204,10 @@ class MultiChoicePopup(tk.Button):
     def set(self, values):
         """set the items to be selected"""
         self.active = [self.codes.index(x) for x in values]
+        self.set_text()
 
     def action(self, event=None):
-        """display the popup window, set self.value and update button text"""
+        """display the popup window, set self.active and update button text"""
         options = {'values': self.displays, 'activate': self.active}
         if len(self.displays) > config.gui2.popup_height:
             options.update(listbox=ActivatingListbox, height=config.gui2.popup_height)
@@ -216,6 +220,11 @@ class MultiChoicePopup(tk.Button):
                 self.master, widget, options, getter='curselection')
         except mtkd.UserExitedDialog:
             pass
+        self.set_text()
+
+    def set_text(self):
+        """set the text to the displays separated by semicolons"""
+        self['text'] = self.sep.join(self.displays[i] for i in self.active)
 
 
 class SearchMultiChoice(MultiChoicePopup):
@@ -225,15 +234,9 @@ class SearchMultiChoice(MultiChoicePopup):
                  action_ns: core.ActionNamespace,
                  attribute='name',
                  **kwargs):
-        kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
         options = [(getattr(o, attribute), str(o)) for o in
                    action_ns.search((), login_context=core.internal_lc)]
         super().__init__(master, cnf, options=options, **kwargs)
-
-    def action(self, event=None):
-        """update the text"""
-        super().action(event)
-        self.set_text()
 
     def set(self, values):
         """update text.
@@ -243,11 +246,11 @@ class SearchMultiChoice(MultiChoicePopup):
         """
         if isinstance(values, str):
             if values:
-                values = values.split(';')
+                values = values.split(self.sep)
             else:
                 values = ()
         super().set(values)
-        self.set_text()
+
 
     def set_text(self):
         """set the text to the displays separated by semicolons"""
