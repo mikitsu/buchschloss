@@ -102,6 +102,16 @@ class OptionsFromSearch(mtk.OptionChoiceWidget):
         super().__init__(master, values=values, **kwargs)
 
 
+class Text(tk.Text):
+    """get/set operate on all the text"""
+    def get(self):  # noqa
+        return super().get('0.0', 'end')
+
+    def set(self, text):
+        super().delete('0.0', 'end')
+        super().insert('0.0', text)
+
+
 @mtk.ScrollableWidget(height=config.gui2.widget_size.main.height,
                       width=config.gui2.widget_size.main.width)
 class InfoWidget(mtk.ContainingWidget):
