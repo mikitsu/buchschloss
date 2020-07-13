@@ -262,9 +262,28 @@ class SearchMultiChoice(MultiChoicePopup):
         super().set(values)
 
 
-    def set_text(self):
-        """set the text to the displays separated by semicolons"""
-        self['text'] = ';'.join(self.displays[i] for i in self.active)
+class FlagEnumMultiChoice(MultiChoicePopup):
+    """Display FlagEnum options"""
+    def __init__(self, master, cnf={}, *,
+                 flag_enum: T.Type[enum.Flag],
+                 get_name_prefix: str = '',
+                 **kwargs):
+        """create a new FlagEnumMultiChoice based on ``flag_enum``"""
+        self.enum = flag_enum
+        options = [(v.value, utils.get_name(get_name_prefix + k))
+                   for k, v in flag_enum.__members__.items()]
+        super().__init__(master, cnf, options, **kwargs)
+
+    def get(self):
+        return functools.reduce(operator.or_, map(self.enum, super().get()))
+
+    def set(self, value):
+        # is there any way to properly do this?
+        to_set = []
+        for v in self.enum.__members__.values():
+            if v in value:
+                to_set.append(v.value)
+        super().set(to_set)
 
 
 class Header:
