@@ -253,6 +253,7 @@ action_tree = ActionTree.from_map({**{
     'view': {
         'book': ShowInfoNS.book,
         'person': ShowInfoNS.person,
+        'script': ShowInfoNS.script,
     },
     'edit': {k: generic_formbased_action('edit', FORMS[k], wrapped_action_ns[k].edit,
                                          fill_data=wrapped_action_ns[k].view_ns)
@@ -263,6 +264,7 @@ action_tree = ActionTree.from_map({**{
         (forms.BookForm, 'book'),
         (forms.PersonForm, 'person'),
         (forms.BorrowSearchForm, 'borrow'),
+        (forms.ScriptForm, 'script'),
     )
     },
     'borrow': actions.borrow_restitute(

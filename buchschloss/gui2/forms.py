@@ -269,7 +269,7 @@ class BorrowSearchForm(SearchForm):
     is_back: mtkf.Element = OptionalCheckbuttonWithVar
 
 
-class ScriptForm(BaseForm):
+class ScriptForm(SearchForm):
     name: mtkf.Element = Entry
     permissions: mtkf.Element = (
         FlagEnumMultiChoice,
@@ -278,5 +278,5 @@ class ScriptForm(BaseForm):
     setlevel: mtkf.Element = (
         mtk.OptionChoiceWidget,
         {'values': ((None, '-----'), *enumerate(utils.get_level()))})
-    current_password: mtkf.Element = NonEmptyPasswordEntry
-    code: mtkf.Element = Text
+    current_password: GroupElement.NO_SEARCH = NonEmptyPasswordEntry
+    code: GroupElement.NO_SEARCH = Text

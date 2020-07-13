@@ -204,9 +204,14 @@ class ShowInfoNS:
     # noinspection PyNestedDecorators
     @func_from_static
     @staticmethod
-    def _show_info_action(view_func: T.Callable[[T.Any], dict],
-                          special_keys, id_get_title,
-                          id_get_text, id_type=int):
+    def _show_info_action(
+            view_func: T.Callable[[T.Any], dict],
+            # TODO: figure out the exact return type of the callable we accept
+            special_keys: T.Mapping[str, T.Callable[[dict], T.Any]],
+            id_get_title: str,
+            id_get_text: str,
+            id_type: type = int,
+            ):
         """prepare a function displaying information
 
         Arguments:
@@ -311,6 +316,13 @@ class ShowInfoNS:
          },
         'not used',
         'anyway',
+    )
+    script = _show_info_action(
+        NSWithLogin(core.Script).view_str,
+        {},
+        utils.get_name('actions::view__Script'),
+        utils.get_name('Script::name'),
+        str,
     )
     to_destroy = None
 
