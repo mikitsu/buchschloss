@@ -237,16 +237,17 @@ FORMS = {
     'activate_group': forms.GroupActivationForm,
     'member': forms.MemberForm,
     'change_password': forms.ChangePasswordForm,
+    'script': forms.ScriptForm,
 }
 wrapped_action_ns = {
     k: NSWithLogin(getattr(core, k.capitalize()))
-    for k in ('book', 'person', 'group', 'library', 'borrow', 'member')
+    for k in ('book', 'person', 'group', 'library', 'borrow', 'member', 'script')
 }
 
 action_tree = ActionTree.from_map({**{
     'new': {  # TODO: add an AddDict to misc to be able to insert the stuff here
         k: generic_formbased_action('new', FORMS[k], wrapped_action_ns[k].new)
-        for k in ('book', 'person', 'library', 'group', 'member')
+        for k in ('book', 'person', 'library', 'group', 'member', 'script')
         # book here to keep it 1st with insertion ordered dicts
     },
     'view': {
@@ -255,7 +256,7 @@ action_tree = ActionTree.from_map({**{
     },
     'edit': {k: generic_formbased_action('edit', FORMS[k], wrapped_action_ns[k].edit,
                                          fill_data=wrapped_action_ns[k].view_str)
-             for k in ('book', 'person', 'member')
+             for k in ('book', 'person', 'member', 'script')
     },  # noqa
     'search': {k: actions.search(f, wrapped_action_ns[k].search, getattr(ShowInfoNS, k))
                for f, k in (
