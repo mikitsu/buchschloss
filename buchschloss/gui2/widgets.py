@@ -279,7 +279,7 @@ class FlagEnumMultiChoice(MultiChoicePopup):
         super().__init__(master, cnf, options, **kwargs)
 
     def get(self):
-        return functools.reduce(operator.or_, map(self.enum, super().get()))
+        return functools.reduce(operator.or_, map(self.enum, super().get()), self.enum(0))
 
     def set(self, value):
         # is there any way to properly do this?
