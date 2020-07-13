@@ -786,9 +786,11 @@ def test_script_view_str(db):
     """test Script.view_str"""
     script = models.Script.create(name='name', code='code', setlevel=None, storage={},
                                   permissions=core.ScriptPermissions(0))
-    ctxt = for_levels(
-        partial(core.Script.view_str, 'name'), 0,
-        lambda x: x == {'name': 'name', 'setlevel': '-----', 'permissions': ''})
+    exp_repr = utils.get_name('Script') + '[name]'
+    expected = {
+        '__str__': exp_repr, 'name': 'name',
+        'setlevel': '-----', 'permissions': ''}
+    ctxt = for_levels(partial(core.Script.view_str, 'name'), 0, lambda x: x == expected)
     script_view_str = partial(core.Script.view_str, login_context=ctxt)
     script.setlevel = 0
     script.permissions = core.ScriptPermissions.STORE | core.ScriptPermissions.REQUESTS
@@ -797,12 +799,14 @@ def test_script_view_str(db):
     assert set(data.pop('permissions').split(';')) == {
         utils.get_name('Script::permissions::STORE'),
         utils.get_name('Script::permissions::REQUESTS')}
-    assert data == {'name': 'name', 'setlevel': utils.get_level(0)}
+    l0 = utils.get_level(0)
+    assert data == {'name': 'name', 'setlevel': l0, '__str__': exp_repr + l0.join('()')}
     script.setlevel = 3
     script.permissions = core.ScriptPermissions.STORE
     script.save()
+    l3 = utils.get_level(3)
     assert (script_view_str('name')
-            == {'name': 'name', 'setlevel': utils.get_level(3),
+            == {'name': 'name', 'setlevel': l3, '__str__': exp_repr + l3.join('()'),
                 'permissions': utils.get_name('Script::permissions::STORE')})
     with pytest.raises(core.BuchSchlossBaseError):
         script_view_str('whatever')

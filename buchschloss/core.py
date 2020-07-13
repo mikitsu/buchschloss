@@ -1160,11 +1160,13 @@ class Script(ActionNamespace):
     def view_str(script: T.Union[models.Script, str], *, login_context) -> dict:
         """return a dict with the following items:
 
+        '__str__': a string representation of the script
         'name': the script name
         'setlevel': the script's setlevel status ('-----' if not set)
         'permissions': the scripts permissions, separated by ';'
         """
         return {
+            '__str__': str(script),
             'name': script.name,
             'setlevel': ('-----' if script.setlevel is None
                          else utils.get_level(script.setlevel)),
