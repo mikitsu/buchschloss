@@ -5,7 +5,6 @@ contents (for use):
     - send_email() -- send an email
     - get_name() -- get a pretty name
     - get_book_data() -- attempt to get data about a book based on the ISBN
-        (first local DB, then DNB).
 
 to add late handlers, append them to late_handlers.
 they will receive arguments as specified in late_books
