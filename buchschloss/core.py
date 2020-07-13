@@ -1305,7 +1305,7 @@ def search(o: T.Type[models.Model], condition: T.Tuple = None,
                 raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
                                  '"ge", "le" or "contains"')
 
-    query = o.select(*o.str_fields)
+    query = o.select_str_fields()
     result = handle_condition(condition, query)
     if complex_params:
         return _do_complex_search(complex_action, result, complex_params)

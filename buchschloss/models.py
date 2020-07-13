@@ -239,7 +239,7 @@ class Script(Model):
     permissions: 'T.Union[core.ScriptPermissions, ScriptPermissionField]' \
         = ScriptPermissionField()
 
-    str_fields = ('name', 'setlevel')
+    str_fields = (name, setlevel)
     pk_name = 'name'
 
     def __str__(self):
