@@ -12,10 +12,11 @@ from .. import utils
 from ..utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
-                      IntEntry, NullREntry, ListEntry,
+                      IntEntry, NullREntry, ListEntry, Text,
                       IntListEntry, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
-                      SeriesEntry, OptionsFromSearch, SearchMultiChoice)
+                      SeriesEntry, OptionsFromSearch, SearchMultiChoice,
+                      FlagEnumMultiChoice)
 
 
 class ElementGroup(enum.Enum):
@@ -266,3 +267,16 @@ class BorrowSearchForm(SearchForm):
     person__libraries: mtkf.Element = ListEntry
 
     is_back: mtkf.Element = OptionalCheckbuttonWithVar
+
+
+class ScriptForm(BaseForm):
+    name: mtkf.Element = Entry
+    permissions: mtkf.Element = (
+        FlagEnumMultiChoice,
+        {'flag_enum': core.ScriptPermissions, 'get_name_prefix': 'Script::permissions::'}
+    )
+    setlevel: mtkf.Element = (
+        mtk.OptionChoiceWidget,
+        {'values': ((None, '-----'), *enumerate(utils.get_level()))})
+    current_password: mtkf.Element = NonEmptyPasswordEntry
+    code: mtkf.Element = Text
