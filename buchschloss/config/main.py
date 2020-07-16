@@ -12,6 +12,7 @@ import configobj
 from .validation import validator
 
 CONFIG_FILE_ENV = 'BUCHSCHLOSS_CONFIG'
+MAX_LEVEL = 10
 DEFAULT_INTRO_TEXT = """Buchschloss
 
 https://github.com/mik2k2/buchschloss"""
@@ -142,12 +143,10 @@ def load_names(name_file: ActuallyPathLike,
         'configobj': (configobj.ConfigObj, configobj.ConfigObjError),
     }
     name_data, __ = load_file(name_file, *loaders[name_format])
-    # special case the only list
-    level_list = name_data.pop('level names', ())
-    if not isinstance(level_list, T.Sequence) or len(level_list) != 5:
-        level_list = ['level_{}'.format(i) for i in range(5)]
     processed_data = convert_name_data(name_data)
-    processed_data['level names'] = level_list
+    # utils.get_level can crash otherwise
+    if not isinstance(processed_data.get('level names'), dict):
+        processed_data['level names'] = {}
     return processed_data
 
 

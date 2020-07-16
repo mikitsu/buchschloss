@@ -56,6 +56,12 @@ class FormattedDate(date):
         return date(self.year, self.month, self.day)
 
 
+class LevelNameDict(dict):
+    """provide defaults for missing level names"""
+    def __missing__(self, key):
+        return 'level_' + str(key)
+
+
 def run_checks():
     """Run stuff to do as specified by times set in config"""
     while True:
@@ -249,15 +255,6 @@ def get_name(internal: str):
     return name
 
 
-def get_level(number: int = None):
-    """get the level name corresponding to the given number
-        or a sequence of all level names"""
-    if number is None:
-        return config.utils.names.level_names
-    else:
-        return config.utils.names.level_names[number]
-
-
 def get_book_data(isbn: int):
     """Attempt to get book data via the ISBN from the DB, if that fails,
         try the DNB (https://portal.dnb.de)"""
@@ -339,3 +336,4 @@ def _default_late_handler(late, warn):
 
 late_handlers = [_default_late_handler]
 stuff_to_do = [globals()[k] for k in config.utils.tasks.recurring]
+level_names = LevelNameDict(config.utils.names.level_names.mapping)
