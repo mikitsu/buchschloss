@@ -101,7 +101,7 @@ class OptionsFromSearch(mtk.OptionChoiceWidget):
         super().__init__(master, values=values, **kwargs)
 
     def set(self, value):
-        return super().set(getattr(value, self.__attribute))
+        return super().set(getattr(value, self.__attribute, value))
 
 
 @mtk.ScrollableWidget(height=config.gui2.widget_size.main.height,
