@@ -9,10 +9,9 @@ import typing as T
 
 import configobj
 
-from .validation import validator
+from .validation import validator, MAX_LEVEL
 
 CONFIG_FILE_ENV = 'BUCHSCHLOSS_CONFIG'
-MAX_LEVEL = 10
 DEFAULT_INTRO_TEXT = """Buchschloss
 
 https://github.com/mik2k2/buchschloss"""
@@ -145,8 +144,22 @@ def load_names(name_file: ActuallyPathLike,
     name_data, __ = load_file(name_file, *loaders[name_format])
     processed_data = convert_name_data(name_data)
     # utils.get_level can crash otherwise
-    if not isinstance(processed_data.get('level names'), dict):
-        processed_data['level names'] = {}
+    # TODO: this is not very nice.
+    #   is there a way to make sure the keys are valid without going berserk
+    #   if something unexpected happens?
+    level_names = processed_data.get('level names')
+    if not isinstance(level_names, dict):
+        level_names = {}
+    for k, v in level_names.copy().items():
+        try:
+            level_names[int(k)] = v
+        except ValueError:
+            del level_names[k]
+    if not level_names:
+        # gui2 needs at least two
+        sys.stderr.write('ATTENTION: filling default values for level names\n')
+        level_names = {i: 'level_' + str(i) for i in range(MAX_LEVEL+1)}
+    processed_data['level names'] = level_names
     return processed_data
 
 
@@ -208,8 +221,9 @@ def merge_ui(config):
 
 def insert_name_data(config):
     """load name data into [utils][names]"""
-    config['utils']['names'] = load_names(
+    name_data = load_names(
         config['utils']['names']['file'], config['utils']['names']['format'])
+    config['utils'].__setitem__('names', name_data, unrepr=True)
 
 
 def apply_ui_intro_text_default(config):
