@@ -4,16 +4,12 @@ import getpass
 import traceback
 import typing as T
 import os
-
-try:
-    import lupa
-except ImportError as e:
-    raise ImportError('did you install cli2-requirements?') from e
 try:
     # on linux (all? some?), importing will make arrow keys usable
     import readline
 except ImportError:
     pass
+import lupa
 from .. import core
 from .. import config
 from .. import utils
@@ -181,14 +177,9 @@ def start():
                 val = rt.eval(line)
             except lupa.LuaSyntaxError:
                 val = rt.execute(line)
-        except (lupa.LuaError,
-                objects.LuaAccessForbidden,
-                core.BuchSchlossBaseError,
-                TypeError,
-                ) as e:
+        except Exception as e:
+            if config.debug:
+                traceback.print_exc()
             print(e)
-        except Exception:
-            traceback.print_exc()
-            print(utils.get_name('unexpected_error'))
         else:
             print(table_to_data(val))
