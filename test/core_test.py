@@ -615,7 +615,7 @@ def test_member_view_str(db):
     assert core.Member.view_str('name', login_context=core.LoginType.INTERNAL(0)) == {
         '__str__': str(models.Member.get_by_id('name')),
         'name': 'name',
-        'level': utils.get_level(0),
+        'level': utils.level_names[0],
     }
 
 

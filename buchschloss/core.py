@@ -190,7 +190,7 @@ class BuchSchlossPermError(BuchSchlossBaseError):
     def __init__(self, level):
         super().__init__(utils.get_name('no_permission'),
                          utils.get_name('must_be_{}').format(
-                             utils.get_level(level)))
+                             utils.level_names[level]))
 
 
 class BuchSchlossNotFoundError(BuchSchlossError.template_title('%s_not_found')
@@ -1094,7 +1094,7 @@ class Member(ActionNamespace):
         return {
             '__str__': str(member),
             'name': member.name,
-            'level': utils.get_level(member.level),
+            'level': utils.level_names[member.level],
         }
 
 
