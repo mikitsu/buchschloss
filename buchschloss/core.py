@@ -1299,7 +1299,7 @@ class ComplexSearch:  # TODO: use misc.Instance for this
         return to[0] if self.return_first_item else to
 
 
-internal_lc = LoginType.INTERNAL(5)
+internal_lc = LoginType.INTERNAL(config.MAX_LEVEL + 1)
 guest_lc = LoginType.GUEST(0)
 misc_data = MiscData()
 
