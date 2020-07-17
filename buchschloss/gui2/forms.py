@@ -248,6 +248,7 @@ class BorrowForm(BorrowRestCommonForm):
         default_content = {'weeks': '4'}
 
     weeks: mtkf.Element = IntEntry
+    override: mtkf.Element = CheckbuttonWithVar
 
 
 class RestituteForm(BorrowRestCommonForm):
