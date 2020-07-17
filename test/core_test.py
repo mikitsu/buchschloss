@@ -670,6 +670,12 @@ def test_borrow_new(db):
     with pytest.raises(core.BuchSchlossBaseError):
         borrow_new(person=123, book=2, weeks=weeks)
     borrow_new(person=123, book=4, weeks=weeks)
+    # allows overriding
+    ctxt.level = 2
+    with pytest.raises(core.BuchSchlossBaseError):
+        borrow_new(2, 123, weeks, override=True)
+    ctxt.level = 4
+    borrow_new(2, 123, weeks, override=True)
 
 
 def test_search(db):
