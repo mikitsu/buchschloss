@@ -262,7 +262,7 @@ def apply_permission_level_defaults(config):
     special_replacements = (
         (('Borrow', 'search'), ('Borrow', 'view')),
         (('Group', 'activate'), ('Book', 'edit')),
-        (('Member', 'change_password'), ('Member', 'edit')),
+        (('Member', 'change password'), ('Member', 'edit')),
     )
     for (src_1, src_2), (dest_1, dest_2) in special_replacements:
         if conf[src_1][src_2] is None:
