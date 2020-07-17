@@ -907,14 +907,15 @@ class Borrow(ActionNamespace):
     """Namespace for Borrow-related functions"""
     model = models.Borrow
 
-    @staticmethod
-    @from_db(models.Book, models.Person)
-    def new(book, person, weeks, *, login_context):
+    @classmethod
+    @from_db(book=models.Book, person=models.Person)
+    def new(cls, book, person, weeks, *, override=False, login_context):
         """Borrow a book.
 
             ``book`` is the ID of the Book begin borrowed
             ``person`` is the ID of the Person borrowing the book
             ``weeks`` is the time to borrow in weeks.
+            ``override`` may be specified to ignore some issues (b, c, e)
 
             raise an error if
                 a) the Person or Book does not exist
@@ -930,23 +931,31 @@ class Borrow(ActionNamespace):
             in the configuration settings
         """
         if weeks > config.core.borrow_time_limit[login_context.level]:
-            raise BuchSchlossPermError(1)
+            min_level = next(i for i, allowed_weeks in
+                             enumerate([*config.core.borrow_time_limit, float('inf')])
+                             if weeks <= allowed_weeks)
+            raise BuchSchlossPermError(min_level)
         if weeks <= 0:
             raise BuchSchlossError('Borrow', 'Borrow::borrow_length_not_positive')
         if not book.is_active or book.borrow:
             raise BuchSchlossError('Borrow', 'Borrow::Book_{}_not_available', book.id)
-        if book.library not in person.libraries:
-            raise BuchSchlossError('Borrow', 'Borrow::{person}_not_in_Library_{library}',
-                                   person=person, library=book.library.name)
-        if (book.library.pay_required
-                and (person.borrow_permission or date.min) < date.today()):
-            raise BuchSchlossError('Borrow', 'Borrow::Library_{}_needs_payment', book.library)
-        if len(person.borrows) >= person.max_borrow:
-            raise BuchSchlossError('Borrow', 'Borrow::{}_reached_max_borrow', person)
+        if override:
+            check_level(login_context, cls.required_levels.override, 'Borrow.new.override')
+        else:
+            if book.library not in person.libraries:
+                raise BuchSchlossError(
+                    'Borrow', 'Borrow::{person}_not_in_Library_{library}',
+                    person=person, library=book.library.name)
+            if (book.library.pay_required
+                    and (person.borrow_permission or date.min) < date.today()):
+                raise BuchSchlossError(
+                    'Borrow', 'Borrow::Library_{}_needs_payment', book.library)
+            if len(person.borrows) >= person.max_borrow:
+                raise BuchSchlossError('Borrow', 'Borrow::{}_reached_max_borrow', person)
         rdate = date.today() + timedelta(weeks=weeks)
         models.Borrow.create(person=person, book=book, return_date=rdate)
-        logging.info('{} borrowed {} to {} until {}'.format(
-            login_context, book, person, rdate))
+        logging.info('{} borrowed {} to {} until {}{}'.format(
+            login_context, book, person, rdate, ' with override=True'*override))
         latest = misc_data.latest_borrowers
         # since the values are written to the DB on explicit assignment only
         # [[and values aren't cached (yet, but I still don't want to rely on it)
