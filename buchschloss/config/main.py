@@ -253,14 +253,14 @@ def redirect_stderr(config):
 def apply_permission_level_defaults(config):
     """apply default values for permission levels"""
     conf = config['core']['required levels']
-    for k in ('Book', 'Person', 'Group', 'Library', 'Borrow', 'Member'):
+    for k in ('Book', 'Person', 'Group', 'Library', 'Member'):
         if conf[k]['search'] is None:
             conf[k]['search'] = conf[k]['view']
-        if 'edit' in conf[k] and conf[k]['edit'] is None:
+        if conf[k]['edit'] is None:
             conf[k]['edit'] = conf[k]['new']
 
     special_replacements = (
-        (('Borrow', 'restitute'), ('Borrow', 'new')),
+        (('Borrow', 'search'), ('Borrow', 'view')),
         (('Group', 'activate'), ('Book', 'edit')),
         (('Member', 'change_password'), ('Member', 'edit')),
     )
