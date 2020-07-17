@@ -261,6 +261,7 @@ def apply_permission_level_defaults(config):
 
     special_replacements = (
         (('Borrow', 'search'), ('Borrow', 'view')),
+        (('Borrow', 'override'), ('Person', 'edit')),
         (('Group', 'activate'), ('Book', 'edit')),
         (('Member', 'change password'), ('Member', 'edit')),
     )
