@@ -250,10 +250,32 @@ def redirect_stderr(config):
         sys.stderr = DummyErrorFile()
 
 
+def apply_permission_level_defaults(config):
+    """apply default values for permission levels"""
+    conf = config['core']['required levels']
+    for k in ('Book', 'Person', 'Group', 'Library', 'Borrow', 'Member'):
+        if conf[k]['search'] is None:
+            conf[k]['search'] = conf[k]['view']
+        if 'edit' in conf[k] and conf[k]['edit'] is None:
+            conf[k]['edit'] = conf[k]['new']
+
+    special_replacements = (
+        (('Borrow', 'restitute'), ('Borrow', 'new')),
+        (('Group', 'activate'), ('Book', 'edit')),
+        (('Member', 'change_password'), ('Member', 'edit')),
+    )
+    for (src_1, src_2), (dest_1, dest_2) in special_replacements:
+        if conf[src_1][src_2] is None:
+            conf[src_1][src_2] = conf[dest_1][dest_2]
+
+    return config
+
+
 pre_validation = [merge_ui]
 post_validation = (
     insert_name_data,
     apply_ui_intro_text_default,
+    apply_permission_level_defaults,
     check_smtp_auth_data,
     redirect_stderr,
 )
