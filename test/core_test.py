@@ -219,12 +219,6 @@ def test_person_view_repr(db):
         person_view(124)
 
 
-def test_person_view_attr(db):
-    """test Person.view_attr"""
-    create_person(123)
-    for_levels(partial(core.Person.view_attr, 123, 'id'), 1, lambda r: r == 123)
-
-
 def test_book_new(db):
     """test Book.new"""
     models.Library.create(name='main')
