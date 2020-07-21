@@ -51,14 +51,18 @@ def lua_set(obj, name, value):
 
 def lua_get(obj, name):
     """handle attribute access from Lua, delegating if possible"""
-    try:
+    with objects.CheckLuaAccessForbidden():
         return obj.lua_get(name)
-    except AttributeError:
+    # noinspection PyUnreachableCode
+    try:
         val = getattr(obj, name)
-        if isinstance(val, (int, str, float)):
+    except AttributeError:
+        return None
+    else:
+        if isinstance(val, (int, str, float, bool)):
             return val
         else:
-            raise AttributeError
+            return None
 
 
 def restrict_runtime(runtime, whitelist):
