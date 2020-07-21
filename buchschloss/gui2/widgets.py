@@ -316,12 +316,8 @@ class SearchResultWidget(mtk.ContainingWidget):
     def __init__(self, master, results, view_func):
         widgets = [(Label, {'text': utils.get_name('{}_results').format(len(results))})]
         for r in results:
-            # This is a very hacky way of getting the actual ID
-            # because in theory, what view_ns returns is not automatically
-            # the model instance
-            r_id = getattr(r, type(r).pk_name)
             widgets.append((Button, {
-                'text': r,
+                'text': r.id,
                 'wraplength': config.gui2.widget_size.main.width,
                 'command': partial(view_func, r_id)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))

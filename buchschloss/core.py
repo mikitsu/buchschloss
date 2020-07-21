@@ -1238,10 +1238,14 @@ class DataNamespace:
             return [view_ns(get_id(o), login_context=self._login_context)
                     for o in getattr(self._data, item)]
         elif item in self._handlers.get('wrap_dns', {}):
-            return self._handlers['wrap_dns'][item].view_ns(
-                get_id(getattr(self._data, item)),
-                login_context=self._login_context
-            )
+            obj = getattr(self._data, item)
+            if obj is None:
+                return None
+            else:
+                return self._handlers['wrap_dns'][item].view_ns(
+                    get_id(obj),
+                    login_context=self._login_context
+                )
         elif item == 'id':
             # Not making the same mistake twice
             return getattr(self._data, type(self._data).pk_name)

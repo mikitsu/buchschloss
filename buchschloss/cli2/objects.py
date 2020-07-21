@@ -78,7 +78,6 @@ class LuaActionNS(LuaObject):
         self.get_allowed += extra_get_allowed
         self.login_context = login_context
         self.action_ns = action_ns
-        self.data_ns = LuaDataNS.specific_class[action_ns]
 
     def lua_get(self, name):
         """Allow access to names stored in self.action_ns"""
@@ -100,20 +99,16 @@ class LuaActionNS(LuaObject):
         """transform the Lua table into a tuple"""
         results = self.action_ns.search(cli2.table_to_data(condition),
                                         login_context=self.login_context)
-        return self.runtime.table(*(self.data_ns(o, runtime=self.runtime) for o in results))
+        return self.runtime.table(*(LuaDataNS(o, runtime=self.runtime) for o in results))
 
     def view_ns(self, id_):
         """wrap the result in LuaDataNS"""
-        return self.data_ns(self.action_ns.view_ns(id_, login_context=self.login_context),
-                            runtime=self.runtime)
+        return LuaDataNS(self.action_ns.view_ns(id_, login_context=self.login_context),
+                         runtime=self.runtime)
 
 
 class LuaDataNS(LuaObject):
     """provide access to data as returned by view_ns"""
-    specific_class: 'T.ClassVar[T.Dict[T.Type[core.ActionNamespace, LuaDataNS]]]' = {}
-    wrap_iter: 'T.ClassVar[T.Mapping[str, T.Type[LuaDataNS]]]'
-    wrap_data_ns: T.ClassVar[T.Mapping[str, T.Type[core.ActionNamespace]]]
-    __waiting_specific_class = {}
 
     def __init__(self, data_ns, **kwargs):
         super().__init__(**kwargs)
@@ -122,49 +117,11 @@ class LuaDataNS(LuaObject):
     def __repr__(self):
         return str(self.data_ns)
 
-    @classmethod
-    def add_specific(cls,
-                     is_for: T.Type[core.ActionNamespace],
-                     allow: T.Iterable[str],
-                     wrap_iter: T.Mapping[str, T.Type[core.ActionNamespace]] = (),
-                     wrap_data_ns: T.Mapping[str, T.Type[core.ActionNamespace]] = None):
-        """add a subclass with correct access checking"""
-        wrap_data_ns = wrap_data_ns or {}
-        get_allowed = tuple(itertools.chain(cls.get_allowed, allow))
-        wrap_iter = dict(wrap_iter)
-        for k, v in wrap_iter.items():
-            try:
-                wrap_iter[k] = cls.specific_class[v]
-            except KeyError:
-                cls.__waiting_specific_class.setdefault(v, []).append((is_for, k))
-        new_cls = type('Lua{}DataNS'.format(is_for.__name__), (cls,),
-                       {'get_allowed': get_allowed,
-                        'wrap_iter': dict(wrap_iter),
-                        'wrap_data_ns': dict(wrap_data_ns)})
-        cls.specific_class[is_for] = new_cls
-        if is_for in cls.__waiting_specific_class:
-            for k in cls.__waiting_specific_class[is_for]:
-                other_cls, other_k = k
-                cls.specific_class[other_cls].wrap_iter[other_k] = new_cls
-            del cls.__waiting_specific_class[is_for]
-
     def lua_get(self, name):
         """enforce wrap_iter ans wrap_data_ns"""
-        if name in self.wrap_iter:
-            return self.runtime.table(*(self.wrap_iter[name](o, runtime=self.runtime)
-                                        for o in getattr(self.data_ns, name)))
-        elif name in self.wrap_data_ns:
-            if getattr(self.data_ns, name) is not None:
-                return self.specific_class[self.wrap_data_ns[name]](
-                    getattr(self.data_ns, name), runtime=self.runtime)
-            else:
-                return None
-        elif name == '__str__':
-            return str(self.data_ns)
+        if name.startswith('_'):
+            raise LuaAccessForbidden
         else:
-            with CheckLuaAccessForbidden():
-                return super().lua_get(name)
-            # noinspection PyUnreachableCode
             return getattr(self.data_ns, name)
 
 
@@ -286,22 +243,3 @@ class LuaRequestsInterface(LuaObject):
             return cli2.data_to_table(self.runtime, r.json())
         else:
             return r.text
-
-
-LuaDataNS.add_specific(core.Book,
-                       ('id isbn author title series series_number language publisher '
-                        'concerned_people year medium genres shelf is_active').split(),
-                       wrap_iter={'groups': core.Group},
-                       wrap_data_ns={'library': core.Library, 'borrow': core.Borrow})
-LuaDataNS.add_specific(core.Person,
-                       'id first_name last_name class_ max_borrow pay_date'.split(),
-                       wrap_iter={'libraries': core.Library, 'borrows': core.Borrow})
-LuaDataNS.add_specific(core.Library,
-                       ('name', 'pay_required'),
-                       wrap_iter={'books': core.Book, 'people': core.Person})
-LuaDataNS.add_specific(core.Group, ('name',), {'books': core.Book})
-LuaDataNS.add_specific(core.Borrow,
-                       ('id', 'return_date', 'is_back'),
-                       wrap_data_ns={'book': core.Book, 'person': core.Person})
-LuaDataNS.add_specific(core.Member, ('name', 'level'))
-LuaDataNS.add_specific(core.Script, ('code', 'setlevel', 'name'))
