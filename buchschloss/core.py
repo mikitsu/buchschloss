@@ -430,18 +430,25 @@ class ActionNamespace:
 
     def __init_subclass__(cls, **kwargs):
         cls.required_levels = getattr(config.core.required_levels, cls.__name__)
-        for name, func in vars(cls).items():
+        for name, wrapped_func in vars(cls).items():
             # the two exceptions
             if (cls.__name__, name) in (('Borrow', 'new'), ('Member', 'change_password')):
                 continue
             # since these are only namespaces, no normal methods
-            if isinstance(func, (staticmethod, classmethod)):
+            if isinstance(wrapped_func, (staticmethod, classmethod)):
+                func = wrapped_func.__func__
                 if name.startswith('view'):
                     req_level = cls.required_levels['view']
                 else:
                     req_level = cls.required_levels[name]
-                wrapped = level_required(req_level)(func.__func__)  # noqa
-                setattr(cls, name, type(func)(wrapped))
+                checker = partial(check_level, level=req_level, resource=func.__qualname__)
+
+                @wraps(func)
+                def rewrapped_func(*args, login_context: LoginContext, **kwargs):
+                    checker(login_context)
+                    return func(*args, login_context=login_context, **kwargs)
+
+                setattr(cls, name, type(wrapped_func)(rewrapped_func))
 
     @classmethod
     @abc.abstractmethod
