@@ -5,7 +5,6 @@ import types
 
 from buchschloss import core
 from buchschloss import cli2
-from buchschloss.cli2 import objects
 
 
 class DummyActionNS:
@@ -26,12 +25,6 @@ def test_new(monkeypatch):
     """test <Model>:new()"""
     book_dummy = DummyActionNS({'new': [1, 2, 3]})
     monkeypatch.setattr(core, 'Book', book_dummy)
-    monkeypatch.setitem(objects.LuaDataNS.specific_class, book_dummy,
-                        type('LuaDummyDataNS', (objects.LuaDataNS,), {
-                            'get_allowed': (),
-                            'wrap_iter': {},
-                            'wrap_data_ns': {}
-                        }))
     rt = cli2.prepare_runtime(core.guest_lc)
     assert rt.eval('Book:new{author="author", title="title"}') == 1
     rt.execute('Book:new({year=0, isbn=123})')
@@ -48,12 +41,6 @@ def test_view(monkeypatch):
         types.SimpleNamespace(first_name='first', pay_date=None),
     ]})
     monkeypatch.setattr(core, 'Person', person_dummy)
-    monkeypatch.setitem(objects.LuaDataNS.specific_class, person_dummy,
-                        type('LuaDummyDataNS', (objects.LuaDataNS,), {
-                            'get_allowed': ('first_name', 'pay_date'),
-                            'wrap_iter': {},
-                            'wrap_data_ns': {}
-                        }))
     rt = cli2.prepare_runtime(core.guest_lc)
     assert tuple(rt.execute(
         'date = Person[123].pay_date; return {date.day, date.month, date.year}')
@@ -71,8 +58,6 @@ def test_specials(monkeypatch):
     group_dummy = DummyActionNS({'activate': [None], 'view_ns': [object()]})
     monkeypatch.setattr(core, 'Borrow', borrow_dummy)
     monkeypatch.setattr(core, 'Group', group_dummy)
-    monkeypatch.setitem(objects.LuaDataNS.specific_class, borrow_dummy, object)
-    monkeypatch.setitem(objects.LuaDataNS.specific_class, group_dummy, lambda *a, **kw: None)
     rt = cli2.prepare_runtime(core.guest_lc)
     assert rt.eval('Borrow:restitute{123, 456}') == 'A4'
     assert borrow_dummy.calls['restitute'][0] == ((123, 456), {'login_context': core.guest_lc})
