@@ -1226,6 +1226,9 @@ class DataNamespace:
         self._handlers = self.data_handling[ans]
         self._login_context = login_context
 
+    def __str__(self):
+        return str(self._data)
+
     def __getattr__(self, item):
         def get_id(obj):
             """I hate myself for not calling the IDs 'id'"""
