@@ -2,7 +2,6 @@
 
 import abc
 import functools
-import itertools
 import typing as T
 import warnings
 
@@ -128,7 +127,8 @@ class LuaDataNS(LuaObject):
             elif (isinstance(val, T.Sequence)
                   and val
                   and isinstance(val[0], core.DataNamespace)):
-                return [LuaDataNS(v, runtime=self.runtime) for v in val]
+                return self.runtime.table_from(
+                    [LuaDataNS(v, runtime=self.runtime) for v in val])
             else:
                 return val
 

@@ -95,6 +95,20 @@ def test_action_ns():
         rt.eval('book.new{"positional", "as well"}')
 
 
+def test_data_ns(monkeypatch):
+    """test LuaDataNS"""
+    monkeypatch.setattr(core, 'DataNamespace', Dummy)
+    data = Dummy(a=1, b=Dummy(x=1), c=[Dummy(x=2), Dummy(x=3)])
+    rt = lupa.LuaRuntime(attribute_handlers=(cli2.lua_get, cli2.lua_set))  # noqa
+    rt.globals()['ldn'] = objects.LuaDataNS(data, runtime=rt)
+    assert rt.eval('type(ldn)') == 'userdata'
+    assert rt.eval('ldn.a') == 1
+    assert rt.eval('type(ldn.b)') == 'userdata'
+    assert rt.eval('ldn.b.x') == 1
+    assert rt.eval('type(ldn.c)') == 'table'
+    assert rt.eval('ldn.c[1].x') == 2
+
+
 def test_login_context():
     """test LuaLoginContext"""
     rt = lupa.LuaRuntime()
