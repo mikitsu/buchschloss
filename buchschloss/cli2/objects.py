@@ -118,11 +118,19 @@ class LuaDataNS(LuaObject):
         return str(self.data_ns)
 
     def lua_get(self, name):
-        """enforce wrap_iter ans wrap_data_ns"""
+        """return data values, re-wrapping if necessary"""
         if name.startswith('_'):
             raise LuaAccessForbidden
         else:
-            return getattr(self.data_ns, name)
+            val = getattr(self.data_ns, name)
+            if isinstance(val, core.DataNamespace):
+                return LuaDataNS(val, runtime=self.runtime)
+            elif (isinstance(val, T.Sequence)
+                  and val
+                  and isinstance(val[0], core.DataNamespace)):
+                return [LuaDataNS(v, runtime=self.runtime) for v in val]
+            else:
+                return val
 
 
 class LuaLoginContext(LuaObject):
