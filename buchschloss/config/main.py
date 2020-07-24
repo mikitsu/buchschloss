@@ -224,6 +224,8 @@ def insert_name_data(config):
     """load name data into [utils][names]"""
     name_data = load_names(
         config['utils']['names']['file'], config['utils']['names']['format'])
+    # without unrepr=True, this gets converted to a Section
+    # which fails with numeric keys (level representations)
     config['utils'].__setitem__('names', name_data, unrepr=True)
 
 
@@ -266,9 +268,9 @@ def apply_permission_level_defaults(config):
         (('Group', 'activate'), ('Book', 'edit')),
         (('Member', 'change password'), ('Member', 'edit')),
     )
-    for (src_1, src_2), (dest_1, dest_2) in special_replacements:
-        if conf[src_1][src_2] is None:
-            conf[src_1][src_2] = conf[dest_1][dest_2]
+    for (dest_1, dest_2), (src_1, src_2) in special_replacements:
+        if conf[dest_1][dest_2] is None:
+            conf[dest_1][dest_2] = conf[src_1][src_2]
 
     return config
 
