@@ -154,8 +154,9 @@ def load_names(name_file: ActuallyPathLike,
         try:
             level_names[int(k)] = v
         except ValueError:
-            del level_names[k]
-    if not level_names:
+            pass
+        del level_names[k]
+    if not len(level_names) >= 2:
         # gui2 needs at least two
         sys.stderr.write('ATTENTION: filling default values for level names\n')
         level_names = {i: 'level_' + str(i) for i in range(MAX_LEVEL+1)}
