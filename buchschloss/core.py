@@ -662,7 +662,7 @@ class Person(ActionNamespace):
         logging.info('{} edited {}'.format(login_context, person)
                      + (' setting borrow_permission to {}'
                         .format(kwargs['borrow_permission'])
-                        if 'pay_date' in kwargs else ''))
+                        if 'borrow_permission' in kwargs else ''))
         return errors
 
     @staticmethod
@@ -922,11 +922,10 @@ class Borrow(ActionNamespace):
             the maximum amount of time a book may be borrowed for is defined
             in the configuration settings
         """
-        if weeks > config.core.borrow_time_limit[login_context.level]:
-            min_level = next(i for i, allowed_weeks in
-                             enumerate([*config.core.borrow_time_limit, float('inf')])
-                             if weeks <= allowed_weeks)
-            raise BuchSchlossPermError(min_level)
+        req_level = next(i for i, allowed_weeks in
+                         enumerate([*config.core.borrow_time_limit, float('inf')])
+                         if weeks <= allowed_weeks)
+        check_level(login_context, req_level, 'Borrow.new')
         if weeks <= 0:
             raise BuchSchlossError('Borrow', 'Borrow::borrow_length_not_positive')
         if not book.is_active or book.borrow:

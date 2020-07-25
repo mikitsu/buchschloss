@@ -227,10 +227,9 @@ class SearchMultiChoice(MultiChoicePopup):
 
     def __init__(self, master, cnf={}, *,
                  action_ns: core.ActionNamespace,
-                 attribute='name',
                  **kwargs):
         kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
-        options = [(getattr(o, attribute), str(o)) for o in
+        options = [(o, str(o)) for o in
                    action_ns.search((), login_context=core.internal_lc)]
         super().__init__(master, cnf, options=options, **kwargs)
 
