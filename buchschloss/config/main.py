@@ -159,7 +159,7 @@ def load_names(name_file: ActuallyPathLike,
     if not len(level_names) >= 2:
         # gui2 needs at least two
         sys.stderr.write('ATTENTION: filling default values for level names\n')
-        level_names = {i: 'level_' + str(i) for i in range(MAX_LEVEL+1)}
+        level_names = {i: 'level_' + str(i) for i in range(MAX_LEVEL + 1)}
     processed_data['level names'] = level_names
     return processed_data
 

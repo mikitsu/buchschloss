@@ -946,7 +946,7 @@ class Borrow(ActionNamespace):
         rdate = date.today() + timedelta(weeks=weeks)
         models.Borrow.create(person=person, book=book, return_date=rdate)
         logging.info('{} borrowed {} to {} until {}{}'.format(
-            login_context, book, person, rdate, ' with override=True'*override))
+            login_context, book, person, rdate, override * ' with override=True'))
         latest = misc_data.latest_borrowers
         # since the values are written to the DB on explicit assignment only
         # [[and values aren't cached (yet, but I still don't want to rely on it)
