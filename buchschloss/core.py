@@ -352,7 +352,7 @@ def auth_required(f):
                 raise TypeError('when called with a MEMBER login context, '
                                 '``current_password`` must be given')
             # noinspection PyUnresolvedReferences
-            login_member = Member.view_ns(login_context.name, login_context=internal_lc)
+            login_member = models.Member.get_by_id(login_context.name)
             if authenticate(login_member, current_password):
                 logging.info('{} passed authentication for {}'.format(
                     login_context, f.__qualname__))
@@ -459,7 +459,7 @@ class ActionNamespace(abc.ABC):
         """Return a namespace of information"""
         check_level(login_context, cls.view_level, cls.__name__ + '.view_ns')
         try:
-            return cls.model.get_by_id(id_)
+            return DataNamespace(cls, cls.model.get_by_id(id_), login_context)
         except cls.model.DoesNotExist:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
@@ -469,18 +469,7 @@ class ActionNamespace(abc.ABC):
         check_level(login_context, cls.view_level, cls.__name__ + '.view_repr')
         try:
             return str(next(iter(cls.model.select_str_fields().where(
-                getattr(cls.model, cls.model.pk_name) == id_))))
-        except StopIteration:
-            raise BuchSchlossNotFoundError(cls.model.__name__, id_)
-
-    @classmethod
-    def view_attr(cls, id_: T.Union[str, int], name: str, *, login_context):
-        """Return the value of a specific attribute"""
-        # this is said to be faster...
-        check_level(login_context, cls.view_level, cls.__name__ + '.view_attr')
-        try:
-            return getattr(next(iter(cls.model.select(getattr(cls.model, name)).where(
-                getattr(cls.model, cls.model.pk_name) == id_))), name)
+                getattr(cls.model, cls.model.pk_name) == id_).limit(1))))
         except StopIteration:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
@@ -1206,7 +1195,7 @@ class Script(ActionNamespace):
         if ScriptPermissions.STORE in script.permissions:
             edit_func = partial(Script.edit, script.name, login_context=internal_lc)
             add_storage = (
-                lambda: Script.view_ns(script.name, login_context=login_context).storage,
+                lambda: Script.view_ns(script.name, login_context=internal_lc).storage,
                 lambda data: edit_func(storage=data),
             )
         else:
@@ -1225,6 +1214,83 @@ class Script(ActionNamespace):
             except (KeyError, TypeError):
                 raise BuchSchlossError('Script.execute', 'no_valid_function_{}', function)
             func()
+
+
+class DataNamespace:
+    """superclass for data namespaces returned by view_ns"""
+    def __init__(self, ans: T.Type[ActionNamespace],
+                 raw_data: T.Any,
+                 login_context: LoginContext):
+        """initialize this namespace with data from the database"""
+        self._data = raw_data
+        self._handlers = self.data_handling[ans]
+        self._login_context = login_context
+
+    def __eq__(self, other):
+        if isinstance(other, DataNamespace):
+            return self._data == other._data
+        else:
+            return False
+
+    def __str__(self):
+        return str(self._data)
+
+    def __getattr__(self, item):
+        def get_id(obj):
+            """I hate myself for not calling the IDs 'id'"""
+            return getattr(obj, type(obj).pk_name)
+
+        if item in self._handlers['allow']:
+            return getattr(self._data, item)
+        elif item in self._handlers.get('wrap_iter', {}):
+            view_ns = self._handlers['wrap_iter'][item].view_ns
+            return [view_ns(get_id(o), login_context=self._login_context)
+                    for o in getattr(self._data, item)]
+        elif item in self._handlers.get('wrap_dns', {}):
+            obj = getattr(self._data, item)
+            if obj is None:
+                return None
+            else:
+                return self._handlers['wrap_dns'][item].view_ns(
+                    get_id(obj),
+                    login_context=self._login_context
+                )
+        elif item == 'id':
+            # Not making the same mistake twice
+            return getattr(self._data, type(self._data).pk_name)
+        else:
+            raise AttributeError("DataNamespace object has no attribute '%s'" % item)
+
+    data_handling: T.Mapping[T.Type[ActionNamespace], T.Mapping] = {
+        Book: {
+            'allow': ('id isbn author title series series_number language publisher '
+                      'concerned_people year medium genres shelf is_active').split(),
+            'wrap_iter': {'groups': Group},
+            'wrap_dns': {'library': Library, 'borrow': Borrow}
+        },
+        Person: {
+            'allow': 'id first_name last_name class_ max_borrow pay_date'.split(),
+            'wrap_iter': {'libraries': Library, 'borrows': Borrow},
+        },
+        Library: {
+            'allow': ('name', 'pay_required'),
+            'wrap_iter': {'books': Book, 'people': Person},
+        },
+        Group: {
+            'allow': ('name',),
+            'wrap_iter': {'books': Book},
+        },
+        Borrow: {
+            'allow': ('id', 'return_date', 'is_back'),
+            'wrap_dns': {'book': Book, 'person': Person},
+        },
+        Member: {
+            'allow': ('name', 'level'),
+        },
+        Script: {
+            'allow': ('code', 'setlevel', 'name')
+        },
+    }
 
 
 def search(o: T.Type[models.Model], condition: T.Tuple = None,

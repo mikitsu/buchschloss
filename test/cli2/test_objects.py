@@ -44,7 +44,7 @@ class Dummy:  # TODO: move this out to misc
         """return self._default if set, else self"""
         if item == '_default':
             return self
-        elif item in ('_str', '_items'):  # _bool and _call are always set
+        elif item in ('_str', '_items', '_instance'):  # _bool and _call are always set
             raise AttributeError
         else:
             return self._default
@@ -55,6 +55,9 @@ class Dummy:  # TODO: move this out to misc
         except (KeyError, IndexError, AttributeError):
             return self._default
 
+    def __instancecheck__(self, instance):
+        return self._instance(instance, self)
+
 
 def test_action_ns():
     FLAG = object()
@@ -62,7 +65,7 @@ def test_action_ns():
     def view_ns(a, *, login_context):
         assert login_context is FLAG
         if a == 1:
-            return FLAG
+            return Dummy(a=FLAG)
         else:
             raise core.BuchSchlossBaseError('', '')
 
@@ -73,14 +76,13 @@ def test_action_ns():
     # noinspection PyArgumentList
     rt = lupa.LuaRuntime(attribute_handlers=(cli2.lua_get, cli2.lua_set))
     dummy = Dummy(view_ns=view_ns, new=new, _call=lambda s, dns, runtime=None: dns)
-    objects.LuaDataNS.specific_class[dummy] = dummy
     ns_book = objects.LuaActionNS(dummy, login_context=FLAG, runtime=rt)
     rt.globals()['book'] = ns_book
     with pytest.raises(AttributeError):
         rt.eval('book.view_str')
     assert rt.eval('book.view_ns') is not None
     assert rt.eval('book.new')
-    assert rt.eval('book.view_ns(1)') is FLAG
+    assert rt.eval('book.view_ns(1).a') is FLAG
     with pytest.raises(core.BuchSchlossBaseError):
         rt.eval('book.view_ns(2)')
     assert (rt.eval('book.new{param="val 1", other_param="something else"}')
@@ -93,18 +95,18 @@ def test_action_ns():
         rt.eval('book.new{"positional", "as well"}')
 
 
-def test_data_ns():
-    rt = lupa.LuaRuntime()
-    dummy = Dummy(a=1, b=[1, 2, 3], c=Dummy(a='1', d=5), e=7)
-    objects.LuaDataNS.add_specific(Dummy, 'ad', {'b': Dummy}, {'c': Dummy})
-    ldn = objects.LuaDataNS.specific_class[Dummy](dummy, runtime=rt)
-    assert ldn.lua_get('a') == 1
-    assert list(ldn.lua_get('b')) == [1, 2, 3]
-    assert isinstance(ldn.lua_get('c'), objects.LuaDataNS)
-    assert ldn.lua_get('c').lua_get('d') == 5
-    assert ldn.lua_get('c').lua_get('a') == '1'
-    with pytest.raises(AttributeError):
-        ldn.lua_get('e')
+def test_data_ns(monkeypatch):
+    """test LuaDataNS"""
+    monkeypatch.setattr(core, 'DataNamespace', Dummy)
+    data = Dummy(a=1, b=Dummy(x=1), c=[Dummy(x=2), Dummy(x=3)])
+    rt = lupa.LuaRuntime(attribute_handlers=(cli2.lua_get, cli2.lua_set))  # noqa
+    rt.globals()['ldn'] = objects.LuaDataNS(data, runtime=rt)
+    assert rt.eval('type(ldn)') == 'userdata'
+    assert rt.eval('ldn.a') == 1
+    assert rt.eval('type(ldn.b)') == 'userdata'
+    assert rt.eval('ldn.b.x') == 1
+    assert rt.eval('type(ldn.c)') == 'table'
+    assert rt.eval('ldn.c[1].x') == 2
 
 
 def test_login_context():

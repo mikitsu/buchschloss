@@ -96,6 +96,37 @@ def test_misc_data(db):
         core.misc_data.also_doesnt_exist = None
 
 
+def test_data_ns():
+    FLAG = object()
+    class DataA(core.Dummy): pass
+    class DataB(core.Dummy):
+        pk_name = 'x'
+        cur_id = 0
+
+        @classmethod
+        def view_ns(cls, id_, login_context):
+            assert id_ == cls.cur_id
+            cls.cur_id += 1
+            assert login_context is FLAG
+            return FLAG
+
+    core.DataNamespace.data_handling[DataA] = {
+        'allow': 'ab',
+        'wrap_iter': {'i': DataB},
+        'wrap_dns': {'d': DataB, 'n': DataB},
+    }
+    core.DataNamespace.data_handling[DataB] = {'allow': 'ad'}
+    data = core.DataNamespace(
+        DataA,
+        DataA(a=1, b=[1, 2, 3], d=DataB(x=0), i=[DataB(x=1), DataB(x=2)], n=None),
+        login_context=FLAG,
+    )
+    assert data.a == 1
+    assert data.b == [1, 2, 3]
+    assert data.d is FLAG
+    assert data.i[0] is FLAG
+
+
 def test_person_new(db):
     """test Person.new"""
     ctxt = for_levels(
@@ -217,12 +248,6 @@ def test_person_view_repr(db):
     person_view = partial(core.Person.view_repr, login_context=ctxt)
     with pytest.raises(core.BuchSchlossBaseError):
         person_view(124)
-
-
-def test_person_view_attr(db):
-    """test Person.view_attr"""
-    create_person(123)
-    for_levels(partial(core.Person.view_attr, 123, 'id'), 1, lambda r: r == 123)
 
 
 def test_book_new(db):
