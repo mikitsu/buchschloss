@@ -1226,6 +1226,12 @@ class DataNamespace:
         self._handlers = self.data_handling[ans]
         self._login_context = login_context
 
+    def __eq__(self, other):
+        if isinstance(other, DataNamespace):
+            return self._data == other._data
+        else:
+            return False
+
     def __str__(self):
         return str(self._data)
 
