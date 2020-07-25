@@ -308,23 +308,6 @@ def check_level(login_context, level, resource):
         raise BuchSchlossPermError(level)
 
 
-def level_required(level):
-    """require the given level for executing the wrapped function.
-    raise a BuchSchlossBaseError when requirement not met."""
-
-    def wrapper_maker(f):
-        checker = partial(check_level, level=level, resource=f.__qualname__)
-
-        @wraps(f)
-        def level_required_wrapper(*args, login_context: LoginContext, **kwargs):
-            checker(login_context)
-            return f(*args, login_context=login_context, **kwargs)
-
-        return level_required_wrapper
-
-    return wrapper_maker
-
-
 def auth_required(f):
     """require the currently logged member's password for executing the function
     raise a BuchSchlossBaseError if not given or wrong"""
@@ -428,27 +411,29 @@ class ActionNamespace:
     model: T.ClassVar[models.Model]
     required_levels: T.Any
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls):
+        def level_required(level, f):
+            """due to scoping, this has to be a separate function"""
+            @wraps(f)
+            def wrapper(*args, login_context: LoginContext, **kwargs):
+                checker(login_context)
+                return f(*args, login_context=login_context, **kwargs)
+
+            checker = partial(check_level, level=level, resource=f.__qualname__)
+            return type(func)(wrapper)
+
         cls.required_levels = getattr(config.core.required_levels, cls.__name__)
-        for name, wrapped_func in vars(cls).items():
+        for name, func in vars(cls).items():
             # the two exceptions
             if (cls.__name__, name) in (('Borrow', 'new'), ('Member', 'change_password')):
                 continue
             # since these are only namespaces, no normal methods
-            if isinstance(wrapped_func, (staticmethod, classmethod)):
-                func = wrapped_func.__func__
+            if isinstance(func, (staticmethod, classmethod)):
                 if name.startswith('view'):
                     req_level = cls.required_levels['view']
                 else:
                     req_level = cls.required_levels[name]
-                checker = partial(check_level, level=req_level, resource=func.__qualname__)
-
-                @wraps(func)
-                def rewrapped_func(*args, login_context: LoginContext, **kwargs):
-                    checker(login_context)
-                    return func(*args, login_context=login_context, **kwargs)
-
-                setattr(cls, name, type(wrapped_func)(rewrapped_func))
+                setattr(cls, name, level_required(req_level, func.__func__))  # noqa
 
     @classmethod
     @abc.abstractmethod
