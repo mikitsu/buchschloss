@@ -190,7 +190,7 @@ class BuchSchlossPermError(BuchSchlossBaseError):
     def __init__(self, level):
         super().__init__(utils.get_name('no_permission'),
                          utils.get_name('must_be_{}').format(
-                             utils.get_level(level)))
+                             utils.level_names[level]))
 
 
 class BuchSchlossNotFoundError(BuchSchlossError.template_title('%s_not_found')
@@ -308,23 +308,6 @@ def check_level(login_context, level, resource):
         raise BuchSchlossPermError(level)
 
 
-def level_required(level):
-    """require the given level for executing the wrapped function.
-    raise a BuchSchlossBaseError when requirement not met."""
-
-    def wrapper_maker(f):
-        checker = partial(check_level, level=level, resource=f.__qualname__)
-
-        @wraps(f)
-        def level_required_wrapper(*args, login_context: LoginContext, **kwargs):
-            checker(login_context)
-            return f(*args, login_context=login_context, **kwargs)
-
-        return level_required_wrapper
-
-    return wrapper_maker
-
-
 def auth_required(f):
     """require the currently logged member's password for executing the function
     raise a BuchSchlossBaseError if not given or wrong"""
@@ -423,10 +406,34 @@ def _update_library_group(lg_model: T.Type[models.Model],
     return errors
 
 
-class ActionNamespace(abc.ABC):
-    """Abstract base class for the Book, Person Member, Library, Group and Borrow namespaces"""
+class ActionNamespace:
+    """common stuff for the Book, Person Member, Library, Group and Borrow namespaces"""
     model: T.ClassVar[models.Model]
-    view_level: T.ClassVar[int] = 0
+    required_levels: T.Any
+
+    def __init_subclass__(cls):
+        def level_required(level, f):
+            """due to scoping, this has to be a separate function"""
+            @wraps(f)
+            def wrapper(*args, login_context: LoginContext, **kwargs):
+                checker(login_context)
+                return f(*args, login_context=login_context, **kwargs)
+
+            checker = partial(check_level, level=level, resource=f.__qualname__)
+            return type(func)(wrapper)  # func is the static/classmethod from outside
+
+        cls.required_levels = getattr(config.core.required_levels, cls.__name__)
+        for name, func in vars(cls).items():
+            # the two exceptions
+            if (cls.__name__, name) in (('Borrow', 'new'), ('Member', 'change_password')):
+                continue
+            # since these are only namespaces, no normal methods
+            if isinstance(func, (staticmethod, classmethod)):
+                if name.startswith('view'):
+                    req_level = cls.required_levels['view']
+                else:
+                    req_level = cls.required_levels[name]
+                setattr(cls, name, level_required(req_level, func.__func__))  # noqa
 
     @classmethod
     @abc.abstractmethod
@@ -443,7 +450,7 @@ class ActionNamespace(abc.ABC):
     @classmethod
     def view_ns(cls, id_: T.Union[int, str], *, login_context):
         """Return a namespace of information"""
-        check_level(login_context, cls.view_level, cls.__name__ + '.view_ns')
+        check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_ns')
         try:
             return cls.model.get_by_id(id_)
         except cls.model.DoesNotExist:
@@ -452,7 +459,7 @@ class ActionNamespace(abc.ABC):
     @classmethod
     def view_repr(cls, id_: T.Union[str, int], *, login_context) -> str:
         """Return a string representation"""
-        check_level(login_context, cls.view_level, cls.__name__ + '.view_repr')
+        check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_repr')
         try:
             return str(next(iter(cls.model.select_str_fields().where(
                 getattr(cls.model, cls.model.pk_name) == id_))))
@@ -463,7 +470,7 @@ class ActionNamespace(abc.ABC):
     def view_attr(cls, id_: T.Union[str, int], name: str, *, login_context):
         """Return the value of a specific attribute"""
         # this is said to be faster...
-        check_level(login_context, cls.view_level, cls.__name__ + '.view_attr')
+        check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_attr')
         try:
             return getattr(next(iter(cls.model.select(getattr(cls.model, name)).where(
                 getattr(cls.model, cls.model.pk_name) == id_))), name)
@@ -479,7 +486,7 @@ class ActionNamespace(abc.ABC):
                login_context
                ):
         """search for records. see search for details on arguments"""
-        check_level(login_context, cls.view_level, cls.__name__ + '.search')
+        check_level(login_context, cls.required_levels.search, cls.__name__ + '.search')
         return search(cls.model, condition, *complex_params,
                       complex_action=complex_action)
 
@@ -489,8 +496,7 @@ class Book(ActionNamespace):
     model = models.Book
 
     @staticmethod
-    @level_required(2)
-    def new(*, isbn: int, author: str, title: str, language: str, publisher: str,
+    def new(*, isbn: int, author: str, title: str, language: str, publisher: str,  # noqa
             year: int, medium: str, shelf: str, series: T.Optional[str] = None,
             series_number: T.Optional[int] = None,
             concerned_people: T.Optional[str] = None,
@@ -521,7 +527,6 @@ class Book(ActionNamespace):
 
     @staticmethod
     @from_db(models.Book)
-    @level_required(2)
     def edit(book: T.Union[int, models.Book], *, login_context, **kwargs):
         """Edit a Book based on the arguments given.
 
@@ -592,11 +597,9 @@ class Book(ActionNamespace):
 class Person(ActionNamespace):
     """Namespace for Person-related functions"""
     model = models.Person
-    view_level = 1
 
     @staticmethod
-    @level_required(3)
-    def new(*, id_: int, first_name: str, last_name: str, class_: str,
+    def new(*, id_: int, first_name: str, last_name: str, class_: str,  # noqa
             max_borrow: int = 3, libraries: T.Iterable[str] = ('main',),
             pay: bool = None, borrow_permission: date = None,
             login_context):
@@ -629,7 +632,6 @@ class Person(ActionNamespace):
                          .format(login_context, p, borrow_permission))
 
     @staticmethod
-    @level_required(3)
     @from_db(models.Person)
     def edit(person: T.Union[int, models.Person], *, login_context, **kwargs):
         """Edit a Person based on the arguments given.
@@ -660,11 +662,10 @@ class Person(ActionNamespace):
         logging.info('{} edited {}'.format(login_context, person)
                      + (' setting borrow_permission to {}'
                         .format(kwargs['borrow_permission'])
-                        if 'pay_date' in kwargs else ''))
+                        if 'borrow_permission' in kwargs else ''))
         return errors
 
     @staticmethod
-    @level_required(1)
     @from_db(models.Person)
     def view_str(person: T.Union[models.Person, int], *, login_context):
         """Return data about a Person.
@@ -692,8 +693,7 @@ class Library(ActionNamespace):
     model = models.Library
 
     @staticmethod
-    @level_required(3)
-    def new(name: str, *,
+    def new(name: str, *,  # noqa
             books: T.Sequence[int] = (),
             people: T.Sequence[int] = (),
             pay_required: bool = True,
@@ -723,7 +723,6 @@ class Library(ActionNamespace):
                                    ).where(models.Book.id << books).execute()
 
     @staticmethod
-    @level_required(3)
     def edit(action: LibraryGroupAction, name: str, *,
              people: T.Sequence[int] = (),
              books: T.Sequence[int] = (),
@@ -797,8 +796,7 @@ class Group(ActionNamespace):
     model = models.Group
 
     @staticmethod
-    @level_required(3)
-    def new(name: str, books: T.Sequence[int] = (), *, login_context):
+    def new(name: str, books: T.Sequence[int] = (), *, login_context):  # noqa
         """Create a new Group with the given name and books
 
             raise a BuchSchlossBaseError if the Group exists
@@ -816,7 +814,6 @@ class Group(ActionNamespace):
                 group.books = books
 
     @staticmethod
-    @level_required(3)
     def edit(action: LibraryGroupAction,
              name: str,
              books: T.Iterable[int],
@@ -846,7 +843,6 @@ class Group(ActionNamespace):
                         getattr(group.books, action.value)(book)
 
     @staticmethod
-    @level_required(3)
     @from_db(models.Group)
     def activate(group, src: T.Sequence[str] = (), dest: str = 'main', *, login_context):
         """Activate a Group
@@ -902,48 +898,54 @@ class Group(ActionNamespace):
 class Borrow(ActionNamespace):
     """Namespace for Borrow-related functions"""
     model = models.Borrow
-    view_level = 1
 
-    @staticmethod
-    @from_db(models.Book, models.Person)
-    def new(book, person, weeks, *, login_context):
+    @classmethod
+    @from_db(book=models.Book, person=models.Person)
+    def new(cls, book, person, weeks, *, override=False, login_context):
         """Borrow a book.
 
             ``book`` is the ID of the Book begin borrowed
             ``person`` is the ID of the Person borrowing the book
             ``weeks`` is the time to borrow in weeks.
+            ``override`` may be specified to ignore some issues (b, c, e)
 
             raise an error if
                 a) the Person or Book does not exist
                 b) the Person has reached their limit set in max_borrow
                 c) the Person is not allowed to access the library the book is in
                 d) the Book is not available
-                e) the Person has not paid for over 52 weeks and the book's
-                    Library requires payment
+                e) the Person's borrow_permission has expired
                 f) ``weeks`` exceeds the one allowed to the executing member
                 g) ``weeks`` is <= 0
 
             the maximum amount of time a book may be borrowed for is defined
             in the configuration settings
         """
-        if weeks > config.core.borrow_time_limit[login_context.level]:
-            raise BuchSchlossPermError(1)
+        req_level = next(i for i, allowed_weeks in
+                         enumerate([*config.core.borrow_time_limit, float('inf')])
+                         if weeks <= allowed_weeks)
+        check_level(login_context, req_level, 'Borrow.new')
         if weeks <= 0:
             raise BuchSchlossError('Borrow', 'Borrow::borrow_length_not_positive')
         if not book.is_active or book.borrow:
             raise BuchSchlossError('Borrow', 'Borrow::Book_{}_not_available', book.id)
-        if book.library not in person.libraries:
-            raise BuchSchlossError('Borrow', 'Borrow::{person}_not_in_Library_{library}',
-                                   person=person, library=book.library.name)
-        if (book.library.pay_required
-                and (person.borrow_permission or date.min) < date.today()):
-            raise BuchSchlossError('Borrow', 'Borrow::Library_{}_needs_payment', book.library)
-        if len(person.borrows) >= person.max_borrow:
-            raise BuchSchlossError('Borrow', 'Borrow::{}_reached_max_borrow', person)
+        if override:
+            check_level(login_context, cls.required_levels.override, 'Borrow.new.override')
+        else:
+            if book.library not in person.libraries:
+                raise BuchSchlossError(
+                    'Borrow', 'Borrow::{person}_not_in_Library_{library}',
+                    person=person, library=book.library.name)
+            if (book.library.pay_required
+                    and (person.borrow_permission or date.min) < date.today()):
+                raise BuchSchlossError(
+                    'Borrow', 'Borrow::Library_{}_needs_payment', book.library)
+            if len(person.borrows) >= person.max_borrow:
+                raise BuchSchlossError('Borrow', 'Borrow::{}_reached_max_borrow', person)
         rdate = date.today() + timedelta(weeks=weeks)
         models.Borrow.create(person=person, book=book, return_date=rdate)
-        logging.info('{} borrowed {} to {} until {}'.format(
-            login_context, book, person, rdate))
+        logging.info('{} borrowed {} to {} until {}{}'.format(
+            login_context, book, person, rdate, override * ' with override=True'))
         latest = misc_data.latest_borrowers
         # since the values are written to the DB on explicit assignment only
         # [[and values aren't cached (yet, but I still don't want to rely on it)
@@ -956,7 +958,6 @@ class Borrow(ActionNamespace):
         misc_data.latest_borrowers = latest
 
     @staticmethod
-    @level_required(1)
     @from_db(models.Book)
     def restitute(book, person, *, login_context):
         """return a book
@@ -985,7 +986,6 @@ class Borrow(ActionNamespace):
         return book.shelf
 
     @staticmethod
-    @level_required(1)
     @from_db(models.Borrow)
     def view_str(borrow, *, login_context):
         """Return information about a Borrow
@@ -1014,11 +1014,9 @@ class Borrow(ActionNamespace):
 class Member(ActionNamespace):
     """namespace for Member-related functions"""
     model = models.Member
-    view_level = 2
 
     @staticmethod
     @auth_required
-    @level_required(4)
     def new(name: str, password: str, level: int, *, login_context):
         """Create a new Member
 
@@ -1040,7 +1038,6 @@ class Member(ActionNamespace):
 
     @staticmethod
     @auth_required
-    @level_required(4)
     @from_db(models.Member)
     def edit(member, *, login_context, **kwargs):
         """Edit the given member.
@@ -1062,20 +1059,22 @@ class Member(ActionNamespace):
         member.save()
         logging.info('{} edited {} to {}'.format(login_context, old_str, member))
 
-    @staticmethod
+    @classmethod
     @auth_required
-    @from_db(models.Member)
-    def change_password(member, new_password, *, login_context):
+    @from_db(member=models.Member)
+    def change_password(cls, member, new_password, *, login_context):
         """Change a Member's password
 
-            editing a password requires being level 4 or the editee
+            editing a password requires having the configured level or being the editee
             If the editee is currently logged in, the new password
             needs to be used for authentication immediately
         """
-        if (login_context.level < 4
+        req_level = cls.required_levels.change_password
+        if (login_context.level < req_level
                 and (login_context.type is not LoginType.MEMBER
                      or login_context.name != member.name)):
-            raise BuchSchlossError('no_permission', 'Member::must_be_level_4_or_editee')
+            raise BuchSchlossError('no_permission', 'Member::must_be_{}_or_editee',
+                                   utils.level_names[req_level])
         member.salt = urandom(config.core.salt_length)
         member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
@@ -1094,7 +1093,7 @@ class Member(ActionNamespace):
         return {
             '__str__': str(member),
             'name': member.name,
-            'level': utils.get_level(member.level),
+            'level': utils.level_names[member.level],
         }
 
 
@@ -1299,7 +1298,7 @@ class ComplexSearch:  # TODO: use misc.Instance for this
         return to[0] if self.return_first_item else to
 
 
-internal_lc = LoginType.INTERNAL(5)
+internal_lc = LoginType.INTERNAL(config.MAX_LEVEL)
 guest_lc = LoginType.GUEST(0)
 misc_data = MiscData()
 

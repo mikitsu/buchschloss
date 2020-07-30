@@ -180,7 +180,7 @@ class MemberForm(BaseForm):
 
     name: mtkf.Element = NonEmptyEntry
     level: mtkf.Element = (mtk.OptionChoiceWidget,
-                           {'values': utils.get_level(),
+                           {'values': list(utils.level_names.items()),
                             'default': 1})
     current_password: mtkf.Element = NonEmptyPasswordEntry
     password: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
@@ -248,6 +248,7 @@ class BorrowForm(BorrowRestCommonForm):
         default_content = {'weeks': '4'}
 
     weeks: mtkf.Element = IntEntry
+    override: mtkf.Element = CheckbuttonWithVar
 
 
 class RestituteForm(BorrowRestCommonForm):

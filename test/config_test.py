@@ -59,7 +59,7 @@ def test_base64bytes():
 
 
 def test_load_file(tmpdir):
-    """test config.load_file"""
+    """test config.main.load_file"""
     f1, f2, f3, f4 = get_temp_files(tmpdir, 4)
     f1.write('a = 1\ninclude = {}'.format(f2))
     f2.write('b = 1\n[sec]\na = 2\ninclude = {},{}'.format(f3, f4))
@@ -71,7 +71,7 @@ def test_load_file(tmpdir):
 
 
 def test_load_file_json(tmpdir):
-    """test config.load_file"""
+    """test config.main.load_file"""
     f1, f2, f3, f4 = get_temp_files(tmpdir, 4)
     f1.write('{"a": "1", "include": "%s"}' % (f2,))
     f2.write('{"b": "1", "sec": {"a": "2", "include": ["%s", "%s"]}}' % (f3, f4))
@@ -80,3 +80,24 @@ def test_load_file_json(tmpdir):
     co, errors = main.load_file(f1, json.load, json.JSONDecodeError)
     assert errors == {str(f4)}
     assert co.dict() == {'a': '1', 'b': '1', 'sec': {'a': '2', 'b': '2'}}
+
+
+def test_load_names(tmpdir):
+    """test config.main.load_names"""
+    file = tmpdir.join('f')
+    file.write('{"a": [1, 2, 3], "b": "hello", "c": {"d": "hi"}}')
+    default_level_names = {i: 'level_' + str(i) for i in range(main.MAX_LEVEL + 1)}
+    assert ({'a': '', 'b': 'hello', 'c': {'d': 'hi'}, 'level names': default_level_names}
+            == main.load_names(file, 'json'))
+    expected_defaults = (
+        '{"0": "only one name"}',
+        '{"NaN": "whatever", "0": "IaN"}',
+        '"a string"',
+        '{"0": "boring", "3": {"very": "interesting"}}',
+        '{"123": "a lot", "0": "none"}',
+    )
+    for default_case in expected_defaults:
+        file.write('{"level names": %s}' % default_case)
+        assert main.load_names(file, 'json') == {'level names': default_level_names}
+    file.write('{"level names": {"4": "four", "6": "six"}}')
+    assert main.load_names(file, 'json') == {'level names': {4: 'four', 6: 'six'}}

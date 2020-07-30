@@ -4,6 +4,7 @@ import pprint as _pprint
 from . import main as _main
 
 _config_data = _main.get_config()
+MAX_LEVEL = _main.MAX_LEVEL
 
 
 def start():

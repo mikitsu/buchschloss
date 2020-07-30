@@ -93,11 +93,15 @@ class OptionsFromSearch(mtk.OptionChoiceWidget):
 
     def __init__(self, master, *, action_ns: core.ActionNamespace,
                  attribute='name', allow_none=False, **kwargs):
+        self.__attribute = attribute
         values = [(getattr(o, attribute), str(o)) for o in
                   action_ns.search((), login_context=core.internal_lc)]
         if allow_none:
             values.insert(0, (None, ''))
         super().__init__(master, values=values, **kwargs)
+
+    def set(self, value):
+        return super().set(getattr(value, self.__attribute, value))
 
 
 @mtk.ScrollableWidget(height=config.gui2.widget_size.main.height,
@@ -223,10 +227,9 @@ class SearchMultiChoice(MultiChoicePopup):
 
     def __init__(self, master, cnf={}, *,
                  action_ns: core.ActionNamespace,
-                 attribute='name',
                  **kwargs):
         kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
-        options = [(getattr(o, attribute), str(o)) for o in
+        options = [(o, str(o)) for o in
                    action_ns.search((), login_context=core.internal_lc)]
         super().__init__(master, cnf, options=options, **kwargs)
 
