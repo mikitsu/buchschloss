@@ -247,7 +247,7 @@ class Script(Model):
             return '{}[{}]'.format(utils.get_name('Script'), self.name)
         else:
             return '{}[{}]({})'.format(
-                utils.get_name('Script'), self.name, utils.get_level(self.setlevel)
+                utils.get_name('Script'), self.name, utils.level_names[self.setlevel]
             )
 
 

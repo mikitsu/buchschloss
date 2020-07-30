@@ -121,7 +121,7 @@ def test_login_context():
         core.LoginType.SCRIPT(name='qwert', level=2, invoker=core.guest_lc)
     )
     assert rt.eval('guest_lc.type == "GUEST"')
-    assert rt.eval('internal_lc.level == 5')
+    assert rt.eval('internal_lc.level == 10')
     assert rt.eval('member_lc.name == "asdf"')
     assert rt.eval('guest_lc.name == nil')
     assert rt.eval('internal_lc.invoker == nil')

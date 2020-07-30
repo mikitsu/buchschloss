@@ -319,7 +319,7 @@ class SearchResultWidget(mtk.ContainingWidget):
             widgets.append((Button, {
                 'text': r.id,
                 'wraplength': config.gui2.widget_size.main.width,
-                'command': partial(view_func, r_id)}))
+                'command': partial(view_func, r.id)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))
 
 

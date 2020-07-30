@@ -18,11 +18,8 @@ import smtplib
 import ssl
 from datetime import datetime, date
 import time
-import requests
 import logging
-import re
 import sched
-import bs4
 
 from buchschloss import core, config, py_scripts
 

@@ -278,6 +278,6 @@ class ScriptForm(SearchForm):
     )
     setlevel: mtkf.Element = (
         mtk.OptionChoiceWidget,
-        {'values': ((None, '-----'), *enumerate(utils.get_level()))})
+        {'values': ((None, '-----'), *utils.level_names.items())})
     current_password: GroupElement.NO_SEARCH = NonEmptyPasswordEntry
     code: GroupElement.NO_SEARCH = Text

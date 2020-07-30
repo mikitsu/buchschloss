@@ -690,7 +690,6 @@ def test_borrow_new(db):
 
 def test_borrow_restitute(db):
     """test Borrow.restitute"""
-    models.Misc.create(pk='latest_borrowers', data=[])
     models.Library.create(name='main')
     create_person(123)
     create_person(124)
@@ -849,12 +848,12 @@ def test_script_view_str(db):
     assert set(data.pop('permissions').split(';')) == {
         utils.get_name('Script::permissions::STORE'),
         utils.get_name('Script::permissions::REQUESTS')}
-    l0 = utils.get_level(0)
+    l0 = utils.level_names[0]
     assert data == {'name': 'name', 'setlevel': l0, '__str__': exp_repr + l0.join('()')}
     script.setlevel = 3
     script.permissions = core.ScriptPermissions.STORE
     script.save()
-    l3 = utils.get_level(3)
+    l3 = utils.level_names[3]
     assert (script_view_str('name')
             == {'name': 'name', 'setlevel': l3, '__str__': exp_repr + l3.join('()'),
                 'permissions': utils.get_name('Script::permissions::STORE')})

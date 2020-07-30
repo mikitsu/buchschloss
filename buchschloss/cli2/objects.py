@@ -195,7 +195,7 @@ class LuaUIInteraction(LuaObject):
         return (utils.get_name(self.script_prefix + internal)
                 .format(*format_args, **format_kwargs))
 
-    get_level = staticmethod(utils.get_level)
+    get_level = staticmethod(utils.level_names.__getitem__)
 
 
 class LuaBS4Interface(LuaObject):
