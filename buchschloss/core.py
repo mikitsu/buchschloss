@@ -420,7 +420,7 @@ class ActionNamespace:
                 return f(*args, login_context=login_context, **kwargs)
 
             checker = partial(check_level, level=level, resource=f.__qualname__)
-            return type(func)(wrapper)
+            return type(func)(wrapper)  # func is the static/classmethod from outside
 
         cls.required_levels = getattr(config.core.required_levels, cls.__name__)
         for name, func in vars(cls).items():
@@ -914,8 +914,7 @@ class Borrow(ActionNamespace):
                 b) the Person has reached their limit set in max_borrow
                 c) the Person is not allowed to access the library the book is in
                 d) the Book is not available
-                e) the Person has not paid for over 52 weeks and the book's
-                    Library requires payment
+                e) the Person's borrow_permission has expired
                 f) ``weeks`` exceeds the one allowed to the executing member
                 g) ``weeks`` is <= 0
 

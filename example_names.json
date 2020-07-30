@@ -16,7 +16,7 @@
   "error": {
     "no_permission": "permission denied",
     "must_be_{}": "For this action, you must be at least {}.",
-    "must_be_level_4_or_editee": "",
+    "must_be_level_{}_or_editee": "For changing other people's passwords, you must be {}.",
     "Book_not_found": "book not found",
     "no_Book_with_id_{}": "There is no book with the ID {}.",
     "Person_not_found": "person not found",

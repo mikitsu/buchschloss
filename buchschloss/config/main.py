@@ -143,7 +143,7 @@ def load_names(name_file: ActuallyPathLike,
     }
     name_data, __ = load_file(name_file, *loaders[name_format])
     processed_data = convert_name_data(name_data)
-    # utils.get_level can crash otherwise
+    # problems here break gui2's level selection widget
     # TODO: this is not very nice.
     #   is there a way to make sure the keys are valid without going berserk
     #   if something unexpected happens?
@@ -152,9 +152,12 @@ def load_names(name_file: ActuallyPathLike,
         level_names = {}
     for k, v in level_names.copy().items():
         try:
-            level_names[int(k)] = v
+            new_k = int(k)
         except ValueError:
             pass
+        else:
+            if 0 <= new_k <= MAX_LEVEL and isinstance(v, str):
+                level_names[new_k] = v
         del level_names[k]
     if not len(level_names) >= 2:
         # gui2 needs at least two
