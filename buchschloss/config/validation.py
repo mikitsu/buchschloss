@@ -8,6 +8,8 @@ import re
 
 from configobj import validate
 
+MAX_LEVEL = 10
+
 
 def is_timedelta(value):
     """create timedeltas"""
@@ -102,6 +104,7 @@ def is_regex(value):
 
 
 validator = validate.Validator({
+    'level_number': lambda v: validate.is_integer(v, 0, MAX_LEVEL),
     'timedelta': is_timedelta,
     'optionlist': is_optionlist,
     'script_spec': is_script_spec,

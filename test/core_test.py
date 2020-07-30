@@ -626,7 +626,7 @@ def test_member_view_str(db):
     assert core.Member.view_str('name', login_context=core.LoginType.INTERNAL(0)) == {
         '__str__': str(models.Member.get_by_id('name')),
         'name': 'name',
-        'level': utils.get_level(0),
+        'level': utils.level_names[0],
     }
 
 
@@ -680,6 +680,31 @@ def test_borrow_new(db):
     with pytest.raises(core.BuchSchlossBaseError):
         borrow_new(person=123, book=2, weeks=weeks)
     borrow_new(person=123, book=4, weeks=weeks)
+    # allows overriding
+    ctxt.level = 2
+    with pytest.raises(core.BuchSchlossBaseError):
+        borrow_new(2, 123, weeks, override=True)
+    ctxt.level = 4
+    borrow_new(2, 123, weeks, override=True)
+
+
+def test_borrow_restitute(db):
+    """test Borrow.restitute"""
+    models.Misc.create(pk='latest_borrowers', data=[])
+    models.Library.create(name='main')
+    create_person(123)
+    create_person(124)
+    create_book()
+    create_book()
+    create_book()
+    models.Borrow.create(person=123, book=1, return_date=datetime.date.today())
+    models.Borrow.create(person=123, book=2, return_date=datetime.date.today())
+    ctxt = for_levels(partial(core.Borrow.restitute, 1, 123), 1)
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Borrow.restitute(1, 123, login_context=ctxt)
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Borrow.restitute(2, 124, login_context=ctxt)
+    core.Borrow.restitute(2, 123, login_context=ctxt)
 
 
 def test_search(db):

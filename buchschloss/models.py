@@ -227,7 +227,7 @@ class Member(Model):
 
     def __str__(self):
         return utils.get_name("Member[{}]({})").format(
-            self.name, utils.get_level(self.level))
+            self.name, utils.level_names[self.level])
 
 
 class Script(Model):

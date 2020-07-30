@@ -9,7 +9,7 @@ import typing as T
 
 import configobj
 
-from .validation import validator
+from .validation import validator, MAX_LEVEL
 
 CONFIG_FILE_ENV = 'BUCHSCHLOSS_CONFIG'
 DEFAULT_INTRO_TEXT = """Buchschloss
@@ -142,12 +142,28 @@ def load_names(name_file: ActuallyPathLike,
         'configobj': (configobj.ConfigObj, configobj.ConfigObjError),
     }
     name_data, __ = load_file(name_file, *loaders[name_format])
-    # special case the only list
-    level_list = name_data.pop('level names', ())
-    if not isinstance(level_list, T.Sequence) or len(level_list) != 5:
-        level_list = ['level_{}'.format(i) for i in range(5)]
     processed_data = convert_name_data(name_data)
-    processed_data['level names'] = level_list
+    # problems here break gui2's level selection widget
+    # TODO: this is not very nice.
+    #   is there a way to make sure the keys are valid without going berserk
+    #   if something unexpected happens?
+    level_names = processed_data.get('level names')
+    if not isinstance(level_names, dict):
+        level_names = {}
+    for k, v in level_names.copy().items():
+        try:
+            new_k = int(k)
+        except ValueError:
+            pass
+        else:
+            if 0 <= new_k <= MAX_LEVEL and isinstance(v, str):
+                level_names[new_k] = v
+        del level_names[k]
+    if not len(level_names) >= 2:
+        # gui2 needs at least two
+        sys.stderr.write('ATTENTION: filling default values for level names\n')
+        level_names = {i: 'level_' + str(i) for i in range(MAX_LEVEL + 1)}
+    processed_data['level names'] = level_names
     return processed_data
 
 
@@ -209,8 +225,11 @@ def merge_ui(config):
 
 def insert_name_data(config):
     """load name data into [utils][names]"""
-    config['utils']['names'] = load_names(
+    name_data = load_names(
         config['utils']['names']['file'], config['utils']['names']['format'])
+    # without unrepr=True, this gets converted to a Section
+    # which fails with numeric keys (level representations)
+    config['utils'].__setitem__('names', name_data, unrepr=True)
 
 
 def apply_ui_intro_text_default(config):
@@ -237,10 +256,45 @@ def redirect_stderr(config):
         sys.stderr = DummyErrorFile()
 
 
+def apply_permission_level_defaults(config):
+    """apply default values for permission levels"""
+    conf = config['core']['required levels']
+    for k in ('Book', 'Person', 'Group', 'Library', 'Member'):
+        if conf[k]['search'] is None:
+            conf[k]['search'] = conf[k]['view']
+        if conf[k]['edit'] is None:
+            conf[k]['edit'] = conf[k]['new']
+
+    special_replacements = (
+        (('Borrow', 'search'), ('Borrow', 'view')),
+        (('Borrow', 'override'), ('Person', 'edit')),
+        (('Group', 'activate'), ('Book', 'edit')),
+        (('Member', 'change password'), ('Member', 'edit')),
+    )
+    for (dest_1, dest_2), (src_1, src_2) in special_replacements:
+        if conf[dest_1][dest_2] is None:
+            conf[dest_1][dest_2] = conf[src_1][src_2]
+
+    return config
+
+
+def create_borrow_time_list(config):
+    """create a list of borrow time limits"""
+    limit_list = []
+    current = 0
+    for i in range(MAX_LEVEL + 1):
+        current = max(current, config['core']['borrow time limit'].get(str(i), 0))
+        limit_list.append(current)
+    config['core']['borrow time limit'] = limit_list
+    return config
+
+
 pre_validation = [merge_ui]
 post_validation = (
     insert_name_data,
     apply_ui_intro_text_default,
+    apply_permission_level_defaults,
+    create_borrow_time_list,
     check_smtp_auth_data,
     redirect_stderr,
 )
