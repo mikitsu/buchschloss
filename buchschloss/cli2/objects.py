@@ -118,8 +118,10 @@ class LuaDataNS(LuaObject):
 
     def lua_get(self, name):
         """return data values, re-wrapping if necessary"""
-        if name.startswith('_'):
-            raise LuaAccessForbidden
+        if name == '__str__':
+            return str(self.data_ns)
+        elif name.startswith('_'):
+            raise LuaAccessForbidden(self, name)
         else:
             val = getattr(self.data_ns, name)
             if isinstance(val, core.DataNamespace):
