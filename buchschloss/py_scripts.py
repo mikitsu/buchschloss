@@ -14,6 +14,14 @@ from . import config
 __all__ = ['local_backup', 'http_backup']
 
 
+def argument_sink(f):
+    """sink the ``callbacks`` and ``login_context`` arguments passed to scripts"""
+    def wrapper(callbacks, login_context):  # noqa
+        return f()
+    return wrapper
+
+
+@argument_sink
 def local_backup():
     """Local backups.
 
@@ -48,11 +56,11 @@ def get_database_bytes(key):
         return plain
     if fernet is None:
         raise RuntimeError('encryption requested, but no cryptography available')
-    key = base64.urlsafe_b64encode(config.utils.tasks.secret_key)
-    cipher = fernet.Fernet(key).encrypt(plain)
+    cipher = fernet.Fernet(base64.urlsafe_b64encode(key)).encrypt(plain)
     return base64.urlsafe_b64decode(cipher)
 
 
+@argument_sink
 def http_backup():
     """remote backups via HTTP"""
     conf = config.scripts.python.http_backup
