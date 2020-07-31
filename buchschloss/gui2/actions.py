@@ -203,13 +203,13 @@ class ShowInfoNS:
     IWData = T.Union[None, str, T.Sequence]
     SpecialKeyFunc = T.Callable[[dict], T.Union[T.Tuple[str, IWData], T.Tuple[IWData]]]
 
-    # noinspection PyNestedDecorators
+    # noinspection PyNestedDecorators, PyDefaultArgument
     @func_from_static
     @staticmethod
     def _show_info_action(
             view_func: T.Callable[[T.Any], dict],
-            special_keys: T.Mapping[str, SpecialKeyFunc],
-            id_type: type = int,
+            special_keys: T.Mapping[str, SpecialKeyFunc] = {},
+            id_type: type = str,
             ):
         """prepare a function displaying information
 
@@ -283,6 +283,7 @@ class ShowInfoNS:
                             if d['borrowed_by_id'] is not None else None)
             }))
          },
+        int,
     )
     person = _show_info_action(
         NSWithLogin(core.Person).view_str,
@@ -293,7 +294,10 @@ class ShowInfoNS:
              for t, i in zip(d['borrows'], d['borrow_book_ids'])],
         )
         },
+        int,
     )
+    library = _show_info_action(NSWithLogin(core.Library).view_str)
+    group = _show_info_action(NSWithLogin(core.Group).view_str)
     borrow = _show_info_action(
         NSWithLogin(core.Borrow).view_str,
         {'person': lambda d: (
@@ -311,12 +315,10 @@ class ShowInfoNS:
                  'text': utils.get_name(str(d['is_back']))
              }),),
          },
+        int,
     )
-    script = _show_info_action(
-        NSWithLogin(core.Script).view_str,
-        {},
-        str,
-    )
+    member = _show_info_action(NSWithLogin(core.Member).view_str)
+    script = _show_info_action(NSWithLogin(core.Script).view_str)
     to_destroy = None
 
 
