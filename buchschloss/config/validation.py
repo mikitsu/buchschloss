@@ -5,6 +5,7 @@ import os
 import base64
 import binascii
 import re
+import functools
 
 from configobj import validate
 
@@ -74,6 +75,14 @@ def is_script_spec(value,
     return r
 
 
+is_gui2_action_spec = functools.partial(
+    is_script_spec,
+    single=True,
+    suffixes=('gui2', 'cli2', 'py'),
+    default_suffix='gui2',
+)
+
+
 def is_file(value):
     """check whether the value is a valid file system path"""
     if not isinstance(value, str):
@@ -114,6 +123,7 @@ validator = validate.Validator({
     'timedelta': is_timedelta,
     'optionlist': is_optionlist,
     'script_spec': is_script_spec,
+    'gui2_action_spec': is_gui2_action_spec,
     'file': is_file,
     'base64bytes': is_base64bytes,
     'regex': is_regex,
