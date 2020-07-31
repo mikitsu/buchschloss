@@ -41,13 +41,19 @@ def is_optionlist(value, *options):
     return val
 
 
-def is_script_spec(value, with_time=False, single=False):
+def is_script_spec(value,
+                   with_time=False,
+                   single=False,
+                   suffixes=('cli2', 'py'),
+                   default_suffix='cli2'):
     """check whether the value is syntactically a script spec and return components"""
-    spec_regex = (r'^\s*(?P<name>[-\w ]+)(?::(?P<function>\w+))?'
-                  r'(?:!(?P<type>py|cli2))?')  # language=PythonRegExp
+    spec_regex_parts = [
+        r'^\s*(?P<name>[-\w ]+)(?::(?P<function>\w+))?',
+        '|'.join(suffixes).join((r'(?:!(?P<type>', '))?')),
+    ]
     if with_time:
-        spec_regex += r'@(?P<invocation>\d+(?::\d+(?::\d+)?)?)'
-    spec_regex = re.compile(spec_regex + r'\s*$')
+        spec_regex_parts.append(r'@(?P<invocation>\d+(?::\d+(?::\d+)?)?)')
+    spec_regex = re.compile(''.join(spec_regex_parts) + r'\s*$')
     if isinstance(value, str):
         value = value.split(',')
     r = []
@@ -57,7 +63,7 @@ def is_script_spec(value, with_time=False, single=False):
             raise validate.VdtValueError(v)
         else:
             script_data = m.groupdict()
-            script_data['type'] = script_data['type'] or 'cli2'
+            script_data['type'] = script_data['type'] or default_suffix
             if 'invocation' in script_data:
                 script_data['invocation'] = is_timedelta(script_data['invocation'])
             r.append(script_data)
