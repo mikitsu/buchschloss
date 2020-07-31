@@ -200,19 +200,21 @@ def func_from_static(static: staticmethod):
 
 class ShowInfoNS:
     """namespace for information viewing"""
+    IWData = T.Union[None, str, T.Sequence]
+    SpecialKeyFunc = T.Callable[[dict], T.Union[T.Tuple[str, IWData], T.Tuple[IWData]]]
 
     # noinspection PyNestedDecorators
     @func_from_static
     @staticmethod
     def _show_info_action(
             view_func: T.Callable[[T.Any], dict],
-            # TODO: figure out the exact return type of the callable we accept
-            special_keys: T.Mapping[str, T.Callable[[dict], T.Any]],
-            id_get_title: str,
-            id_get_text: str,
+            special_keys: T.Mapping[str, SpecialKeyFunc],
             id_type: type = int,
             ):
         """prepare a function displaying information
+
+        return a function that takes a presentation string for asking
+        the ID and itself returns the actual function that displays information
 
         Arguments:
             - namespace: the namespace with the viewing function
@@ -221,57 +223,56 @@ class ShowInfoNS:
                 to widgets.InfoWidget. Optionally, a different name for the field
                 may be returned as first element in a sequence, the display value
                 being second
-            TODO -- move to a form-based question
-            - id_get_title: the title of the popup window asking for the ID
-            - id_get_text: the text of the window asking for the ID
             - id_type: the type of the ID
         """
 
-        def show_info(id_=None):
-            if ShowInfoNS.to_destroy is not None:
+        def wrapper(id_get_text: str):
+            def show_info(id_=None):
+                if ShowInfoNS.to_destroy is not None:
+                    try:
+                        # workaround because mtk.ScrollableWidget doesn't handle .destroy() yet
+                        ShowInfoNS.to_destroy.container.destroy()
+                    except AttributeError as e:
+                        # don't crash everything if I stop using ScrollableWidget
+                        logging.error(e)
+                        ShowInfoNS.to_destroy.destroy()
+                if id_ is None:
+                    try:
+                        validator = mval.Validator((
+                            id_type, {ValueError: utils.get_name(
+                                'error::must_be_{}'.format(id_type.__name__))}))
+                        id_ = mtkd.WidgetDialog.ask(
+                            main.app.root, mtk.ValidatedWidget.new_cls(tk.Entry, validator),
+                            title=id_get_text, text=id_get_text)
+                    except mtkd.UserExitedDialog:
+                        main.action_tree.view()
+                        return
+
                 try:
-                    # workaround because mtk.ScrollableWidget doesn't handle .destroy() yet
-                    ShowInfoNS.to_destroy.container.destroy()
-                except AttributeError as e:
-                    # don't crash everything if I stop using ScrollableWidget
-                    logging.error(e)
-                    ShowInfoNS.to_destroy.destroy()
-            if id_ is None:
-                try:
-                    validator = mval.Validator((
-                        id_type, {ValueError: utils.get_name(
-                            'error::must_be_{}'.format(id_type.__name__))}))
-                    id_ = mtkd.WidgetDialog.ask(
-                        main.app.root, mtk.ValidatedWidget.new_cls(tk.Entry, validator),
-                        title=id_get_title, text=id_get_text)
-                except mtkd.UserExitedDialog:
-                    main.action_tree.view()
+                    data = view_func(id_)
+                except core.BuchSchlossBaseError as e:
+                    show_BSE(e)
+                    main.app.reset()
                     return
+                pass_widgets = {utils.get_name('info_regarding'): data['__str__']}
+                for k, v in data.items():
+                    if k in special_keys:
+                        *k_new, v = special_keys[k](data)
+                        if k_new:
+                            k = k_new[0]
+                        else:
+                            k = utils.get_name(k)
+                        pass_widgets[k] = v
+                    elif '_id' not in k and k != '__str__':
+                        pass_widgets[utils.get_name(k)] = str(v)
+                iw = widgets.InfoWidget(main.app.center, pass_widgets)
+                iw.pack()
+                main.app.queue.put(iw.set_scrollregion)
+                main.app.root.bind('<q>', lambda e: iw.set_scrollregion())
+                ShowInfoNS.to_destroy = iw
 
-            try:
-                data = view_func(id_)
-            except core.BuchSchlossBaseError as e:
-                show_BSE(e)
-                main.app.reset()
-                return
-            pass_widgets = {utils.get_name('info_regarding'): data['__str__']}
-            for k, v in data.items():
-                if k in special_keys:
-                    *k_new, v = special_keys[k](data)
-                    if k_new:
-                        k = k_new[0]
-                    else:
-                        k = utils.get_name(k)
-                    pass_widgets[k] = v
-                elif '_id' not in k and k != '__str__':
-                    pass_widgets[utils.get_name(k)] = str(v)
-            iw = widgets.InfoWidget(main.app.center, pass_widgets)
-            iw.pack()
-            main.app.queue.put(iw.set_scrollregion)
-            main.app.root.bind('<q>', lambda e: iw.set_scrollregion())
-            ShowInfoNS.to_destroy = iw
-
-        return show_info
+            return show_info
+        return wrapper
 
     book = _show_info_action(
         NSWithLogin(core.Book).view_str,
@@ -282,8 +283,6 @@ class ShowInfoNS:
                             if d['borrowed_by_id'] is not None else None)
             }))
          },
-        utils.get_name('actions::view__Book'),
-        utils.get_name('Book::id')
     )
     person = _show_info_action(
         NSWithLogin(core.Person).view_str,
@@ -294,8 +293,6 @@ class ShowInfoNS:
              for t, i in zip(d['borrows'], d['borrow_book_ids'])],
         )
         },
-        utils.get_name('actions::view__Person'),
-        utils.get_name('Person::id')
     )
     borrow = _show_info_action(
         NSWithLogin(core.Borrow).view_str,
@@ -314,14 +311,10 @@ class ShowInfoNS:
                  'text': utils.get_name(str(d['is_back']))
              }),),
          },
-        'not used',
-        'anyway',
     )
     script = _show_info_action(
         NSWithLogin(core.Script).view_str,
         {},
-        utils.get_name('actions::view__Script'),
-        utils.get_name('Script::name'),
         str,
     )
     to_destroy = None
