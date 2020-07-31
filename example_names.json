@@ -67,7 +67,7 @@
       "Book_with_ISBN_{}_not_in_DNB": "A book with an ISBN of {} wasn't found in the DNB"
     }
   },
-  "actions": {
+  "action": {
     "new": "new",
     "view": "view",
     "edit": "edit",
