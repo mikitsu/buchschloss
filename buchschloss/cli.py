@@ -197,7 +197,7 @@ def start():
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
-                except utils.requests.RequestException as e:
+                except Exception as e:
                     print('\n'.join((utils.get_name('error::error_while_sending_error_msg'),
                                      str(e))))
             sys.exit()
@@ -319,5 +319,5 @@ parser = MyArgumentParser('', add_help=False)
 parser.add_argument('action', help=utils.get_name('cli::help::action'),
                     choices=COMMANDS)
 parser.add_argument('args', nargs='*', help=utils.get_name('cli::help::args'))
-parser.add_argument('--store', help=utils.get_name('cli::help::args'))
+parser.add_argument('--store', help=utils.get_name('cli::help::store'))
 parser.add_argument('-c', '--cmd', help=utils.get_name('cli::help::cmd'))
