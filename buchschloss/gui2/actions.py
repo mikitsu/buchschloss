@@ -226,53 +226,59 @@ class ShowInfoNS:
             - id_type: the type of the ID
         """
 
-        def wrapper(id_get_text: str):
-            def show_info(id_=None):
-                if ShowInfoNS.to_destroy is not None:
-                    try:
-                        # workaround because mtk.ScrollableWidget doesn't handle .destroy() yet
-                        ShowInfoNS.to_destroy.container.destroy()
-                    except AttributeError as e:
-                        # don't crash everything if I stop using ScrollableWidget
-                        logging.error(e)
-                        ShowInfoNS.to_destroy.destroy()
-                if id_ is None:
-                    try:
-                        validator = mval.Validator((
-                            id_type, {ValueError: utils.get_name(
-                                'error::must_be_{}'.format(id_type.__name__))}))
-                        id_ = mtkd.WidgetDialog.ask(
-                            main.app.root, mtk.ValidatedWidget.new_cls(tk.Entry, validator),
-                            title=id_get_text, text=id_get_text)
-                    except mtkd.UserExitedDialog:
-                        main.action_tree.view()
-                        return
-
+        def show_info(id_=None):
+            if ShowInfoNS.to_destroy is not None:
                 try:
-                    data = view_func(id_)
-                except core.BuchSchlossBaseError as e:
-                    show_BSE(e)
+                    # workaround because mtk.ScrollableWidget doesn't handle .destroy() yet
+                    ShowInfoNS.to_destroy.container.destroy()
+                except AttributeError as e:
+                    # don't crash everything if I stop using ScrollableWidget
+                    logging.error(e)
+                    ShowInfoNS.to_destroy.destroy()
+            if id_ is None:
+                if id_get_text is None:
+                    raise AssertionError('called without ID and id_get_text = None')
+                try:
+                    validator = mval.Validator((
+                        id_type, {ValueError: utils.get_name(
+                            'error::must_be_{}'.format(id_type.__name__))}))
+                    id_ = mtkd.WidgetDialog.ask(
+                        main.app.root, mtk.ValidatedWidget.new_cls(tk.Entry, validator),
+                        title=id_get_text, text=id_get_text)
+                except mtkd.UserExitedDialog:
                     main.app.reset()
                     return
-                pass_widgets = {utils.get_name('info_regarding'): data['__str__']}
-                for k, v in data.items():
-                    if k in special_keys:
-                        *k_new, v = special_keys[k](data)
-                        if k_new:
-                            k = k_new[0]
-                        else:
-                            k = utils.get_name(k)
-                        pass_widgets[k] = v
-                    elif '_id' not in k and k != '__str__':
-                        pass_widgets[utils.get_name(k)] = str(v)
-                iw = widgets.InfoWidget(main.app.center, pass_widgets)
-                iw.pack()
-                main.app.queue.put(iw.set_scrollregion)
-                main.app.root.bind('<q>', lambda e: iw.set_scrollregion())
-                ShowInfoNS.to_destroy = iw
 
+            try:
+                data = view_func(id_)
+            except core.BuchSchlossBaseError as e:
+                show_BSE(e)
+                main.app.reset()
+                return
+            pass_widgets = {utils.get_name('info_regarding'): data['__str__']}
+            for k, v in data.items():
+                if k in special_keys:
+                    *k_new, v = special_keys[k](data)
+                    if k_new:
+                        k = k_new[0]
+                    else:
+                        k = utils.get_name(k)
+                    pass_widgets[k] = v
+                elif '_id' not in k and k != '__str__':
+                    pass_widgets[utils.get_name(k)] = str(v)
+            iw = widgets.InfoWidget(main.app.center, pass_widgets)
+            iw.pack()
+            main.app.queue.put(iw.set_scrollregion)
+            main.app.root.bind('<q>', lambda e: iw.set_scrollregion())
+            ShowInfoNS.to_destroy = iw
+
+        def id_get_text_setter(value):
+            nonlocal id_get_text
+            id_get_text = value
             return show_info
-        return wrapper
+
+        id_get_text = None
+        return id_get_text_setter
 
     book = _show_info_action(
         NSWithLogin(core.Book).view_str,
