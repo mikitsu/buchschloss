@@ -1,5 +1,9 @@
 """GUIv2 for buchschloss"""
 
+import collections
+import functools
+import operator
+import logging
 import tkinter.messagebox as tk_msg
 import tkinter.font as tk_font
 import tkinter as tk
@@ -215,75 +219,76 @@ def new_book_autofill(form):
     isbn_field.bind('<FocusOut>', filler)
 
 
-def get_script_actions(spec):
-    """return a dict of script actions"""
-    r = {}
-    for k, v in spec.items():
-        # check whether this is a subdict or a script spec
-        if v and isinstance(v.get('type'), str):
-            r[k] = actions.get_script_action(v)
+def get_actions(spec):
+    """return a dict of actions suitable for ActionTree.from_map"""
+    wrapped_action_ns = {
+        k: NSWithLogin(getattr(core, k))
+        for k in ('Book', 'Person', 'Group', 'Library', 'Borrow', 'Member', 'Script')
+    }
+    default_action_adapters = {
+        'new': lambda name, ns: generic_formbased_action('new', get_form(name), ns.new),
+        'edit': lambda name, ns: generic_formbased_action(
+            'edit', get_form(name), ns.edit, fill_data=ns.view_ns),
+        'search': lambda name, ns: actions.search(
+            get_form(name + '_search', get_form(name)), ns.search,
+            getattr(ShowInfoNS, name.lower())(None)),  # ID is always given
+    }
+    special_action_funcs = {
+        ('Group', 'edit'): None,
+        ('Library', 'edit'): None,
+        ('Group', 'activate'): None,
+        ('Member', 'change_password'): None,
+        ('Borrow', 'restitute'): None,
+    }
+
+    def get_form(name, *default):
+        return getattr(forms, name.title().replace('_', '') + 'Form', *default)
+
+    def get_gui2_action(namespace, func):
+        action_ns = wrapped_action_ns.get(namespace)
+        action_func = getattr(action_ns, func, None)
+        if action_func is None:
+            logging.warning('unknown action "{}"'.format(':'.join((namespace, func))))
+            return None
+        return default_action_adapters[func](namespace, wrapped_action_ns[namespace])
+
+    RType = T.DefaultDict[str, T.Union['RType', T.Callable[[T.Optional[tk.Event]], None]]]
+    r: RType = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
+    for complete_k, v in spec.items():
+        *path, k = complete_k.split('::')
+        cur_r = functools.reduce(operator.getitem, path, r)
+        if v['type'] == 'gui2':
+            if v['function'] is None:
+                # TODO: support setting all subactions of a namespace
+                continue
+            if (v['name'], v['function']) in special_action_funcs:
+                action = special_action_funcs[(v['name'], v['function'])]
+            elif v['function'] == 'view':
+                info_func = getattr(ShowInfoNS, v['name'].lower(), None)
+                get_name_text = utils.get_name('action::{}::id'.format(complete_k))
+                action = info_func and info_func(get_name_text)
+            else:
+                action = get_gui2_action(v['name'], v['function'])
+            if action is not None:
+                cur_r[k] = action
         else:
-            r[k] = get_script_actions(v)
+            cur_r[k] = actions.get_script_action(v)
     return r
 
 
 app = App()
 
-FORMS = {
-    'book': forms.BookForm,
-    'person': forms.PersonForm,
-    'library': forms.LibraryForm,
-    'group': forms.GroupForm,
-    'activate_group': forms.GroupActivationForm,
-    'member': forms.MemberForm,
-    'change_password': forms.ChangePasswordForm,
-    'script': forms.ScriptForm,
-}
-wrapped_action_ns = {
-    k: NSWithLogin(getattr(core, k.capitalize()))
-    for k in ('book', 'person', 'group', 'library', 'borrow', 'member', 'script')
-}
-
-action_tree = ActionTree.from_map({**{
-    'new': {  # TODO: add an AddDict to misc to be able to insert the stuff here
-        k: generic_formbased_action('new', FORMS[k], wrapped_action_ns[k].new)
-        for k in ('book', 'person', 'library', 'group', 'member', 'script')
-        # book here to keep it 1st with insertion ordered dicts
-    },
-    # 'view': {
-    #     'book': ShowInfoNS.book,
-    #     'person': ShowInfoNS.person,
-    #     'script': ShowInfoNS.script,
-    # },
-    'edit': {k: generic_formbased_action('edit', FORMS[k], wrapped_action_ns[k].edit,
-                                         fill_data=wrapped_action_ns[k].view_ns)
-             for k in ('book', 'person', 'member', 'script')
-    },  # noqa
-    'search': {k: actions.search(f, wrapped_action_ns[k].search, getattr(ShowInfoNS, k))
-               for f, k in (
-        (forms.BookForm, 'book'),
-        (forms.PersonForm, 'person'),
-        (forms.LibraryForm, 'library'),
-        (forms.GroupForm, 'group'),
-        (forms.BorrowSearchForm, 'borrow'),
-        (forms.ScriptForm, 'script'),
-    )
-    },
-    'borrow': actions.borrow_restitute(
-        forms.BorrowForm, wrapped_action_ns['borrow'].new),
-    'restitute': actions.borrow_restitute(
-        forms.RestituteForm, wrapped_action_ns['borrow'].restitute),
-}})#, **get_script_actions(config.gui2.script_actions.mapping)})
-action_tree.new.book = generic_formbased_action(
-    'new', FORMS['book'], actions.new_book, post_init=new_book_autofill)
-action_tree.edit.change_password = generic_formbased_action(
-    'edit', FORMS['change_password'], wrapped_action_ns['member'].change_password)
-action_tree.edit.activate_group = generic_formbased_action(
-    'edit', FORMS['activate_group'], wrapped_action_ns['group'].activate)
-action_tree.edit.library = generic_formbased_action(
-    'edit', FORMS['library'], wrapped_action_ns['library'].edit)
-action_tree.edit.group = generic_formbased_action(
-    'edit', FORMS['group'], wrapped_action_ns['group'].edit)
+action_tree = ActionTree.from_map(get_actions(config.gui2.actions.mapping))
+# action_tree.new.book = generic_formbased_action(
+#     'new', FORMS['book'], actions.new_book, post_init=new_book_autofill)
+# action_tree.edit.change_password = generic_formbased_action(
+#     'edit', FORMS['change_password'], wrapped_action_ns['member'].change_password)
+# action_tree.edit.activate_group = generic_formbased_action(
+#     'edit', FORMS['activate_group'], wrapped_action_ns['group'].activate)
+# action_tree.edit.library = generic_formbased_action(
+#     'edit', FORMS['library'], wrapped_action_ns['library'].edit)
+# action_tree.edit.group = generic_formbased_action(
+#     'edit', FORMS['group'], wrapped_action_ns['group'].edit)
 
 cli2_callbacks = {
     'ask': partial(tk_msg.askyesno, None),
