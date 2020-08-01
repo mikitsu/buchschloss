@@ -204,7 +204,7 @@ def new_book_autofill(form):
             tk_msg.showerror(message=isbn)
             isbn_field.focus()
             return
-        if not tk_msg.askyesno(utils.get_name('actions::new__Book'),
+        if not tk_msg.askyesno(utils.get_name('action::new__Book'),
                                utils.get_name('interactive_question::isbn_autofill')):
             return
         try:
@@ -234,11 +234,18 @@ def get_actions(spec):
             getattr(ShowInfoNS, name.lower())(None)),  # ID is always given
     }
     special_action_funcs = {
-        ('Group', 'edit'): None,
-        ('Library', 'edit'): None,
-        ('Group', 'activate'): None,
-        ('Member', 'change_password'): None,
-        ('Borrow', 'restitute'): None,
+        ('Group', 'edit'): generic_formbased_action(
+            'edit', forms.GroupForm, wrapped_action_ns['Group'].edit),
+        ('Library', 'edit'): generic_formbased_action(
+            'edit', forms.LibraryForm, wrapped_action_ns['Library'].edit),
+        ('Group', 'activate'): generic_formbased_action(
+            'edit', forms.GroupActivationForm, wrapped_action_ns['Group'].activate),
+        ('Member', 'change_password'): generic_formbased_action(
+            'edit', forms.ChangePasswordForm, wrapped_action_ns['Member'].change_password),
+        ('Borrow', 'restitute'): generic_formbased_action(
+            'edit', forms.RestituteForm, wrapped_action_ns['Borrow'].restitute),
+        ('Book', 'new'): generic_formbased_action(
+            'new', forms.BookForm, actions.new_book, post_init=new_book_autofill),
     }
 
     def get_form(name, *default):
