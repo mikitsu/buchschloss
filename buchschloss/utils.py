@@ -121,7 +121,7 @@ def get_name(internal: str):
                 operator.getitem,
                 (ns for i, ns in enumerate(path, 1) if components & (1 << (len(path) - i))),
                 config.utils.names))
-        except KeyError:
+        except (KeyError, TypeError):
             pass
     for ns in look_in:
         if isinstance(ns, str):
