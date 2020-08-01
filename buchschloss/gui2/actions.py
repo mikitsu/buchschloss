@@ -236,8 +236,6 @@ class ShowInfoNS:
                     logging.error(e)
                     ShowInfoNS.to_destroy.destroy()
             if id_ is None:
-                if id_get_text is None:
-                    raise AssertionError('called without ID and id_get_text = None')
                 try:
                     validator = mval.Validator((
                         id_type, {ValueError: utils.get_name(
@@ -274,7 +272,8 @@ class ShowInfoNS:
 
         def id_get_text_setter(value):
             nonlocal id_get_text
-            id_get_text = value
+            if value is not None:
+                id_get_text = value
             return show_info
 
         id_get_text = None
