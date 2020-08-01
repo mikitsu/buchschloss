@@ -159,7 +159,7 @@ class App:
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
-                except utils.requests.RequestException as e:
+                except Exception as e:
                     tk_msg.showerror(None, '\n'.join((
                         utils.get_name('error::error_while_sending_error_msg'), str(e))))
             self.root.destroy()
@@ -250,11 +250,11 @@ action_tree = ActionTree.from_map({**{
         for k in ('book', 'person', 'library', 'group', 'member', 'script')
         # book here to keep it 1st with insertion ordered dicts
     },
-    'view': {
-        'book': ShowInfoNS.book,
-        'person': ShowInfoNS.person,
-        'script': ShowInfoNS.script,
-    },
+    # 'view': {
+    #     'book': ShowInfoNS.book,
+    #     'person': ShowInfoNS.person,
+    #     'script': ShowInfoNS.script,
+    # },
     'edit': {k: generic_formbased_action('edit', FORMS[k], wrapped_action_ns[k].edit,
                                          fill_data=wrapped_action_ns[k].view_ns)
              for k in ('book', 'person', 'member', 'script')
@@ -263,6 +263,8 @@ action_tree = ActionTree.from_map({**{
                for f, k in (
         (forms.BookForm, 'book'),
         (forms.PersonForm, 'person'),
+        (forms.LibraryForm, 'library'),
+        (forms.GroupForm, 'group'),
         (forms.BorrowSearchForm, 'borrow'),
         (forms.ScriptForm, 'script'),
     )
@@ -271,7 +273,7 @@ action_tree = ActionTree.from_map({**{
         forms.BorrowForm, wrapped_action_ns['borrow'].new),
     'restitute': actions.borrow_restitute(
         forms.RestituteForm, wrapped_action_ns['borrow'].restitute),
-}, **get_script_actions(config.gui2.script_actions.mapping)})
+}})#, **get_script_actions(config.gui2.script_actions.mapping)})
 action_tree.new.book = generic_formbased_action(
     'new', FORMS['book'], actions.new_book, post_init=new_book_autofill)
 action_tree.edit.change_password = generic_formbased_action(
