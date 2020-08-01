@@ -169,7 +169,7 @@ class PersonForm(SearchForm):
     pay: GroupElement.NO_SEARCH = CheckbuttonWithVar
 
 
-class MemberForm(BaseForm):
+class MemberForm(SearchForm):
     class FormWidget(PasswordFormWidget):
         def clean_data(self):
             try:
@@ -183,7 +183,7 @@ class MemberForm(BaseForm):
     level: mtkf.Element = (mtk.OptionChoiceWidget,
                            {'values': list(utils.level_names.items()),
                             'default': 1})
-    current_password: mtkf.Element = NonEmptyPasswordEntry
+    current_password: GroupElement.NO_SEARCH = NonEmptyPasswordEntry
     password: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
     password2: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
 
@@ -203,10 +203,10 @@ class LoginForm(BaseForm):
     password: mtkf.Element = NonEmptyPasswordEntry
 
 
-class LibraryGroupCommon(BaseForm, template=True):
+class LibraryGroupCommon(SearchForm, template=True):
     _position_over_ = True
     name: mtkf.Element = NonEmptyEntry
-    books: mtkf.Element = IntListEntry
+    books: GroupElement.NO_SEARCH = IntListEntry
     # not as element to allow Library to have a nice order
     action = (mtk.RadioChoiceWidget, {
         '*args': [(a, get_name('form::LibraryGroupCommon::' + a))
@@ -221,7 +221,7 @@ class LibraryForm(LibraryGroupCommon):
     class FormWidget:
         default_content = {'pay_required': True}
 
-    people: mtkf.Element = IntListEntry
+    people: GroupElement.NO_SEARCH = IntListEntry
     pay_required: GroupElement.ONLY_NEW = CheckbuttonWithVar
     action: GroupElement.ONLY_EDIT = LibraryGroupCommon.action
 
