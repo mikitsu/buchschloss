@@ -251,13 +251,23 @@ def get_actions(spec):
     def get_form(name, *default):
         return getattr(forms, name.title().replace('_', '') + 'Form', *default)
 
-    def get_gui2_action(namespace, func):
-        action_ns = wrapped_action_ns.get(namespace)
-        action_func = getattr(action_ns, func, None)
-        if action_func is None:
-            logging.warning('unknown action "{}"'.format(':'.join((namespace, func))))
-            return None
-        return default_action_adapters[func](namespace, wrapped_action_ns[namespace])
+    def set_gui2_action(namespace, func, view_name, insert_key):
+        if (namespace, func) in special_action_funcs:
+            action = special_action_funcs[(namespace, func)]
+        elif func == 'view':
+            info_func = getattr(ShowInfoNS, namespace.lower(), None)
+            get_name_text = utils.get_name('action::{}::id'.format(view_name))
+            action = info_func and info_func(get_name_text)
+        else:
+            action_ns = wrapped_action_ns[namespace]
+            action_func = getattr(action_ns, func, None)
+            if action_func is None:
+                logging.warning('unknown action "{}"'.format(':'.join((namespace, func))))
+                action = None
+            else:
+                action = default_action_adapters[func](namespace, action_ns)
+        if action is not None:
+            cur_r[insert_key] = action
 
     RType = T.DefaultDict[str, T.Union['RType', T.Callable[[T.Optional[tk.Event]], None]]]
     r: RType = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
@@ -265,19 +275,20 @@ def get_actions(spec):
         *path, k = complete_k.split('::')
         cur_r = functools.reduce(operator.getitem, path, r)
         if v['type'] == 'gui2':
-            if v['function'] is None:
-                # TODO: support setting all subactions of a namespace
+            if v['name'] not in wrapped_action_ns:
+                logging.warning('unknown action namespace "{}"'.format(v['name']))
                 continue
-            if (v['name'], v['function']) in special_action_funcs:
-                action = special_action_funcs[(v['name'], v['function'])]
-            elif v['function'] == 'view':
-                info_func = getattr(ShowInfoNS, v['name'].lower(), None)
-                get_name_text = utils.get_name('action::{}::id'.format(complete_k))
-                action = info_func and info_func(get_name_text)
+            if v['function'] is None:
+                core_ans = getattr(core, v['name'])
+                cur_r = cur_r[k]
+                for func_name, func_v in vars(core_ans).items():
+                    if (func_name.startswith(('_', 'view'))
+                            or not isinstance(func_v, (staticmethod, classmethod))):
+                        continue
+                    set_gui2_action(v['name'], func_name, 'ignored', func_name)
+                set_gui2_action(v['name'], 'view', complete_k + '::view', 'view')
             else:
-                action = get_gui2_action(v['name'], v['function'])
-            if action is not None:
-                cur_r[k] = action
+                set_gui2_action(v['name'], v['function'], complete_k, k)
         else:
             cur_r[k] = actions.get_script_action(v)
     return r
@@ -286,16 +297,7 @@ def get_actions(spec):
 app = App()
 
 action_tree = ActionTree.from_map(get_actions(config.gui2.actions.mapping))
-# action_tree.new.book = generic_formbased_action(
-#     'new', FORMS['book'], actions.new_book, post_init=new_book_autofill)
-# action_tree.edit.change_password = generic_formbased_action(
-#     'edit', FORMS['change_password'], wrapped_action_ns['member'].change_password)
-# action_tree.edit.activate_group = generic_formbased_action(
-#     'edit', FORMS['activate_group'], wrapped_action_ns['group'].activate)
-# action_tree.edit.library = generic_formbased_action(
-#     'edit', FORMS['library'], wrapped_action_ns['library'].edit)
-# action_tree.edit.group = generic_formbased_action(
-#     'edit', FORMS['group'], wrapped_action_ns['group'].edit)
+
 
 cli2_callbacks = {
     'ask': partial(tk_msg.askyesno, None),
