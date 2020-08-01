@@ -489,8 +489,9 @@ class ActionNamespace:
                ):
         """search for records. see search for details on arguments"""
         check_level(login_context, cls.required_levels.search, cls.__name__ + '.search')
-        return search(cls.model, condition, *complex_params,
-                      complex_action=complex_action)
+        result = search(cls.model, condition, *complex_params,
+                        complex_action=complex_action)
+        return (DataNamespace(cls, value, login_context) for value in result)
 
 
 class Book(ActionNamespace):
