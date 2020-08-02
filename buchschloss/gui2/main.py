@@ -204,7 +204,7 @@ def new_book_autofill(form):
             tk_msg.showerror(message=isbn)
             isbn_field.focus()
             return
-        if not tk_msg.askyesno(utils.get_name('action::new__Book'),
+        if not tk_msg.askyesno(utils.get_name('book::isbn'),
                                utils.get_name('interactive_question::isbn_autofill')):
             return
         try:

@@ -234,7 +234,7 @@ def flatten_gui2_actions(config):
                 r['::'.join(prefix + (k,))] = v
         return r
     flat = flatten_one_layer((), config.get('gui2', {}).get('actions', {}))
-    config['gui2']['actions'] = flat
+    config.get('gui2', {})['actions'] = flat
 
 
 def insert_name_data(config):

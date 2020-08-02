@@ -85,9 +85,9 @@ def test_script_spec():
         {'name': 'with', 'type': 'non-default', 'function': 'func'}
     ]
     with pytest.raises(validate.ValidateError):
-        config_val.is_script_spec('asd@invalid')
+        config_val.is_script_spec('asd!invalid')
     with pytest.raises(validate.ValidateError):
-        config_val.is_script_spec('asd@also-invalid', suffixes=('valid',))
+        config_val.is_script_spec('asd!also-invalid', suffixes=('valid',))
 
 
 # test tasklist later when it's more than just an optionlist wrapper
