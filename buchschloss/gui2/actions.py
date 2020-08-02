@@ -314,11 +314,11 @@ def login():
             return
         main.app.header.set_info_text(utils.get_name('logged_in_as_{}'
                                                      ).format(main.app.current_login))
-        main.app.header.set_login_text(utils.get_name('actions::logout'))
+        main.app.header.set_login_text(utils.get_name('action::logout'))
     else:
         main.app.current_login = core.guest_lc
         main.app.header.set_info_text(utils.get_name('logged_out'))
-        main.app.header.set_login_text(utils.get_name('actions::login'))
+        main.app.header.set_login_text(utils.get_name('action::login'))
 
 
 def view_late(late, warn):
@@ -350,7 +350,7 @@ def activate_group(name, src, dest):
 
 
 def new_book(**kwargs):
-    tk_msg.showinfo(utils.get_name('actions::new__Book'),
+    tk_msg.showinfo(utils.get_name('Book'),
                     utils.get_name('Book::new_id_{}')
                     .format(core.Book.new(login_context=main.app.current_login,
                                           **kwargs)))

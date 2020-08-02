@@ -115,10 +115,10 @@ class App:
         self.center = tk.Frame(self.root)
         self.header = widgets.Header(
             self.root,
-            {'text': utils.get_name('actions::login'), 'command': actions.login},
+            {'text': utils.get_name('action::login'), 'command': actions.login},
             utils.get_name('not_logged_in'),
-            {'text': utils.get_name('actions::abort'), 'command': self.reset},
-            {'text': utils.get_name('actions::exit_app'), 'command': self.onexit}
+            {'text': utils.get_name('action::abort'), 'command': self.reset},
+            {'text': utils.get_name('action::exit_app'), 'command': self.onexit}
         )
 
     def launch(self):
@@ -154,7 +154,7 @@ class App:
 
     def onexit(self):
         """execute when the user exits the application"""
-        if tk_msg.askokcancel(utils.get_name('actions::exit_app'),
+        if tk_msg.askokcancel(utils.get_name('action::exit_app'),
                               utils.get_name('interactive_question::really_exit_app')):
             if (isinstance(sys.stderr, DummyErrorFile)
                     and sys.stderr.error_happened
