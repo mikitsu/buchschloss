@@ -86,70 +86,6 @@
     "name": "name",
     "current_password": "your password",
     "password2": "repeat password",
-    "Search": {
-      "search_mode": "search mode",
-      "exact_match": "require exact match"
-    },
-    "Book": {
-      "id": "ID",
-      "isbn": "ISBN",
-      "author": "author",
-      "title": "title",
-      "series": "series",
-      "language": "language",
-      "publisher": "publisher",
-      "concerned_people": "other people",
-      "year": "year",
-      "medium": "medium",
-      "genres": "genres",
-      "library": "library",
-      "groups": "groups",
-      "shelf": "shelf"
-    },
-    "Person": {
-      "id_": "ID",
-      "first_name": "first name",
-      "last_name": "last name",
-      "class_": "class",
-      "max_borrow": "max. borrowed books",
-      "libraries": "libraries",
-      "pay": "has paid"
-    },
-    "Member": {
-      "level": "level",
-      "password": "new password"
-    },
-    "ChangePassword": {
-      "member": "name",
-      "new_password": "new password"
-    },
-    "Login": {
-      "name": "name",
-      "password": "password"
-    },
-    "LibraryGroupCommon": {
-      "add": "add",
-      "remove": "remove",
-      "delete": "delete",
-      "books": "books"
-    },
-    "Group": {
-      "action": "action"
-    },
-    "Library": {
-      "action": "action",
-      "people": "people",
-      "pay_required": "payment required"
-    },
-    "GroupActivation": {
-      "name": "group",
-      "src": "source libraries",
-      "dest": "destination library"
-    },
-    "BorrowRestCommon": {
-      "person": "person",
-      "book": "book"
-    },
     "Borrow": {
       "weeks": "borrow time (weeks)"
     },
@@ -157,17 +93,79 @@
       "is_back": "was returned"
     }
   },
+  "Search": {
+    "search_mode": "search mode",
+    "exact_match": "require exact match"
+  },
   "Book": {
     "*this*": "book",
     "id": "ID",
     "new_id_{}": "The new book has the ID {}.",
     "borrowed": "borrowed",
     "available": "available",
-    "inactive": "removed"
+    "inactive": "removed",
+    "isbn": "ISBN",
+    "author": "author",
+    "title": "title",
+    "series": "series",
+    "series_number": "series number",
+    "language": "language",
+    "publisher": "publisher",
+    "concerned_people": "other people",
+    "year": "year",
+    "medium": "medium",
+    "genres": "genres",
+    "library": "library",
+    "groups": "groups",
+    "shelf": "shelf",
+    "borrowed_by": "borrowed by",
+    "return_date": "due on"
   },
   "Person": {
     "*this*": "person",
-    "id": "ID"
+    "id": "ID",
+    "id_": "ID",
+    "first_name": "first name",
+    "last_name": "last name",
+    "class_": "class",
+    "max_borrow": "max. borrowed books",
+    "libraries": "libraries",
+    "pay": "has paid"
+  },
+  "Member": {
+    "level": "level",
+    "password": "new password"
+  },
+  "ChangePassword": {
+    "member": "name",
+    "new_password": "new password"
+  },
+  "Login": {
+    "name": "name",
+    "password": "password"
+  },
+  "LibraryGroupCommon": {
+    "add": "add",
+    "remove": "remove",
+    "delete": "delete",
+    "books": "books"
+  },
+  "Group": {
+    "action": "action"
+  },
+  "Library": {
+    "action": "action",
+    "people": "people",
+    "pay_required": "payment required"
+  },
+  "GroupActivation": {
+    "name": "group",
+    "src": "source libraries",
+    "dest": "destination library"
+  },
+  "BorrowRestCommon": {
+    "person": "person",
+    "book": "book"
   },
   "Borrow": {
     "*this*": "borrowing action",

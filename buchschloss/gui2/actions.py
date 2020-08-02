@@ -187,11 +187,6 @@ def search(form_cls: T.Type[forms.BaseForm],
     return generic_formbased_action('search', form_cls, search_callback, do_reset=False)
 
 
-def func_from_static(static: staticmethod):
-    # removes scary warnings when using functions inside a class body
-    return static.__func__
-
-
 class ShowInfo:
     """provide callables that display information"""
     to_destroy: T.ClassVar[T.Optional[tk.Widget]] = None
@@ -246,12 +241,12 @@ class ShowInfo:
             return
         pass_widgets = {utils.get_name('info_regarding'): data['__str__']}
         for k, v in data.items():
-            k = utils.get_name(self.get_name_prefix + k)
+            display = utils.get_name(self.get_name_prefix + k)
             if k in self.special_keys:
                 v = self.special_keys[k](data)
-                pass_widgets[k] = v
+                pass_widgets[display] = v
             elif '_id' not in k and k != '__str__':
-                pass_widgets[k] = str(v)
+                pass_widgets[display] = str(v)
         iw = widgets.InfoWidget(main.app.center, pass_widgets)
         iw.pack()
         main.app.queue.put(iw.set_scrollregion)
