@@ -156,7 +156,7 @@ def show_results(results: T.Iterable, view_func: T.Callable[[T.Any], dict], mast
 
     search_frame = tk.Frame(master)
     search_frame.pack()
-    rw = widgets.SearchResultWidget(search_frame, results, view_wrap)
+    rw = widgets.SearchResultWidget(search_frame, tuple(results), view_wrap)
     rw.pack()
     main.app.queue.put(rw.set_scrollregion)
     q_binding = main.app.root.bind('<q>', lambda e: rw.set_scrollregion())
