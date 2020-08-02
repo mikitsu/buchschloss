@@ -709,9 +709,9 @@ def test_borrow_restitute(db):
 def test_search(db):
     """test searches"""
     models.Library.create(name='main')
-    book_1 = create_book(author='author name')
-    book_2 = create_book(author='author 2', year=2000)
-    person = create_person(123, class_='cls', libraries=['main'])
+    book_1 = core.DataNamespace(core.Book, create_book(author='author name'), None)
+    book_2 = core.DataNamespace(core.Book, create_book(author='author 2', year=2000), None)
+    person = core.DataNamespace(core.Person, create_person(123, class_='cls', libraries=['main']), None)
     ctxt_person = for_levels(partial(core.Person.search, ()), 1)
     person_search = partial(core.Person.search, login_context=ctxt_person)
     book_search = partial(core.Book.search, login_context=core.LoginType.INTERNAL(0))

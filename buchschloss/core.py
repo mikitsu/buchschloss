@@ -1229,6 +1229,9 @@ class DataNamespace:
         else:
             return False
 
+    def __hash__(self):
+        return hash(self._data)
+
     def __str__(self):
         return str(self._data)
 
