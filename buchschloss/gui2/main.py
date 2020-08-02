@@ -28,7 +28,7 @@ from ..config.main import DummyErrorFile
 from . import forms
 from . import widgets
 from . import actions
-from .actions import generic_formbased_action, ShowInfoNS, show_BSE
+from .actions import generic_formbased_action, ShowInfo, show_BSE
 
 
 class NSWithLogin:
@@ -229,9 +229,9 @@ def get_actions(spec):
         'new': lambda name, ns: generic_formbased_action('new', get_form(name), ns.new),
         'edit': lambda name, ns: generic_formbased_action(
             'edit', get_form(name), ns.edit, fill_data=ns.view_ns),
+        'view': lambda name, __: ShowInfo.instances.get(name),
         'search': lambda name, ns: actions.search(
-            get_form(name + '_search', get_form(name)), ns.search,
-            getattr(ShowInfoNS, name.lower())(None)),  # ID is always given
+            get_form(name + '_search', get_form(name)), ns.search, ShowInfo.instances[name]),
     }
     special_action_funcs = {
         ('Group', 'edit'): generic_formbased_action(
@@ -239,11 +239,11 @@ def get_actions(spec):
         ('Library', 'edit'): generic_formbased_action(
             'edit', forms.LibraryForm, wrapped_action_ns['Library'].edit),
         ('Group', 'activate'): generic_formbased_action(
-            'edit', forms.GroupActivationForm, wrapped_action_ns['Group'].activate),
+            None, forms.GroupActivationForm, wrapped_action_ns['Group'].activate),
         ('Member', 'change_password'): generic_formbased_action(
-            'edit', forms.ChangePasswordForm, wrapped_action_ns['Member'].change_password),
+            None, forms.ChangePasswordForm, wrapped_action_ns['Member'].change_password),
         ('Borrow', 'restitute'): generic_formbased_action(
-            'edit', forms.RestituteForm, wrapped_action_ns['Borrow'].restitute),
+            None, forms.RestituteForm, wrapped_action_ns['Borrow'].restitute),
         ('Book', 'new'): generic_formbased_action(
             'new', forms.BookForm, actions.new_book, post_init=new_book_autofill),
     }
@@ -251,28 +251,24 @@ def get_actions(spec):
     def get_form(name, *default):
         return getattr(forms, name.title().replace('_', '') + 'Form', *default)
 
-    def set_gui2_action(namespace, func, view_name, insert_key):
+    def set_gui2_action(namespace, func, insert_key):
         if (namespace, func) in special_action_funcs:
             action = special_action_funcs[(namespace, func)]
-        elif func == 'view':
-            info_func = getattr(ShowInfoNS, namespace.lower(), None)
-            get_name_text = utils.get_name('action::{}::id'.format(view_name))
-            action = info_func and info_func(get_name_text)
         else:
             action_ns = wrapped_action_ns[namespace]
-            action_func = getattr(action_ns, func, None)
-            if action_func is None:
+            action_adapter = default_action_adapters.get(func)
+            if action_adapter is None:
                 logging.warning('unknown action "{}"'.format(':'.join((namespace, func))))
                 action = None
             else:
-                action = default_action_adapters[func](namespace, action_ns)
+                action = action_adapter(namespace, action_ns)
         if action is not None:
             cur_r[insert_key] = action
 
     RType = T.DefaultDict[str, T.Union['RType', T.Callable[[T.Optional[tk.Event]], None]]]
     r: RType = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
-    for complete_k, v in spec.items():
-        *path, k = complete_k.split('::')
+    for k, v in spec.items():
+        *path, k = k.split('::')
         cur_r = functools.reduce(operator.getitem, path, r)
         if v['type'] == 'gui2':
             if v['name'] not in wrapped_action_ns:
@@ -281,14 +277,15 @@ def get_actions(spec):
             if v['function'] is None:
                 core_ans = getattr(core, v['name'])
                 cur_r = cur_r[k]
-                for func_name, func_v in vars(core_ans).items():
+                for func_name in dir(core_ans):
+                    func_v = getattr(core_ans, func_name)
                     if (func_name.startswith(('_', 'view'))
-                            or not isinstance(func_v, (staticmethod, classmethod))):
+                            or not callable(func_v)):
                         continue
-                    set_gui2_action(v['name'], func_name, 'ignored', func_name)
-                set_gui2_action(v['name'], 'view', complete_k + '::view', 'view')
+                    set_gui2_action(v['name'], func_name, func_name)
+                set_gui2_action(v['name'], 'view', 'view')
             else:
-                set_gui2_action(v['name'], v['function'], complete_k, k)
+                set_gui2_action(v['name'], v['function'], k)
         else:
             cur_r[k] = actions.get_script_action(v)
     return r

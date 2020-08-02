@@ -5,7 +5,6 @@ import itertools
 import tkinter as tk
 import tkinter.messagebox as tk_msg
 from functools import partial
-import logging
 import typing as T
 
 from ..misc import tkstuff as mtk
@@ -57,7 +56,8 @@ def generic_formbased_action(form_type, form_cls, callback,
         k: {'groups': v} for k, v in {
             'new': [forms.ElementGroup.NEW],
             'edit': [forms.ElementGroup.EDIT],
-            'search': [forms.ElementGroup.SEARCH]
+            'search': [forms.ElementGroup.SEARCH],
+            None: [],
         }.items()
     }
     form_options_['edit']['default_content'] = {}
@@ -140,14 +140,8 @@ def show_results(results: T.Iterable, view_func: T.Callable[[T.Any], dict], mast
 
     def search_show(btn):
         btn.destroy()
-        try:
-            # workaround because mtk.ScrollableWidget doesn't handle .destroy() yet
-            ShowInfoNS.to_destroy.container.destroy()
-        except AttributeError as e:
-            # don't crash everything if I stop using ScrollableWidget
-            logging.error(e)
-            ShowInfoNS.to_destroy.destroy()
-        ShowInfoNS.to_destroy = None
+        ShowInfo.to_destroy.container.destroy()
+        ShowInfo.to_destroy = None
         rw.pack()
 
     def view_wrap(*args, **kwargs):
@@ -198,133 +192,117 @@ def func_from_static(static: staticmethod):
     return static.__func__
 
 
-class ShowInfoNS:
-    """namespace for information viewing"""
-    IWData = T.Union[None, str, T.Sequence]
-    SpecialKeyFunc = T.Callable[[dict], T.Union[T.Tuple[str, IWData], T.Tuple[IWData]]]
+class ShowInfo:
+    """provide callables that display information"""
+    to_destroy: T.ClassVar[T.Optional[tk.Widget]] = None
+    instances: T.ClassVar[T.Dict[str, 'ShowInfo']]
+    SpecialKeyFunc = T.Callable[[dict], T.Optional[T.Sequence]]
 
-    # noinspection PyNestedDecorators, PyDefaultArgument
-    @func_from_static
-    @staticmethod
-    def _show_info_action(
-            view_func: T.Callable[[T.Any], dict],
-            special_keys: T.Mapping[str, SpecialKeyFunc] = {},
+    def __init__(
+            self,
+            namespace: T.Type[core.ActionNamespace],
+            special_keys: T.Mapping[str, SpecialKeyFunc] = {},  # noqa
             id_type: type = str,
             ):
-        """prepare a function displaying information
+        """Initialize
 
-        return a function that takes a presentation string for asking
-        the ID and itself returns the actual function that displays information
-
-        Arguments:
-            - namespace: the namespace with the viewing function
-            - special_keys: a mapping form keys in the returned data to a function
-                taking the value mapped by the key and returning a value to pass
-                to widgets.InfoWidget. Optionally, a different name for the field
-                may be returned as first element in a sequence, the display value
-                being second
-            - id_type: the type of the ID
+        :param namespace: the action namespace to use for getting information
+        :param special_keys: a mapping from keys in the returned data to a function
+            taking the value mapped by the key and returning anew key
+            (may be None to use the default) and a value to pass
+            to widgets.InfoWidget.
+        :param id_type: the type of the ID
         """
+        self.view_func = NSWithLogin(namespace).view_str
+        self.special_keys = special_keys
+        self.id_type = id_type
+        self.get_name_prefix = namespace.__name__ + '::'
 
-        def show_info(id_=None):
-            if ShowInfoNS.to_destroy is not None:
-                try:
-                    # workaround because mtk.ScrollableWidget doesn't handle .destroy() yet
-                    ShowInfoNS.to_destroy.container.destroy()
-                except AttributeError as e:
-                    # don't crash everything if I stop using ScrollableWidget
-                    logging.error(e)
-                    ShowInfoNS.to_destroy.destroy()
-            if id_ is None:
-                try:
-                    validator = mval.Validator((
-                        id_type, {ValueError: utils.get_name(
-                            'error::must_be_{}'.format(id_type.__name__))}))
-                    id_ = mtkd.WidgetDialog.ask(
-                        main.app.root, mtk.ValidatedWidget.new_cls(tk.Entry, validator),
-                        title=id_get_text, text=id_get_text)
-                except mtkd.UserExitedDialog:
-                    main.app.reset()
-                    return
-
+    def __call__(self, id_=None):
+        """ask for ID if not given"""
+        if id_ is None:
+            id_get_text = utils.get_name(self.get_name_prefix + 'id')
             try:
-                data = view_func(id_)
-            except core.BuchSchlossBaseError as e:
-                show_BSE(e)
+                validator = mval.Validator((
+                    self.id_type, {ValueError: utils.get_name(
+                        'error::must_be_{}'.format(self.id_type.__name__))}))
+                id_ = mtkd.WidgetDialog.ask(
+                    main.app.root, mtk.ValidatedWidget.new_cls(tk.Entry, validator),
+                    title=id_get_text, text=id_get_text)
+            except mtkd.UserExitedDialog:
                 main.app.reset()
                 return
-            pass_widgets = {utils.get_name('info_regarding'): data['__str__']}
-            for k, v in data.items():
-                if k in special_keys:
-                    *k_new, v = special_keys[k](data)
-                    if k_new:
-                        k = k_new[0]
-                    else:
-                        k = utils.get_name(k)
-                    pass_widgets[k] = v
-                elif '_id' not in k and k != '__str__':
-                    pass_widgets[utils.get_name(k)] = str(v)
-            iw = widgets.InfoWidget(main.app.center, pass_widgets)
-            iw.pack()
-            main.app.queue.put(iw.set_scrollregion)
-            main.app.root.bind('<q>', lambda e: iw.set_scrollregion())
-            ShowInfoNS.to_destroy = iw
+        return self.display_information(id_)
 
-        def id_get_text_setter(value):
-            nonlocal id_get_text
-            if value is not None:
-                id_get_text = value
-            return show_info
+    def display_information(self, id_):
+        """actually display information"""
+        if ShowInfo.to_destroy is not None:
+            ShowInfo.to_destroy.container.destroy()
+        try:
+            data = self.view_func(id_)
+        except core.BuchSchlossBaseError as e:
+            show_BSE(e)
+            main.app.reset()
+            return
+        pass_widgets = {utils.get_name('info_regarding'): data['__str__']}
+        for k, v in data.items():
+            k = utils.get_name(self.get_name_prefix + k)
+            if k in self.special_keys:
+                v = self.special_keys[k](data)
+                pass_widgets[k] = v
+            elif '_id' not in k and k != '__str__':
+                pass_widgets[k] = str(v)
+        iw = widgets.InfoWidget(main.app.center, pass_widgets)
+        iw.pack()
+        main.app.queue.put(iw.set_scrollregion)
+        main.app.root.bind('<q>', lambda e: iw.set_scrollregion())
+        ShowInfo.to_destroy = iw
 
-        id_get_text = None
-        return id_get_text_setter
 
-    book = _show_info_action(
-        NSWithLogin(core.Book).view_str,
-        {'borrowed_by': lambda d: (
-            utils.get_name('borrowed_by'), (widgets.Button, {
+ShowInfo.instances = {
+    'Book': ShowInfo(
+        core.Book,
+        {'borrowed_by': lambda d:
+            (widgets.Button, {
                 'text': d['borrowed_by'],
-                'command': (partial(ShowInfoNS.person, d['borrowed_by_id'])
+                'command': (partial(ShowInfo.instances['Person'], d['borrowed_by_id'])
                             if d['borrowed_by_id'] is not None else None)
-            }))
+            })
          },
         int,
-    )
-    person = _show_info_action(
-        NSWithLogin(core.Person).view_str,
-        {'borrows': lambda d: (
+    ),
+    'Person': ShowInfo(
+        core.Person,
+        {'borrows': lambda d:
             [(widgets.Button, {
                 'text': t,
-                'command': partial(ShowInfoNS.book, i)})
+                'command': partial(ShowInfo.instances['Book'], i)})
              for t, i in zip(d['borrows'], d['borrow_book_ids'])],
-        )
-        },
-        int,
-    )
-    library = _show_info_action(NSWithLogin(core.Library).view_str)
-    group = _show_info_action(NSWithLogin(core.Group).view_str)
-    borrow = _show_info_action(
-        NSWithLogin(core.Borrow).view_str,
-        {'person': lambda d: (
-            (widgets.Button, {
-                'text': d['person'],
-                'command': partial(ShowInfoNS.person, d['person_id'])
-            }),),
-         'book': lambda d: (
-             (widgets.Button, {
-                 'text': d['book'],
-                 'command': partial(ShowInfoNS.book, d['book_id'])
-             }),),
-         'is_back': lambda d: (
-             (widgets.Label, {
-                 'text': utils.get_name(str(d['is_back']))
-             }),),
          },
         int,
-    )
-    member = _show_info_action(NSWithLogin(core.Member).view_str)
-    script = _show_info_action(NSWithLogin(core.Script).view_str)
-    to_destroy = None
+    ),
+    'Borrow': ShowInfo(
+        core.Borrow,
+        {'person': lambda d:
+            (widgets.Button, {
+                'text': d['person'],
+                'command': partial(ShowInfo.instances['Person'], d['person_id'])
+            }),
+         'book': lambda d:
+             (widgets.Button, {
+                 'text': d['book'],
+                 'command': partial(ShowInfo.instances['Book'], d['book_id'])
+             }),
+         'is_back': lambda d:
+             (widgets.Label, {
+                 'text': utils.get_name(str(d['is_back']))
+             }),
+         },
+        int,
+    ),
+}
+ShowInfo.instances.update({k: ShowInfo(getattr(core, k))
+                           for k in ('Library', 'Group', 'Member', 'Script')})
 
 
 def login():
@@ -350,7 +328,7 @@ def login():
 
 def view_late(late, warn):
     """show late books"""
-    show_results(warn + late, ShowInfoNS.borrow)
+    show_results(warn + late, ShowInfo.instances['Borrow'])
 
 
 def borrow_restitute(form_cls, callback):
