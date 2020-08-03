@@ -170,14 +170,7 @@ class PersonForm(SearchForm):
 
 
 class MemberForm(SearchForm):
-    class FormWidget(PasswordFormWidget):
-        def clean_data(self):
-            try:
-                super().clean_data()
-            except KeyError:
-                pass
-            if 'edit_password_button' in self.data:
-                del self.data['edit_password_button']
+    FormWidget = PasswordFormWidget
 
     name: mtkf.Element = NonEmptyEntry
     level: mtkf.Element = (mtk.OptionChoiceWidget,
