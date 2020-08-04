@@ -75,6 +75,19 @@ def test_script_spec():
         {'name': 's', 'type': 'cli2', 'function': None, 'invocation': get_td(1)},
         {'name': 's', 'type': 'py', 'function': 'f', 'invocation': get_td(4, 5, 6)},
     ]
+    assert config_val.is_script_spec(
+        ['asd', 'qwert!private', 'with:func'],
+        suffixes=('private',),
+        default_suffix='non-default',
+    ) == [
+        {'name': 'asd', 'type': 'non-default', 'function': None},
+        {'name': 'qwert', 'type': 'private', 'function': None},
+        {'name': 'with', 'type': 'non-default', 'function': 'func'}
+    ]
+    with pytest.raises(validate.ValidateError):
+        config_val.is_script_spec('asd!invalid')
+    with pytest.raises(validate.ValidateError):
+        config_val.is_script_spec('asd!also-invalid', suffixes=('valid',))
 
 
 # test tasklist later when it's more than just an optionlist wrapper

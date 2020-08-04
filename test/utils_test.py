@@ -45,6 +45,7 @@ def test_get_name():
     assert utils.get_name('does::not::exist::at::all::c::d') == 'CD'
     assert utils.get_name('a::b::c__e') == 'ABC: ABCE'
     assert utils.get_name('a::c::h__i') == 'ACH: CI'
+    assert utils.get_name('c::d::does::not::exist') == 'c::d::does::not::exist'
 
 
 def test_script_exec(db, monkeypatch):
