@@ -16,7 +16,7 @@ from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
                       IntListEntry, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
                       SeriesEntry, OptionsFromSearch, SearchMultiChoice,
-                      FlagEnumMultiChoice)
+                      FlagEnumMultiChoice, ScriptNameEntry)
 
 
 class ElementGroup(enum.Enum):
@@ -266,7 +266,7 @@ class BorrowSearchForm(SearchForm):
 
 
 class ScriptForm(SearchForm):
-    name: mtkf.Element = Entry
+    name: mtkf.Element = ScriptNameEntry
     permissions: mtkf.Element = (
         FlagEnumMultiChoice,
         {'flag_enum': core.ScriptPermissions, 'get_name_prefix': 'Script::permissions::'}

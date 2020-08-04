@@ -42,6 +42,7 @@ IntEntry = mtk.ValidatedWidget.new_cls(Entry, validation.type_int)
 NullIntEntry = mtk.ValidatedWidget.new_cls(Entry, validation.int_or_none)
 NullEntry = mtk.ValidatedWidget.new_cls(Entry, validation.none_on_empty)
 NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_on_empty)
+ScriptNameEntry = mtk.ValidatedWidget.new_cls(Entry, validation.script_name)
 
 
 class SeriesEntry(mtk.ContainingWidget):
