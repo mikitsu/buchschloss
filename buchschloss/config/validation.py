@@ -45,8 +45,8 @@ def is_optionlist(value, *options):
 def is_script_spec(value,
                    with_time=False,
                    single=False,
-                   suffixes=('cli2', 'py'),
-                   default_suffix='cli2'):
+                   suffixes=('lua', 'py'),
+                   default_suffix='lua'):
     """check whether the value is syntactically a script spec and return components"""
     spec_regex_parts = [
         r'^\s*(?P<name>[-\w ]+)(?::(?P<function>\w+))?',
@@ -78,7 +78,7 @@ def is_script_spec(value,
 is_gui2_action_spec = functools.partial(
     is_script_spec,
     single=True,
-    suffixes=('gui2', 'cli2', 'py'),
+    suffixes=('gui2', 'lua', 'py'),
     default_suffix='gui2',
 )
 

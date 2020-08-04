@@ -1,13 +1,13 @@
-"""test cli2/objects.py"""
+"""test lua/objects.py"""
 import functools
 
 import lupa
 import pytest
 
 from buchschloss import core
-from buchschloss import cli2
+from buchschloss import lua
 from buchschloss import utils
-from buchschloss.cli2 import objects
+from buchschloss.lua import objects
 
 
 class Dummy:  # TODO: move this out to misc
@@ -74,7 +74,7 @@ def test_action_ns():
         return param, other_param
 
     # noinspection PyArgumentList
-    rt = lupa.LuaRuntime(attribute_handlers=(cli2.lua_get, cli2.lua_set))
+    rt = lupa.LuaRuntime(attribute_handlers=(lua.lua_get, lua.lua_set))
     dummy = Dummy(view_ns=view_ns, new=new, _call=lambda s, dns, runtime=None: dns)
     ns_book = objects.LuaActionNS(dummy, login_context=FLAG, runtime=rt)
     rt.globals()['book'] = ns_book
@@ -99,7 +99,7 @@ def test_data_ns(monkeypatch):
     """test LuaDataNS"""
     monkeypatch.setattr(core, 'DataNamespace', Dummy)
     data = Dummy(a=1, b=Dummy(x=1), c=[Dummy(x=2), Dummy(x=3)])
-    rt = lupa.LuaRuntime(attribute_handlers=(cli2.lua_get, cli2.lua_set))  # noqa
+    rt = lupa.LuaRuntime(attribute_handlers=(lua.lua_get, lua.lua_set))  # noqa
     rt.globals()['ldn'] = objects.LuaDataNS(data, runtime=rt)
     assert rt.eval('type(ldn)') == 'userdata'
     assert rt.eval('ldn.a') == 1

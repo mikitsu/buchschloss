@@ -264,10 +264,10 @@ app = App()
 action_tree = ActionTree.from_nested(get_actions(config.gui2.actions.mapping))
 
 
-cli2_callbacks = {
+lua_callbacks = {
     'ask': partial(tk_msg.askyesno, None),
     'alert': partial(tk_msg.showinfo, None),
-    'display': actions.display_cli2_data,
-    'get_data': actions.handle_cli2_get_data,
+    'display': actions.display_lua_data,
+    'get_data': actions.handle_lua_get_data,
 }
-core.Script.callbacks = cli2_callbacks
+core.Script.callbacks = lua_callbacks

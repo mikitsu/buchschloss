@@ -11,7 +11,7 @@ import requests
 
 from .. import utils
 from .. import core
-from .. import cli2
+from .. import lua
 from .. import config
 
 
@@ -87,8 +87,8 @@ class LuaActionNS(LuaObject):
         if callable(val):
             @lupa.unpacks_lua_table
             def func(*args, **kwargs):
-                args = map(cli2.table_to_data, args)
-                kwargs = {k: cli2.table_to_data(v) for k, v in kwargs.items()}
+                args = map(lua.table_to_data, args)
+                kwargs = {k: lua.table_to_data(v) for k, v in kwargs.items()}
                 return val(*args, login_context=self.login_context, **kwargs)
             return func
         else:
@@ -96,7 +96,7 @@ class LuaActionNS(LuaObject):
 
     def search(self, condition):
         """transform the Lua table into a tuple"""
-        results = self.action_ns.search(cli2.table_to_data(condition),
+        results = self.action_ns.search(lua.table_to_data(condition),
                                         login_context=self.login_context)
         return self.runtime.table(*(LuaDataNS(o, runtime=self.runtime) for o in results))
 
@@ -183,13 +183,13 @@ class LuaUIInteraction(LuaObject):
 
     def display(self, data):
         """display data to the user"""
-        return self.callbacks['display'](cli2.table_to_data(data))
+        return self.callbacks['display'](lua.table_to_data(data))
 
     def get_data(self, data_spec):
         """get input from the user. Includes acceptable types (int, str, bool)"""
         data_spec = ((k, self.get_name(k), v) for k, v in
-                     cli2.table_to_data(data_spec).items())
-        return cli2.data_to_table(self.runtime, self.callbacks['get_data'](data_spec))
+                     lua.table_to_data(data_spec).items())
+        return lua.data_to_table(self.runtime, self.callbacks['get_data'](data_spec))
 
     @lupa.unpacks_lua_table_method
     def get_name(self, internal, *format_args, **format_kwargs):
@@ -213,7 +213,7 @@ class LuaBS4Interface(LuaObject):
                 warnings.filterwarnings('ignore', 'No parser was')
                 self.tag = bs4.BeautifulSoup(markup, features=features)
         self.text = self.tag.get_text()
-        self.attrs = cli2.data_to_table(self.runtime, self.tag.attrs)
+        self.attrs = lua.data_to_table(self.runtime, self.tag.attrs)
 
     def __str__(self):
         return str(self.tag)
@@ -235,11 +235,11 @@ class LuaBS4Interface(LuaObject):
 
 class LuaRequestsInterface(LuaObject):
     """Provide Lua code an interface to requests"""
-    get_allowed = config.cli2.requests.methods
+    get_allowed = config.lua.requests.methods
 
     def get(self, url, result='auto'):
         """wrap requests.get"""
-        if config.cli2.requests.url_regex.search(url) is None:
+        if config.lua.requests.url_regex.search(url) is None:
             return None
         try:
             r = requests.get(url)
@@ -250,6 +250,6 @@ class LuaRequestsInterface(LuaObject):
         if result in ('html', 'xml'):
             return LuaBS4Interface(r.text, result, runtime=self.runtime)
         elif result == 'json':
-            return cli2.data_to_table(self.runtime, r.json())
+            return lua.data_to_table(self.runtime, r.json())
         else:
             return r.text

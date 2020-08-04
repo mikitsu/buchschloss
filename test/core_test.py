@@ -795,15 +795,15 @@ def test_script_execute(db, monkeypatch):
     script_execute_noname = partial(core.Script.execute, login_context=ctxt)
     calls = []
 
-    def cli2_execute(*args, **kwargs):
+    def lua_execute(*args, **kwargs):
         calls.append(kwargs)
         return {
             'func': lambda: calls.append('func'),
         }
 
-    monkeypatch.setattr('buchschloss.cli2.execute_script', cli2_execute)
+    monkeypatch.setattr('buchschloss.lua.execute_script', lua_execute)
     monkeypatch.setattr(core.Script, 'callbacks', 'cls-cb-flag')
-    monkeypatch.setitem(config.scripts.cli2.mapping, 'name', {'key': 'value'})
+    monkeypatch.setitem(config.scripts.lua.mapping, 'name', {'key': 'value'})
     script_execute(callbacks='callback-flag')
     assert calls[-1].pop('add_ui') == ('callback-flag', 'script-data::name::')
     script.permissions |= core.ScriptPermissions.REQUESTS
@@ -813,7 +813,7 @@ def test_script_execute(db, monkeypatch):
     script.permissions |= core.ScriptPermissions.STORE
     script.save()
     monkeypatch.setattr(core.Script, 'callbacks', None)
-    monkeypatch.delitem(config.scripts.cli2.mapping, 'name')
+    monkeypatch.delitem(config.scripts.lua.mapping, 'name')
     script_execute_noname('name', 'func')
     assert calls.pop() == 'func'
     getter, setter = calls[-1].pop('add_storage')

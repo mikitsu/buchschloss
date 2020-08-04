@@ -1,4 +1,4 @@
-"""Lua-based cli2"""
+"""Lua-based lua"""
 
 import getpass
 import logging
@@ -121,7 +121,7 @@ def prepare_runtime(login_context: core.LoginContext, *,
     }
     # noinspection PyArgumentList
     runtime = lupa.LuaRuntime(attribute_handlers=(lua_get, lua_set))
-    restrict_runtime(runtime, config.cli2.whitelist.mapping)
+    restrict_runtime(runtime, config.lua.whitelist.mapping)
     g = runtime.globals()
     g['buchschloss'] = runtime.table_from({
         k: objects.LuaActionNS(getattr(core, k),
@@ -174,7 +174,7 @@ def start():
     rt.globals()['getpass'] = getpass.getpass  # for auth_required functions
     while True:
         try:
-            line = input(str(login_context)+'@buchschloss-cli2 ==> ')
+            line = input(str(login_context)+'@buchschloss-lua ==> ')
         except EOFError:
             print()
             return

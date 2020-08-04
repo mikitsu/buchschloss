@@ -53,11 +53,11 @@ def test_script_exec(db, monkeypatch):
     invokes = set()
     monkeypatch.setitem(config.scripts.mapping, 'startup', (
         {'type': 'py', 'name': 'test_2', 'function': None},
-        {'type': 'cli2', 'name': 'test-5', 'function': 'test'},))
+        {'type': 'lua', 'name': 'test-5', 'function': 'test'},))
     monkeypatch.setitem(config.scripts.mapping, 'repeating', (
         {'type': 'py', 'name': 'test_3', 'function': None,
          'invocation': datetime.timedelta(seconds=0.1)},
-        {'type': 'cli2', 'name': 'test-4', 'function': None,
+        {'type': 'lua', 'name': 'test-4', 'function': None,
          'invocation': datetime.timedelta(minutes=300)},
     ))
     common = dict(permissions=core.ScriptPermissions(0), storage={})
@@ -70,7 +70,7 @@ def test_script_exec(db, monkeypatch):
     monkeypatch.setattr(py_scripts, 'test_3', get_py_func('test_3'), raising=False)
     core.misc_data.last_script_invocations = {
         'test_3!py': datetime.datetime.now() - datetime.timedelta(minutes=15),
-        'test-4!cli2': datetime.datetime.now() - datetime.timedelta(minutes=15)
+        'test-4!lua': datetime.datetime.now() - datetime.timedelta(minutes=15)
     }
     callbacks = {'alert': invokes.add, 'display': lambda x: None}
     monkeypatch.setattr(core.Script, 'callbacks', callbacks)

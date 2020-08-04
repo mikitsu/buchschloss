@@ -1178,8 +1178,8 @@ class Script(ActionNamespace):
             dictionary to the default one
         """
         # avoid problems with circular import
-        # core -> cli2.__init__ -> cli2.objects -> core
-        from . import cli2
+        # core -> lua.__init__ -> lua.objects -> core
+        from . import lua
         if script.setlevel is not None:
             script_lc_level = script.setlevel
         else:
@@ -1188,7 +1188,7 @@ class Script(ActionNamespace):
             script_lc_level, name=script.name, invoker=login_context)
         ui_callbacks = callbacks or cls.callbacks
         get_name_prefix = 'script-data::{}::'.format(script.name)
-        script_config = config.scripts.cli2.get(script.name).mapping
+        script_config = config.scripts.lua.get(script.name).mapping
         if ScriptPermissions.STORE in script.permissions:
             edit_func = partial(Script.edit, script.name, login_context=internal_lc)
             add_storage = (
@@ -1197,7 +1197,7 @@ class Script(ActionNamespace):
             )
         else:
             add_storage = None
-        ns = cli2.execute_script(
+        ns = lua.execute_script(
             script.code,
             script_lc,
             add_ui=(None if ui_callbacks is None else (ui_callbacks, get_name_prefix)),
@@ -1209,7 +1209,7 @@ class Script(ActionNamespace):
             try:
                 ns[function]()
             except Exception:
-                display = ':'.join((script, function))
+                display = ':'.join((script.name, function))
                 raise BuchSchlossError('Script::execute', 'script_{}_exec_problem', display)
 
 

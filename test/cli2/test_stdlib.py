@@ -4,7 +4,7 @@ import datetime
 import types
 
 from buchschloss import core
-from buchschloss import cli2
+from buchschloss import lua
 
 
 class DummyActionNS:
@@ -25,7 +25,7 @@ def test_new(monkeypatch):
     """test <Model>:new()"""
     book_dummy = DummyActionNS({'new': [1, 2, 3]})
     monkeypatch.setattr(core, 'Book', book_dummy)
-    rt = cli2.prepare_runtime(core.guest_lc)
+    rt = lua.prepare_runtime(core.guest_lc)
     assert rt.eval('Book:new{author="author", title="title"}') == 1
     rt.execute('Book:new({year=0, isbn=123})')
     assert tuple(book_dummy.calls['new']) == (
@@ -41,7 +41,7 @@ def test_view(monkeypatch):
         types.SimpleNamespace(first_name='first', pay_date=None),
     ]})
     monkeypatch.setattr(core, 'Person', person_dummy)
-    rt = cli2.prepare_runtime(core.guest_lc)
+    rt = lua.prepare_runtime(core.guest_lc)
     assert tuple(rt.execute(
         'date = Person[123].pay_date; return {date.day, date.month, date.year}')
                  .values()) == (31, 1, 1965)
@@ -58,7 +58,7 @@ def test_specials(monkeypatch):
     group_dummy = DummyActionNS({'activate': [None], 'view_ns': [object()]})
     monkeypatch.setattr(core, 'Borrow', borrow_dummy)
     monkeypatch.setattr(core, 'Group', group_dummy)
-    rt = cli2.prepare_runtime(core.guest_lc)
+    rt = lua.prepare_runtime(core.guest_lc)
     assert rt.eval('Borrow:restitute{123, 456}') == 'A4'
     assert borrow_dummy.calls['restitute'][0] == ((123, 456), {'login_context': core.guest_lc})
     assert rt.eval('Group.g_name:activate{{"1", "2", "3"}, "dest"}') is None

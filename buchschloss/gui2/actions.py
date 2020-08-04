@@ -341,12 +341,12 @@ def new_book(**kwargs):
                                           **kwargs)))
 
 
-def display_cli2_data(data):
-    """provide a callback for cli2's display"""
+def display_lua_data(data):
+    """provide a callback for lua's display"""
     popup = tk.Toplevel(main.app.root)
     popup.transient(main.app.root)
     popup.grab_set()
-    widget_cls, kwargs = get_cli2_data_widget(popup, data)
+    widget_cls, kwargs = get_lua_data_widget(popup, data)
     # TODO: make scrolled?
     # this relies on strict LtR evaluation. If it breaks, just use two lines
     widget = widget_cls(popup, *kwargs.pop('*args', ()), **kwargs)
@@ -354,24 +354,24 @@ def display_cli2_data(data):
     tk.Button(popup, command=popup.destroy, text='OK').pack()
 
 
-def get_cli2_data_widget(master, data):
+def get_lua_data_widget(master, data):
     """recursively create a widget for cli' display callback"""
     if isinstance(data, dict):
         return (mtk.ContainingWidget,
                 {'*args': itertools.chain(*(((tk.Label, {'text': k}),
-                                            get_cli2_data_widget(master, v))
+                                            get_lua_data_widget(master, v))
                                             for k, v in data.items())),
                  'horizontal': 2})
     elif isinstance(data, T.Sequence) and not isinstance(data, str):
         return (mtk.ContainingWidget,
-                {'*args': map(partial(get_cli2_data_widget, master), data),
+                {'*args': map(partial(get_lua_data_widget, master), data),
                  'direction': (tk.BOTTOM, tk.RIGHT)})
     else:
         return (tk.Label, {'text': data})
 
 
-def handle_cli2_get_data(data_spec):
-    """provide a callback for cli2's get_data"""
+def handle_lua_get_data(data_spec):
+    """provide a callback for lua's get_data"""
     type_widget_map = {
         'int': widgets.IntEntry,
         'bool': widgets.CheckbuttonWithVar,
@@ -390,13 +390,13 @@ def handle_cli2_get_data(data_spec):
 
 
 def get_script_action(script_spec):
-    """prepare a cli2 script action"""
+    """prepare a lua script action"""
     # login_context must be passed at call time
     def action():
         try:
             utils.get_script_target(
                 script_spec,
-                ui_callbacks=main.cli2_callbacks,
+                ui_callbacks=main.lua_callbacks,
                 login_context=main.app.current_login,
                 propagate_bse=True,
             )()

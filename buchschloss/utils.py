@@ -179,7 +179,7 @@ def get_script_target(spec, *, ui_callbacks=None, login_context, propagate_bse=F
                                      callbacks=ui_callbacks,
                                      login_context=login_context)
         return functools.partial(logging.error, 'no such script: {}!py'.format(spec['name']))
-    elif spec['type'] == 'cli2':
+    elif spec['type'] == 'lua':
         def target(_name=spec['name'], _func=spec['function']):
             try:
                 core.Script.execute(
@@ -190,10 +190,10 @@ def get_script_target(spec, *, ui_callbacks=None, login_context, propagate_bse=F
                 elif config.debug:
                     raise
                 else:
-                    logging.error('error while executing script {}!cli2: {}'.format(_name, e))
+                    logging.error('error while executing script {}!lua: {}'.format(_name, e))
         return target
     else:
-        raise AssertionError("spec['type'] == {0[type]!r} not in ('py', 'cli2')"
+        raise AssertionError("spec['type'] == {0[type]!r} not in ('py', 'lua')"
                              .format(spec))
 
 

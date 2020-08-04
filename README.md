@@ -38,7 +38,7 @@ The actual files are in the ``buchschloss`` directory. Inside, there is:
     - ``actions.py`` the code that actually calls the actions exposed by ``core``
     - ``main.py`` the graphical application
     - ``__init__.py`` glue
-- ``cli2/`` work in progress
+- ``lua/`` work in progress
 
 ### <del>Documentation</del> <small>TODO</small>
 

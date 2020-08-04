@@ -57,22 +57,22 @@ def test_base64bytes():
 
 def test_script_spec():
     assert config_val.is_script_spec(
-        ['asdf-_ q', 'asdf-_ q!py', 'asdf!cli2', 'script:func!cli2', 's:f!py']
+        ['asdf-_ q', 'asdf-_ q!py', 'asdf!lua', 'script:func!lua', 's:f!py']
     ) == [
-        {'name': 'asdf-_ q', 'type': 'cli2', 'function': None},
+        {'name': 'asdf-_ q', 'type': 'lua', 'function': None},
         {'name': 'asdf-_ q', 'type': 'py', 'function': None},
-        {'name': 'asdf', 'type': 'cli2', 'function': None},
-        {'name': 'script', 'type': 'cli2', 'function': 'func'},
+        {'name': 'asdf', 'type': 'lua', 'function': None},
+        {'name': 'script', 'type': 'lua', 'function': 'func'},
         {'name': 's', 'type': 'py', 'function': 'f'},  # doesn't really make sense
     ]
     get_td = lambda d, h=0, m=0: datetime.timedelta(days=d, hours=h, minutes=m)
     assert config_val.is_script_spec(
-        ['s@1:2:3', 's!py@2:3', 's!cli2@1',  's:f!py@4:5:6'],
+        ['s@1:2:3', 's!py@2:3', 's!lua@1',  's:f!py@4:5:6'],
         with_time=True,
     ) == [
-        {'name': 's', 'type': 'cli2', 'function': None, 'invocation': get_td(1, 2, 3)},
+        {'name': 's', 'type': 'lua', 'function': None, 'invocation': get_td(1, 2, 3)},
         {'name': 's', 'type': 'py', 'function': None, 'invocation': get_td(2, 3)},
-        {'name': 's', 'type': 'cli2', 'function': None, 'invocation': get_td(1)},
+        {'name': 's', 'type': 'lua', 'function': None, 'invocation': get_td(1)},
         {'name': 's', 'type': 'py', 'function': 'f', 'invocation': get_td(4, 5, 6)},
     ]
     assert config_val.is_script_spec(
