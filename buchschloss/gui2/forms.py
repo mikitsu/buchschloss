@@ -222,7 +222,7 @@ class LibraryForm(LibraryGroupCommon):
 
 
 class GroupActivationForm(BaseForm):
-    name: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Group})
+    group: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Group})
     src: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
     dest: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
 
