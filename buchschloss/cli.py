@@ -173,8 +173,7 @@ def ask(question):
     r = ''
     valid_answers = config.cli.answers.yes + config.cli.answers.no
     while not r or r.lower() not in valid_answers:
-        print(utils.get_name('cli::interactive_question::' + question))
-        r = input().lower()
+        r = input(question).lower()
     return r.lower() in config.cli.answers.yes
 
 
@@ -193,7 +192,7 @@ def start():
             # make the terminal prompt go onto a new line
             print()
         if isinstance(sys.stderr, DummyErrorFile) and sys.stderr.error_happened:
-            if ask('send_error_report'):
+            if ask(utils.get_name('cli::interactive_question::send_error_report') + ' '):
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
@@ -270,6 +269,32 @@ def foreach(iterable):
         eval_val.last_result = val
         for ui in inputs:
             handle_user_input(ui)
+
+
+def get_lua_data(data_spec):
+    val_funcs = {
+        'str': input,
+        'int': lambda p: int(input(p)),
+        'bool': ask,
+    }
+    r = {}
+    for k, name, val_type in data_spec:
+        while True:
+            try:
+                v = val_funcs[val_type](name + ': ')
+            except ValueError:
+                continue
+            break
+        r[k] = v  # noqa
+    return r
+
+
+core.Script.callbacks = {
+    'ask': ask,
+    'alert': print,
+    'display': pprint.pprint,
+    'get_data': get_lua_data,
+}
 
 
 EXTERNAL_COMMANDS = {
