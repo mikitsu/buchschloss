@@ -1,6 +1,7 @@
 """translate GUI actions to core-provided functions"""
 
 import collections
+import copy
 import itertools
 import tkinter as tk
 import tkinter.messagebox as tk_msg
@@ -16,6 +17,7 @@ from . import forms
 from . import widgets
 from . import common
 from .. import core
+from .. import config
 from .. import utils
 
 
@@ -347,10 +349,14 @@ def display_lua_data(data):
     popup.transient(main.app.root)
     popup.grab_set()
     widget_cls, kwargs = get_lua_data_widget(popup, data)
-    # TODO: make scrolled?
-    # this relies on strict LtR evaluation. If it breaks, just use two lines
-    widget = widget_cls(popup, *kwargs.pop('*args', ()), **kwargs)
+    widget_cls = mtk.ScrollableWidget(**config.gui2.widget_size.popup.mapping)(widget_cls)
+    # The copy & re-__init__ (actually the 3rd) is a workaround
+    # for a weird bug I don't understand
+    args = kwargs.pop('*args', ())
+    widget = widget_cls(popup, *copy.deepcopy(args), **kwargs)
+    widget.__init__(popup, *args, **kwargs)
     widget.pack()
+    main.app.queue.put(widget.set_scrollregion)
     tk.Button(popup, command=popup.destroy, text='OK').pack()
 
 
@@ -364,7 +370,7 @@ def get_lua_data_widget(master, data):
                  'horizontal': 2})
     elif isinstance(data, T.Sequence) and not isinstance(data, str):
         return (mtk.ContainingWidget,
-                {'*args': map(partial(get_lua_data_widget, master), data),
+                {'*args': [get_lua_data_widget(master, d) for d in data],
                  'direction': (tk.BOTTOM, tk.RIGHT)})
     else:
         return (tk.Label, {'text': data})
