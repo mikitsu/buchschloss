@@ -180,6 +180,8 @@ def ask(question):
 def start():
     """Entry point. Provide a REPL"""
     print(config.cli.intro.text, end='\n\n')
+    for script_spec in config.cli.startup_scripts:
+        utils.get_script_target(script_spec, login_context=core.internal_lc)()
     try:
         while True:
             try:

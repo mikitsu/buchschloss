@@ -106,6 +106,9 @@ class App:
         self.center.pack()
         self.display_start()
         threading.Thread(target=self.my_event_handler, daemon=True).start()
+        for script_spec in config.gui2.startup_scripts:
+            self.queue.put(utils.get_script_target(
+                script_spec, login_context=core.internal_lc))
 
     def reset(self):
         """reset to initial view"""
