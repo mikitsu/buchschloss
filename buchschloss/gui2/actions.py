@@ -183,7 +183,7 @@ class ShowInfo:
             namespace: T.Type[core.ActionNamespace],
             special_keys: T.Mapping[str, SpecialKeyFunc] = {},  # noqa
             id_type: type = str,
-        ):
+        ):  # noqa
         """Initialize
 
         :param namespace: the action namespace to use for getting information
