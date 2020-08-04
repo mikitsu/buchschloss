@@ -143,8 +143,7 @@ def get_name(internal: str):
 
 
 def get_book_data(isbn: int):
-    """Attempt to get book data via the ISBN from the DB, if that fails,
-        try the DNB (https://portal.dnb.de)"""
+    """Attempt to get book data via the ISBN from the DB and configured scripts"""
     def get_data_from_script(script_spec):
         get_script_target(
             script_spec,
