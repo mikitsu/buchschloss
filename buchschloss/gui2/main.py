@@ -7,6 +7,7 @@ import logging
 import tkinter.messagebox as tk_msg
 import tkinter.font as tk_font
 import tkinter as tk
+import types
 from functools import partial
 import queue
 import threading
@@ -260,10 +261,11 @@ def get_actions(spec):
             if v['function'] is None:
                 core_ans = getattr(core, v['name'])
                 cur_r = cur_r[k]
+                action_type = (types.FunctionType, types.MethodType)
                 for func_name in dir(core_ans):
                     func_v = getattr(core_ans, func_name)
                     if (func_name.startswith(('_', 'view'))
-                            or not callable(func_v)):
+                            or not isinstance(func_v, action_type)):
                         continue
                     set_gui2_action(v['name'], func_name, func_name)
                 set_gui2_action(v['name'], 'view', 'view')
