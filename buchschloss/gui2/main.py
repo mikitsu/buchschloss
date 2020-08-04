@@ -50,12 +50,12 @@ class ActionTree(dict):
         r = {}
         for k, v in mapping.items():
             if isinstance(v, T.Mapping):
-                v = cls.from_nested(v)
+                action = cls.from_nested(v)
             else:
-                def v(_f=v):
+                def action(_f=v):
                     app.clear_center()
                     _f()
-            r[k] = v
+            r[k] = action
         return ActionTree(r)
 
 
