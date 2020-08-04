@@ -39,6 +39,8 @@ class PasswordFormWidget(mtkf.FormWidget):
 
     def clean_data(self):
         super().clean_data()
+        if self.password_name not in self.data:
+            return
         if self.data[self.password_name] != self.data[self.password2_name]:
             self.errors[self.password2_name].add(get_name('error::no_password_match'))
             self.widget_dict[self.password_name].delete(0, tk.END)
