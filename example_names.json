@@ -207,7 +207,8 @@
       "restitute": "leseclub:restitute",
       "get_results": "leseclub:results",
       "end_leseclub": "leseclub:end",
-      "start_leseclub": "leseclub:start"
+      "start_leseclub": "leseclub:start",
+      "missing_config_{}": "missing configuration value \"{}\""
     }
   }
 }

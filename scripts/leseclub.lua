@@ -4,7 +4,8 @@ Leseclub management
 
 local borrow_weeks = tonumber(config['borrow weeks'])
 if borrow_weeks == nil then
-    error('missing configuration value "borrow weeks"')
+    ui.alert('missing_config_{}', 'borrow weeks')
+    return {}
 end
 local lc_library_name = config['library name'] or 'leseclub'
 
