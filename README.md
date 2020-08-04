@@ -38,7 +38,10 @@ The actual files are in the ``buchschloss`` directory. Inside, there is:
     - ``actions.py`` the code that actually calls the actions exposed by ``core``
     - ``main.py`` the graphical application
     - ``__init__.py`` glue
-- ``lua/`` work in progress
+- ``lua/`` subpackage for lua scripting support
+    - ``__init__.py`` main execution, sandboxing and lua-based cli interface
+    - ``objects.py`` object wrappers exported to lua
+    - ``builtins.lua`` abstraction of core APIs
 
 ### <del>Documentation</del> <small>TODO</small>
 
