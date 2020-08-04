@@ -14,25 +14,9 @@ from ..misc import validation as mval
 from . import main
 from . import forms
 from . import widgets
+from . import common
 from .. import core
 from .. import utils
-
-
-def show_BSE(e):
-    tk_msg.showerror(e.title, e.message)
-
-
-class NSWithLogin:
-    """Wrap around an ActionNamespace providing the current login"""
-    def __init__(self, ans: T.Type[core.ActionNamespace]):
-        self.ans = ans
-
-    def __getattr__(self, item):
-        val = getattr(self.ans, item)
-        if callable(val):
-            return lambda *a, **kw: val(*a, login_context=main.app.current_login, **kw)
-        else:
-            return val
 
 
 # noinspection PyDefaultArgument
@@ -97,8 +81,9 @@ def generic_formbased_action(form_type, form_cls, callback,
             id_name = {id(v): k for k, v in form.widget_dict.items()}[id(id_field)]
 
             def fill_fields(event=None):
-                if str(form) not in str(main.app.root.focus_get()):
-                    return  # going somewhere else
+                with common.ignore_missing_messagebox():
+                    if str(form) not in str(main.app.root.focus_get()):
+                        return  # going somewhere else
                 valid, id_ = id_field.validate()
                 if not valid:
                     tk_msg.showerror(None, id_)
@@ -208,7 +193,7 @@ class ShowInfo:
             to widgets.InfoWidget.
         :param id_type: the type of the ID
         """
-        self.view_func = NSWithLogin(namespace).view_str
+        self.view_func = common.NSWithLogin(namespace).view_str
         self.special_keys = special_keys
         self.id_type = id_type
         self.get_name_prefix = namespace.__name__ + '::'
@@ -236,7 +221,7 @@ class ShowInfo:
         try:
             data = self.view_func(id_)
         except core.BuchSchlossBaseError as e:
-            show_BSE(e)
+            tk_msg.showerror(e.title, e.message)
             main.app.reset()
             return
         pass_widgets = {utils.get_name('info_regarding'): data['__str__']}
@@ -336,7 +321,7 @@ def borrow_restitute(form_cls, callback):
             }) for p in core.misc_data.latest_borrowers]
             widgets.mtk.ContainingWidget(main.app.center, *pw, horizontal=2).pack()
         except core.BuchSchlossBaseError as e:
-            show_BSE(e)
+            tk_msg.showerror(e.title, e.message)
 
     return generic_formbased_action(None, form_cls, callback, post_init=add_btn)
 
@@ -416,7 +401,7 @@ def get_script_action(script_spec):
                 propagate_bse=True,
             )()
         except core.BuchSchlossBaseError as e:
-            show_BSE(e)
+            tk_msg.showerror(e.title, e.message)
         main.app.reset()
 
     return action

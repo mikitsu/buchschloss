@@ -29,20 +29,8 @@ from ..config.main import DummyErrorFile
 from . import forms
 from . import widgets
 from . import actions
-from .actions import generic_formbased_action, ShowInfo, show_BSE
-
-
-class NSWithLogin:
-    """Wrap around an ActionNamespace providing the current login"""
-    def __init__(self, ans: T.Type[core.ActionNamespace]):
-        self.ans = ans
-
-    def __getattr__(self, item):
-        val = getattr(self.ans, item)
-        if callable(val):
-            return lambda *a, **kw: val(*a, login_context=app.current_login, **kw)
-        else:
-            return val
+from . import common
+from .actions import generic_formbased_action, ShowInfo
 
 
 class ActionTree(dict):
@@ -175,15 +163,10 @@ def new_book_autofill(form):
     """automatically fill some information on a book"""
 
     def filler(event=None):
-        try:
+        with common.ignore_missing_messagebox():
             if str(form) not in str(app.root.focus_get()):
                 # going somewhere else
                 return
-        except KeyError as e:
-            if str(e) == "'__tk__messagebox'":
-                return
-            else:
-                raise
         valid, isbn = isbn_field.validate()
         if not valid:
             tk_msg.showerror(message=isbn)
@@ -195,7 +178,7 @@ def new_book_autofill(form):
         try:
             data = utils.get_book_data(isbn)
         except core.BuchSchlossBaseError as e:
-            show_BSE(e)
+            tk_msg.showerror(e.title, e.message)
         else:
             for k, v in data.items():
                 mtk.get_setter(form.widget_dict[k])(v)
@@ -207,7 +190,7 @@ def new_book_autofill(form):
 def get_actions(spec):
     """return a dict of actions suitable for ActionTree.from_map"""
     wrapped_action_ns = {
-        k: NSWithLogin(getattr(core, k))
+        k: common.NSWithLogin(getattr(core, k))
         for k in ('Book', 'Person', 'Group', 'Library', 'Borrow', 'Member', 'Script')
     }
     default_action_adapters = {
