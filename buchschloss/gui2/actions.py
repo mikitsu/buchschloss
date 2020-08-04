@@ -361,7 +361,7 @@ def display_lua_data(data):
 
 
 def get_lua_data_widget(master, data):
-    """recursively create a widget for cli' display callback"""
+    """recursively create a widget for lua display callback"""
     if isinstance(data, dict):
         return (mtk.ContainingWidget,
                 {'*args': itertools.chain(*(((tk.Label, {'text': k}),
