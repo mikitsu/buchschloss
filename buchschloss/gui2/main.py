@@ -44,46 +44,30 @@ class NSWithLogin:
             return val
 
 
-class ActionTree:
-    def __getattr__(self, name):
-        if name not in self.subactions:
-            setattr(self, name, None)
-        return self.subactions[name]
-
-    def __setattr__(self, name, value):
-        if isinstance(value, __class__):  # noqa
-            self.subactions[name] = value
-        else:
-            self.subactions[name] = type(self)(value)
-
-    def __init__(self, action=None):
-        super().__setattr__('subactions', {})
-        super().__setattr__('action', action)
-        super().__setattr__('__name__', repr(self))
-
-    def __call__(self, *args, **kwargs):
-        def call_wrapper_for_unknown_reasons(func):
-            # this also works with a class defining __call__,
-            # it might be a problem with ?? the NAME ??
-            return lambda *a, **kw: func(*a, **kw)
-
-        CWFUR = call_wrapper_for_unknown_reasons
+class ActionTree(dict):
+    def __call__(self):
         app.clear_center()
-        if self.action is None:
-            widgets.ActionChoiceWidget(
-                app.center, ((k, CWFUR(v)) for k, v in self.subactions.items()),
-                horizontal=4 + (len(self.subactions) < 6)).pack()
-        else:
-            return self.action(*args, **kwargs)
+        # this can probably be done better
+        width = config.gui2.action_width
+        orphan_n = len(self) % width or float('inf')
+        orphan_nm1 = len(self) % (width - 1 or width) or float('inf')
+        if orphan_n < orphan_nm1:
+            width -= 1
+        widgets.ActionChoiceWidget(app.center, self.items(), horizontal=width).pack()
 
     @classmethod
-    def from_map(cls, mapping):
-        self = cls(mapping.pop('**here**', None))
-        for name, val in mapping.items():
-            if isinstance(val, Mapping):
-                val = cls.from_map(val)
-            setattr(self, name, val)
-        return self
+    def from_nested(cls, mapping: T.Mapping):
+        """auto-generate sub-ActionTrees"""
+        r = {}
+        for k, v in mapping.items():
+            if isinstance(v, T.Mapping):
+                v = cls.from_nested(v)
+            else:
+                def v(_f=v):
+                    app.clear_center()
+                    _f()
+            r[k] = v
+        return ActionTree(r)
 
 
 class App:
@@ -268,8 +252,7 @@ def get_actions(spec):
     RType = T.DefaultDict[str, T.Union['RType', T.Callable[[T.Optional[tk.Event]], None]]]
     r: RType = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
     for k, v in spec.items():
-        *path, k = k.split('::')
-        cur_r = functools.reduce(operator.getitem, path, r)
+        cur_r = functools.reduce(operator.getitem, k.split('::')[:-1], r)
         if v['type'] == 'gui2':
             if v['name'] not in wrapped_action_ns:
                 logging.warning('unknown action namespace "{}"'.format(v['name']))
@@ -293,7 +276,7 @@ def get_actions(spec):
 
 app = App()
 
-action_tree = ActionTree.from_map(get_actions(config.gui2.actions.mapping))
+action_tree = ActionTree.from_nested(get_actions(config.gui2.actions.mapping))
 
 
 cli2_callbacks = {
