@@ -4,6 +4,8 @@ scanner:
 
 flake8:
   max-line-length: 95
-  exclude: [misc]
+  exclude:
+    - misc
+    - test
   ignore:
     - W503  # line break before binary operator

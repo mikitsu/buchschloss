@@ -121,7 +121,7 @@ def get_name(internal: str):
                 operator.getitem,
                 (ns for i, ns in enumerate(path, 1) if components & (1 << (len(path) - i))),
                 config.utils.names))
-        except KeyError:
+        except (KeyError, TypeError):
             pass
     for ns in look_in:
         if isinstance(ns, str):
@@ -209,9 +209,10 @@ def get_runner():
     for spec in config.scripts.repeating:
         target = get_script_target(spec, login_context=core.internal_lc)
         script_id = '{0[name]}!{0[type]}'.format(spec)
+        delay = spec['invocation'].total_seconds()
         invoke_time: datetime = last_invocations[script_id] + spec['invocation']
 
-        def target_wrapper(_f, _t=target, _id=script_id, _delay=spec['invocation'].total_seconds()):
+        def target_wrapper(_f, _t=target, _id=script_id, _delay=delay):
             _t()
             last_invs = core.misc_data.last_script_invocations
             last_invs[_id] = datetime.now()

@@ -39,6 +39,8 @@ class PasswordFormWidget(mtkf.FormWidget):
 
     def clean_data(self):
         super().clean_data()
+        if self.password_name not in self.data:
+            return
         if self.data[self.password_name] != self.data[self.password2_name]:
             self.errors[self.password2_name].add(get_name('error::no_password_match'))
             self.widget_dict[self.password_name].delete(0, tk.END)
@@ -169,21 +171,14 @@ class PersonForm(SearchForm):
     pay: GroupElement.NO_SEARCH = CheckbuttonWithVar
 
 
-class MemberForm(BaseForm):
-    class FormWidget(PasswordFormWidget):
-        def clean_data(self):
-            try:
-                super().clean_data()
-            except KeyError:
-                pass
-            if 'edit_password_button' in self.data:
-                del self.data['edit_password_button']
+class MemberForm(SearchForm):
+    FormWidget = PasswordFormWidget
 
     name: mtkf.Element = NonEmptyEntry
     level: mtkf.Element = (mtk.OptionChoiceWidget,
                            {'values': list(utils.level_names.items()),
                             'default': 1})
-    current_password: mtkf.Element = NonEmptyPasswordEntry
+    current_password: GroupElement.NO_SEARCH = NonEmptyPasswordEntry
     password: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
     password2: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
 
@@ -203,10 +198,10 @@ class LoginForm(BaseForm):
     password: mtkf.Element = NonEmptyPasswordEntry
 
 
-class LibraryGroupCommon(BaseForm, template=True):
+class LibraryGroupCommon(SearchForm, template=True):
     _position_over_ = True
     name: mtkf.Element = NonEmptyEntry
-    books: mtkf.Element = IntListEntry
+    books: GroupElement.NO_SEARCH = IntListEntry
     # not as element to allow Library to have a nice order
     action = (mtk.RadioChoiceWidget, {
         '*args': [(a, get_name('form::LibraryGroupCommon::' + a))
@@ -221,13 +216,13 @@ class LibraryForm(LibraryGroupCommon):
     class FormWidget:
         default_content = {'pay_required': True}
 
-    people: mtkf.Element = IntListEntry
+    people: GroupElement.NO_SEARCH = IntListEntry
     pay_required: GroupElement.ONLY_NEW = CheckbuttonWithVar
     action: GroupElement.ONLY_EDIT = LibraryGroupCommon.action
 
 
 class GroupActivationForm(BaseForm):
-    name: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Group})
+    group: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Group})
     src: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
     dest: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
 
