@@ -85,7 +85,7 @@ class LoginType(enum.Enum):
     MEMBER = 'Member[{name}]({level})'
     GUEST = 'Guest'
     SCRIPT = 'Script[{name}]({level})<-{invoker}'
-    INTERNAL = 'SYSTEM'
+    INTERNAL = 'SYSTEM({level})'
 
     def __call__(self, level: int, **kwargs):
         self.value.format(type=self, level=level, **kwargs)
@@ -310,8 +310,8 @@ def check_level(login_context, level, resource):
     """check if the currently logged in member has the given level.
         otherwise, raise a BuchSchlossBaseError and log"""
     if login_context.level < level:
-        logging.info('access to {} denied to {}'
-                     .format(resource, login_context))
+        logging.info('{} was granted access to {} (level)'
+                     .format(login_context, resource))
         raise BuchSchlossPermError(level)
 
 
@@ -324,29 +324,32 @@ def auth_required(f):
                               login_context: LoginContext,
                               current_password: str = None,
                               **kwargs):
+        status = None
         if login_context.type is LoginType.INTERNAL:
-            logging.info('{} was granted access to {}'.format(login_context, f.__qualname__))
+            if not login_context.level:
+                status = 'unprivileged_login_context'
         elif login_context.type is LoginType.SCRIPT:
-            # Todo: auth attributes...
-            logging.info('{} was denied access to {}'.format(login_context, f.__qualname__))
-            raise BuchSchlossError('auth_failed', 'no_script_perms')
+            if (ScriptPermissions.AUTH_GRANTED
+                    not in Script.view_ns(login_context.name).permissions):  # noqa
+                status = 'no_script_perms'
         elif login_context.type is LoginType.MEMBER:
             if current_password is None:
                 raise TypeError('when called with a MEMBER login context, '
                                 '``current_password`` must be given')
             # noinspection PyUnresolvedReferences
             login_member = models.Member.get_by_id(login_context.name)
-            if authenticate(login_member, current_password):
-                logging.info('{} passed authentication for {}'.format(
-                    login_context, f.__qualname__))
-            else:
-                logging.info('{} failed to authenticate for {}'.format(
-                    login_context, f.__qualname__))
-                raise BuchSchlossError('auth_failed', 'wrong_password')
+            if not authenticate(login_member, current_password):
+                status = 'wrong_password'
         else:
-            logging.info('{} was denied access to {}'.format(login_context, f.__qualname__))
-            raise BuchSchlossError('auth_failed', 'unknown_auth_category')
-        return f(*args, login_context=login_context, **kwargs)
+            status = 'unknown_auth_category'
+        if status is None:
+            logging.info('{} was granted access to {} (auth)'
+                         .format(login_context, f.__qualname__))
+            return f(*args, login_context=login_context, **kwargs)
+        else:
+            logging.info('{} was denied access to {} (auth)'
+                         .format(login_context, f.__qualname__))
+            raise BuchSchlossError('auth_failure', status)
 
     auth_required_wrapper.__doc__ += (
         '\n\nWhen called with a MEMBER LoginContext,\n'
@@ -1192,9 +1195,9 @@ class Script(ActionNamespace):
         get_name_prefix = 'script-data::{}::'.format(script.name)
         script_config = config.scripts.lua.get(script.name).mapping
         if ScriptPermissions.STORE in script.permissions:
-            edit_func = partial(Script.edit, script.name, login_context=internal_lc)
+            edit_func = partial(Script.edit, script.name, login_context=internal_priv_lc)
             add_storage = (
-                lambda: Script.view_ns(script.name, login_context=internal_lc).storage,
+                lambda: Script.view_ns(script.name, login_context=internal_priv_lc).storage,
                 lambda data: edit_func(storage=data),
             )
         else:
@@ -1498,7 +1501,8 @@ class ComplexSearch:  # TODO: use misc.Instance for this
         return to[0] if self.return_first_item else to
 
 
-internal_lc = LoginType.INTERNAL(config.MAX_LEVEL)
+internal_priv_lc = LoginType.INTERNAL(config.MAX_LEVEL)
+internal_unpriv_lc = LoginType.INTERNAL(0)
 guest_lc = LoginType.GUEST(0)
 misc_data = MiscData()
 

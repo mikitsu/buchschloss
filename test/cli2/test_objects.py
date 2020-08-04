@@ -114,7 +114,7 @@ def test_login_context():
     rt = lupa.LuaRuntime()
     llc = functools.partial(objects.LuaLoginContext, runtime=rt)
     rt.globals()['guest_lc'] = llc(core.guest_lc)
-    rt.globals()['internal_lc'] = llc(core.internal_lc)
+    rt.globals()['internal_lc'] = llc(core.internal_priv_lc)
     rt.globals()['member_lc'] = llc(
         core.LoginType.MEMBER(name='asdf', level=3))
     rt.globals()['script_lc'] = llc(

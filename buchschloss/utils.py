@@ -61,7 +61,7 @@ def late_books():
     warn_for = today + config.utils.tasks.late_books_warn_time
     for b in core.Borrow.search((
             ('is_back', 'eq', False), 'and', ('return_date', 'gt', warn_for)),
-            login_context=core.internal_lc):
+            login_context=core.internal_priv_lc):
         if b.return_date < today:
             late.append(b)
         else:
@@ -151,7 +151,7 @@ def get_book_data(isbn: int):
                 'get_data': lambda __: {'isbn': isbn},
                 'display': data.update,
             },
-            login_context=core.internal_lc,
+            login_context=core.internal_unpriv_lc,
         )()
 
     data = {}
@@ -159,11 +159,11 @@ def get_book_data(isbn: int):
         get_data_from_script(spec)
     try:
         book = next(iter(core.Book.search(
-            ('isbn', 'eq', isbn), login_context=core.internal_lc)))
+            ('isbn', 'eq', isbn), login_context=core.internal_priv_lc)))
     except StopIteration:
         pass
     else:
-        new_data = core.Book.view_str(book.id, login_context=core.internal_lc)
+        new_data = core.Book.view_str(book.id, login_context=core.internal_priv_lc)
         del new_data['id'], new_data['status'], new_data['return_date']
         del new_data['borrowed_by_id'], new_data['__str__'], new_data['borrowed_by']
         data.update(new_data)
@@ -201,12 +201,13 @@ def get_runner():
     """return a function that runs all startup tasks and schedules repeating tasks"""
     scheduler = sched.scheduler(timefunc=time.time)
     for spec in config.scripts.startup:
-        scheduler.enter(0, 0, get_script_target(spec, login_context=core.internal_lc))
+        target = get_script_target(spec, login_context=core.internal_unpriv_lc)
+        scheduler.enter(0, 0, target)
 
     last_invocations = collections.defaultdict(
         lambda: datetime.fromtimestamp(0), core.misc_data.last_script_invocations)
     for spec in config.scripts.repeating:
-        target = get_script_target(spec, login_context=core.internal_lc)
+        target = get_script_target(spec, login_context=core.internal_unpriv_lc)
         script_id = '{0[name]}!{0[type]}'.format(spec)
         delay = spec['invocation'].total_seconds()
         invoke_time: datetime = last_invocations[script_id] + spec['invocation']

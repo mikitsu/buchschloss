@@ -59,6 +59,9 @@ def test_auth_required(db):
         test(login_context=ctxt_guest, current_password='')
     with pytest.raises(core.BuchSchlossBaseError):
         test(login_context=ctxt_guest)
+    with pytest.raises(core.BuchSchlossBaseError):
+        test(login_context=ctxt_internal)
+    ctxt_internal.level = 1
     assert test(login_context=ctxt_internal)
 
 

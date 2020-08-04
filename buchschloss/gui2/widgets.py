@@ -97,8 +97,9 @@ class OptionsFromSearch(mtk.OptionChoiceWidget):
     def __init__(self, master, *, action_ns: core.ActionNamespace,
                  attribute='name', allow_none=False, **kwargs):
         self.__attribute = attribute
+        # TODO: Rather use a WrappedNS here?
         values = [(getattr(o, attribute), str(o)) for o in
-                  action_ns.search((), login_context=core.internal_lc)]
+                  action_ns.search((), login_context=core.internal_priv_lc)]
         if allow_none:
             values.insert(0, (None, ''))
         super().__init__(master, values=values, **kwargs)
@@ -249,8 +250,9 @@ class SearchMultiChoice(MultiChoicePopup):
                  action_ns: core.ActionNamespace,
                  **kwargs):
         kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
+        # TODO: use a WrappedNS here?y
         options = [(o, str(o)) for o in
-                   action_ns.search((), login_context=core.internal_lc)]
+                   action_ns.search((), login_context=core.internal_priv_lc)]
         super().__init__(master, cnf, options=options, **kwargs)
 
     def set(self, values):
