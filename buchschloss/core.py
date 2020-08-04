@@ -1117,6 +1117,8 @@ class Script(ActionNamespace):
         if not (name and set(name) <= cls.allowed_chars):
             raise ValueError("Name contains illegal characters {}"
                              .format(''.join(set(name) - cls.allowed_chars)))
+        if setlevel and setlevel > login_context.level:
+            raise BuchSchlossPermError(setlevel)
         try:
             new = models.Script.create(
                 name=name, code=code, setlevel=setlevel,
