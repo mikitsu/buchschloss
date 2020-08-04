@@ -1,6 +1,7 @@
 """Lua-based cli2"""
 
 import getpass
+import logging
 import traceback
 import typing as T
 import os
@@ -152,8 +153,9 @@ def execute_script(code: str, login_context: core.LoginContext, **kwargs):
     rt = prepare_runtime(login_context, **kwargs)
     try:
         return rt.execute(code)
-    except (lupa.LuaError, objects.LuaAccessForbidden):
-        traceback.print_exc()
+    except Exception as e:
+        logging.error('Problem executing Lua code: {}'.format(e))
+        return {}
 
 
 def start():

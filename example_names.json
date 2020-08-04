@@ -18,6 +18,7 @@
     "must_be_{}": "For this action, you must be at least {}.",
     "must_be_level_{}_or_editee": "For changing other people's passwords, you must be {}.",
     "no_script_perms": "The script does not have the AUTH_GRANTED permission",
+    "script_{}_exec_problem": "Problem executing the script {}.",
     "unknown_auth_category": "You must log in",
     "Book_not_found": "book not found",
     "no_Book_with_id_{}": "There is no book with the ID {}.",

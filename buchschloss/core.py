@@ -1207,10 +1207,10 @@ class Script(ActionNamespace):
         )
         if function is not None:
             try:
-                func = ns[function]
-            except (KeyError, TypeError):
-                raise BuchSchlossError('Script.execute', 'no_valid_function_{}', function)
-            func()
+                ns[function]()
+            except Exception:
+                display = ':'.join((script, function))
+                raise BuchSchlossError('Script::execute', 'script_{}_exec_problem', display)
 
 
 class DataNamespace:
