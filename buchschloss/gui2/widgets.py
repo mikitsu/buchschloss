@@ -95,17 +95,13 @@ class OptionsFromSearch(mtk.OptionChoiceWidget):
     """an option widget that gets its options from search results"""
 
     def __init__(self, master, *, action_ns: core.ActionNamespace,
-                 attribute='name', allow_none=False, **kwargs):
-        self.__attribute = attribute
+                 allow_none=False, **kwargs):
         # TODO: Rather use a WrappedNS here?
-        values = [(getattr(o, attribute), str(o)) for o in
+        values = [(o.id, str(o)) for o in
                   action_ns.search((), login_context=core.internal_priv_lc)]
         if allow_none:
             values.insert(0, (None, ''))
         super().__init__(master, values=values, **kwargs)
-
-    def set(self, value):
-        return super().set(getattr(value, self.__attribute, value))
 
 
 class Text(tk.Text):
@@ -251,7 +247,7 @@ class SearchMultiChoice(MultiChoicePopup):
                  **kwargs):
         kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
         # TODO: use a WrappedNS here?y
-        options = [(o, str(o)) for o in
+        options = [(o.id, str(o)) for o in
                    action_ns.search((), login_context=core.internal_priv_lc)]
         super().__init__(master, cnf, options=options, **kwargs)
 
