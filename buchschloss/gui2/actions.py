@@ -328,14 +328,6 @@ def borrow_restitute(form_cls, callback):
     return generic_formbased_action(None, form_cls, callback, post_init=add_btn)
 
 
-def activate_group(name, src, dest):
-    """allow activation of multiple groups"""
-    e = set()
-    for n in name.split(';'):
-        e |= core.Group.activate(n, src, dest)
-    return e
-
-
 def new_book(**kwargs):
     tk_msg.showinfo(utils.get_name('Book'),
                     utils.get_name('Book::new_id_{}')
