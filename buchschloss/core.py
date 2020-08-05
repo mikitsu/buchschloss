@@ -1231,8 +1231,10 @@ class DataNamespace:
     def __eq__(self, other):
         if isinstance(other, DataNamespace):
             return self._data == other._data
+        elif isinstance(other, type(self.id)):
+            return self.id == other
         else:
-            return False
+            return NotImplemented
 
     def __hash__(self):
         return hash(self._data)
