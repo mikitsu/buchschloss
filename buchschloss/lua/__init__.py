@@ -7,7 +7,7 @@ import typing as T
 import os
 try:
     # on linux (all? some?), importing will make arrow keys usable
-    import readline
+    import readline  # noqa
 except ImportError:
     pass
 import lupa
@@ -33,7 +33,7 @@ def table_to_data(table):
     """convert a Lua table to a dict or a list"""
     if lupa.lua_type(table) == 'table':
         keys = set(table.keys())
-        if keys == set(range(1, len(keys)+1)):
+        if keys == set(range(1, len(keys) + 1)):
             return [table_to_data(t) for t in table.values()]
         else:
             return {k: table_to_data(v) for k, v in table.items()}
@@ -174,7 +174,7 @@ def start():
     rt.globals()['getpass'] = getpass.getpass  # for auth_required functions
     while True:
         try:
-            line = input(str(login_context)+'@buchschloss-lua ==> ')
+            line = input(str(login_context) + '@buchschloss-lua ==> ')
         except EOFError:
             print()
             return
