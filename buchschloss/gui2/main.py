@@ -140,11 +140,6 @@ class App:
             sys.exit()
 
 
-def late_hook(late, warn):
-    """Add an action to view late books. This is a late handler for utils"""
-    actions.view_late = partial(actions.view_late, late, warn)
-
-
 def new_book_autofill(form):
     """automatically fill some information on a book"""
 

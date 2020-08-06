@@ -209,6 +209,12 @@
       "end_leseclub": "leseclub:end",
       "start_leseclub": "leseclub:start",
       "missing_config_{}": "missing configuration value \"{}\""
+    },
+    "check-late-books": {
+      "late_books_present": "Some books are late",
+      "warn_books_present": "Some books are nearly late",
+      "late": "late:",
+      "warn": "nearly late:"
     }
   }
 }

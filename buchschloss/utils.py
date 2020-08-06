@@ -49,27 +49,6 @@ class LevelNameDict(dict):
         return 'level_' + str(key)
 
 
-def late_books():
-    """Check for late and nearly late books.
-
-    Call the functions in late_handlers with arguments (late, warn).
-    late and warn are sequences of core.Borrow instances.
-    """
-    late = []
-    warn = []
-    today = date.today()
-    warn_for = today + config.utils.tasks.late_books_warn_time
-    for b in core.Borrow.search((
-            ('is_back', 'eq', False), 'and', ('return_date', 'gt', warn_for)),
-            login_context=core.internal_priv_lc):
-        if b.return_date < today:
-            late.append(b)
-        else:
-            warn.append(b)
-    for h in late_handlers:
-        h(late, warn)
-
-
 def send_email(subject, text):
     """Send an email to the recipient specified in config"""
     cfg = config.utils.email
@@ -225,15 +204,4 @@ def get_runner():
     return scheduler.run
 
 
-def _default_late_handler(late, warn):
-    head = datetime.now().strftime(config.core.date_format).join(('\n\n',))
-    with open('late.txt', 'w') as f:
-        f.write(head)
-        f.write('\n'.join(str(L) for L in late))
-    with open('warn.txt', 'w') as f:
-        f.write(head)
-        f.write('\n'.join(str(w) for w in warn))
-
-
-late_handlers = [_default_late_handler]
 level_names = LevelNameDict(config.utils.names.level_names.mapping)

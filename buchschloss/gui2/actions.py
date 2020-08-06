@@ -302,11 +302,6 @@ def login():
         main.app.header.set_login_text(utils.get_name('action::login'))
 
 
-def view_late(late, warn):
-    """show late books"""
-    show_results(warn + late, ShowInfo.instances['Borrow'])
-
-
 def borrow_restitute(form_cls, callback):
     """function for borrow and restitute actions"""
     def add_btn(form):
