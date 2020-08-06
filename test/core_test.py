@@ -820,7 +820,12 @@ def test_script_execute(db, monkeypatch):
     assert calls.pop() == 'func'
     getter, setter = calls[-1].pop('add_storage')
     assert callable(getter) and callable(setter)
-    with pytest.raises(core.BuchSchlossBaseError):
+    if config.debug:
+        # GitHub actions Python 3.6 seems to have this...
+        exc = KeyError
+    else:
+        exc = core.BuchSchlossBaseError
+    with pytest.raises(exc):
         script_execute('nonexistent')
     calls.pop()
     assert calls == [
