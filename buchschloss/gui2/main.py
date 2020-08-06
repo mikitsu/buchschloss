@@ -9,7 +9,6 @@ import tkinter.font as tk_font
 import tkinter as tk
 import types
 from functools import partial
-import threading
 import sys
 import typing as T
 
@@ -102,11 +101,6 @@ class App:
         self.header.pack()
         self.center.pack()
         self.display_start()
-        threading.Thread(target=self.handle_startup_scripts).start()
-
-    @staticmethod
-    def handle_startup_scripts():
-        """run all UI startup scripts specified in config"""
         for script_spec in config.gui2.startup_scripts:
             utils.get_script_target(script_spec, login_context=core.internal_unpriv_lc)()
 

@@ -1214,7 +1214,10 @@ class Script(ActionNamespace):
         if function is not None:
             try:
                 ns[function]()
-            except Exception:
+            except Exception as e:
+                if config.debug:
+                    raise
+                logging.error('error executing script function: ' + str(e))
                 display = ':'.join((script.name, function))
                 raise BuchSchlossError('Script::execute', 'script_{}_exec_problem', display)
 
