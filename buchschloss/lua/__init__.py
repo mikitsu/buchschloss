@@ -1,4 +1,4 @@
-"""Lua-based lua"""
+"""Lua-based scripting and command line interface"""
 
 import getpass
 import logging
