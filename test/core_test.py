@@ -240,7 +240,7 @@ def test_person_view_str(db):
     )
     assert info['borrow_book_ids'] in ([1, 2], [2, 1])
 
-# since view_repr and view_attr are implemented in ActionNamespace,
+# since view_repr is implemented in ActionNamespace,
 # I hope we only need one test each. Person is chosen bc. you need level 1
 
 
@@ -795,7 +795,6 @@ def test_script_execute(db, monkeypatch):
                                   permissions=core.ScriptPermissions(0))
     ctxt = core.LoginType.INTERNAL(0)
     script_execute = partial(core.Script.execute, 'name', login_context=ctxt)
-    script_execute_noname = partial(core.Script.execute, login_context=ctxt)
     calls = []
 
     def lua_execute(*args, **kwargs):
@@ -817,16 +816,13 @@ def test_script_execute(db, monkeypatch):
     script.save()
     monkeypatch.setattr(core.Script, 'callbacks', None)
     monkeypatch.delitem(config.scripts.lua.mapping, 'name')
-    script_execute_noname('name', 'func')
+    script_execute('func')
     assert calls.pop() == 'func'
     getter, setter = calls[-1].pop('add_storage')
     assert callable(getter) and callable(setter)
     with pytest.raises(core.BuchSchlossBaseError):
-        script_execute_noname('name', 'nonexistent')
+        script_execute('nonexistent')
     calls.pop()
-    with pytest.raises(core.BuchSchlossBaseError):
-        # since this doesn't use @from_db, test for access as well
-        script_execute_noname('nonexistent')
     assert calls == [
         {'add_storage': None, 'add_requests': False, 'add_config': {'key': 'value'}},
         {'add_storage': None, 'add_requests': True, 'add_config': {'key': 'value'}},
