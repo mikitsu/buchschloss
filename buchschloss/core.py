@@ -12,6 +12,7 @@ __all__ exports:
 """
 
 import inspect
+import itertools
 import string
 from hashlib import pbkdf2_hmac
 from functools import wraps, partial
@@ -310,7 +311,7 @@ def check_level(login_context, level, resource):
     """check if the currently logged in member has the given level.
         otherwise, raise a BuchSchlossBaseError and log"""
     if login_context.level < level:
-        logging.info('{} was granted access to {} (level)'
+        logging.info('{} was denied access to {} (level)'
                      .format(login_context, resource))
         raise BuchSchlossPermError(level)
 
@@ -329,8 +330,8 @@ def auth_required(f):
             if not login_context.level:
                 status = 'unprivileged_login_context'
         elif login_context.type is LoginType.SCRIPT:
-            if (ScriptPermissions.AUTH_GRANTED
-                    not in Script.view_ns(login_context.name).permissions):  # noqa
+            data = Script.view_ns(login_context.name, login_context=internal_priv_lc)  # noqa
+            if ScriptPermissions.AUTH_GRANTED not in data.permissions:
                 status = 'no_script_perms'
         elif login_context.type is LoginType.MEMBER:
             if current_password is None:
@@ -1219,7 +1220,7 @@ class Script(ActionNamespace):
 
 
 class DataNamespace:
-    """superclass for data namespaces returned by view_ns"""
+    """class for data namespaces returned by view_ns"""
     def __init__(self, ans: T.Type[ActionNamespace],
                  raw_data: T.Any,
                  login_context: LoginContext):
@@ -1235,6 +1236,13 @@ class DataNamespace:
             return self.id == other
         else:
             return NotImplemented
+
+    def __dir__(self) -> T.Iterable[str]:
+        return set(itertools.chain(
+            super().__dir__(),
+            ['id'],  # some already have it -> set
+            *self._handlers.values(),
+        ))
 
     def __hash__(self):
         return hash(self._data)
@@ -1273,7 +1281,7 @@ class DataNamespace:
             'allow': ('id isbn author title series series_number language publisher '
                       'concerned_people year medium genres shelf is_active').split(),
             'wrap_iter': {'groups': Group},
-            'wrap_dns': {'library': Library, 'borrow': Borrow}
+            'wrap_dns': {'library': Library, 'borrow': Borrow},
         },
         Person: {
             'allow': 'id first_name last_name class_ max_borrow pay_date'.split(),
