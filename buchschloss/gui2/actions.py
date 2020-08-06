@@ -1,7 +1,6 @@
 """translate GUI actions to core-provided functions"""
 
 import collections
-import copy
 import itertools
 import tkinter as tk
 import tkinter.messagebox as tk_msg
@@ -139,9 +138,6 @@ def show_results(results: T.Iterable, view_func: T.Callable[[T.Any], dict], mast
     search_frame.pack()
     rw = widgets.SearchResultWidget(search_frame, tuple(results), view_wrap)
     rw.pack()
-    main.app.queue.put(rw.set_scrollregion)
-    q_binding = main.app.root.bind('<q>', lambda e: rw.set_scrollregion())
-    main.app.on_next_reset.append(lambda: main.app.root.unbind('<q>', q_binding))
 
 
 def search(form_cls: T.Type[forms.BaseForm],
@@ -236,8 +232,6 @@ class ShowInfo:
                 pass_widgets[display] = str(v)
         iw = widgets.InfoWidget(main.app.center, pass_widgets)
         iw.pack()
-        main.app.queue.put(iw.set_scrollregion)
-        main.app.root.bind('<q>', lambda e: iw.set_scrollregion())
         ShowInfo.to_destroy = iw
 
 
@@ -342,13 +336,8 @@ def display_lua_data(data):
     popup.grab_set()
     widget_cls, kwargs = get_lua_data_widget(popup, data)
     widget_cls = mtk.ScrollableWidget(**config.gui2.widget_size.popup.mapping)(widget_cls)
-    # The copy & re-__init__ (actually the 3rd) is a workaround
-    # for a weird bug I don't understand
-    args = kwargs.pop('*args', ())
-    widget = widget_cls(popup, *copy.deepcopy(args), **kwargs)
-    widget.__init__(popup, *args, **kwargs)
+    widget = widget_cls(popup, *kwargs.pop('*args', ()), **kwargs)
     widget.pack()
-    main.app.queue.put(widget.set_scrollregion)
     tk.Button(popup, command=popup.destroy, text='OK').pack()
 
 

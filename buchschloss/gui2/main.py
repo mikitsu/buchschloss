@@ -9,9 +9,7 @@ import tkinter.font as tk_font
 import tkinter as tk
 import types
 from functools import partial
-import queue
 import threading
-import time
 import sys
 import typing as T
 
@@ -79,7 +77,6 @@ class App:
         for font_name in ('Default', 'Text', 'Menu'):
             tk_font.nametofont(font_name.join(('Tk', 'Font'))).config(**font_conf)
         self.current_login = core.guest_lc
-        self.queue = queue.Queue()
         self.on_next_reset = []
         self.greeter = tk.Label(self.root,
                                 text=config.gui2.intro.text,
@@ -105,10 +102,13 @@ class App:
         self.header.pack()
         self.center.pack()
         self.display_start()
-        threading.Thread(target=self.my_event_handler, daemon=True).start()
+        threading.Thread(target=self.handle_startup_scripts).start()
+
+    @staticmethod
+    def handle_startup_scripts():
+        """run all UI startup scripts specified in config"""
         for script_spec in config.gui2.startup_scripts:
-            self.queue.put(utils.get_script_target(
-                script_spec, login_context=core.internal_unpriv_lc))
+            utils.get_script_target(script_spec, login_context=core.internal_unpriv_lc)()
 
     def reset(self):
         """reset to initial view"""
@@ -144,17 +144,6 @@ class App:
                         utils.get_name('error::error_while_sending_error_msg'), str(e))))
             self.root.destroy()
             sys.exit()
-
-    def my_event_handler(self):  # TODO: move this to a proper scheduler
-        """execute events outside of the tkinter event loop"""
-
-        # in theory, I shouldn't need this, but misc.ScrollableWidget
-        # doesn't work without calling .set_scrollregion(),
-        # which in turn can't be done from inside a tkinter callback
-        while True:
-            event = self.queue.get()
-            time.sleep(0.35)
-            event()
 
 
 def late_hook(late, warn):
