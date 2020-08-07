@@ -1,6 +1,6 @@
 
-BuchSchloss API documentation
-=============================
+Python API
+==========
 
 Introduction
 ------------

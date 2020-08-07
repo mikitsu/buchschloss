@@ -77,6 +77,13 @@ logging.basicConfig(level=getattr(logging, config.core.log.level),
 
 
 class ScriptPermissions(enum.Flag):
+    """permissions scripts can have
+
+    - AUTH_GRANTED: execute functions that require a password when
+        executed with a Member LoginContext
+    - REQUESTS: access the internet, confined to configured URLs and HTTP methods
+    - STORE: store data
+    """
     AUTH_GRANTED = enum.auto()
     REQUESTS = enum.auto()
     STORE = enum.auto()
