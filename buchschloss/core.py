@@ -390,7 +390,7 @@ def login(name: str, password: str):
 
     :return LoginContext: on success
 
-    Try all iterations specified in config.HASH_ITERATIONS
+    Try all iterations specified in the configuration
     and update to newest (first) one where applicable
 
     :raise BuchSchlossBaseError: on failure

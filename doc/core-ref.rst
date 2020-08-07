@@ -1,3 +1,4 @@
+.. _core-ref:
 ``core`` module reference
 =========================
 
