@@ -1,5 +1,7 @@
 """widgets"""
-
+import enum
+import functools
+import operator
 import tkinter as tk
 from tkinter import Entry, Label, Button
 from functools import partial
@@ -11,6 +13,7 @@ from ..misc.tkstuff import dialogs as mtkd
 from ..misc.tkstuff.blocks import PasswordEntry, CheckbuttonWithVar
 
 from . import validation
+from . import common
 from .. import utils
 from .. import config
 from .. import core
@@ -40,6 +43,7 @@ IntEntry = mtk.ValidatedWidget.new_cls(Entry, validation.type_int)
 NullIntEntry = mtk.ValidatedWidget.new_cls(Entry, validation.int_or_none)
 NullEntry = mtk.ValidatedWidget.new_cls(Entry, validation.none_on_empty)
 NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_on_empty)
+ScriptNameEntry = mtk.ValidatedWidget.new_cls(Entry, validation.script_name)
 
 
 class SeriesEntry(mtk.ContainingWidget):
@@ -82,7 +86,7 @@ class SeriesEntry(mtk.ContainingWidget):
 
 class ActionChoiceWidget(mtk.ContainingWidget):
     def __init__(self, master, actions, **kw):
-        widgets = [(Button, {'text': utils.get_name('actions::' + txt), 'command': cmd,
+        widgets = [(Button, {'text': utils.get_name('action::' + txt), 'command': cmd,
                              'padx': 50})
                    for txt, cmd in actions]
         super().__init__(master, *widgets, **kw)
@@ -91,13 +95,23 @@ class ActionChoiceWidget(mtk.ContainingWidget):
 class OptionsFromSearch(mtk.OptionChoiceWidget):
     """an option widget that gets its options from search results"""
 
-    def __init__(self, master, *, action_ns: core.ActionNamespace,
-                 attribute='name', allow_none=False, **kwargs):
-        values = [(getattr(o, attribute), str(o)) for o in
-                  action_ns.search((), login_context=core.internal_lc)]
+    def __init__(self, master, *, action_ns: T.Type[core.ActionNamespace],
+                 allow_none=False, **kwargs):
+        values = [(o.id, str(o)) for o in
+                  common.NSWithLogin(action_ns).search(())]
         if allow_none:
             values.insert(0, (None, ''))
         super().__init__(master, values=values, **kwargs)
+
+
+class Text(tk.Text):
+    """get/set operate on all the text"""
+    def get(self):  # noqa
+        return super().get('0.0', 'end')
+
+    def set(self, text):
+        super().delete('0.0', 'end')
+        super().insert('0.0', text)
 
 
 @mtk.ScrollableWidget(height=config.gui2.widget_size.main.height,
@@ -177,7 +191,7 @@ class ScrolledListbox(tk.Listbox):
 
 class MultiChoicePopup(tk.Button):
     """Button that displays a multi-choice listbox popup dialog on click"""
-    # TODO: move to misc
+    sep = ';'
 
     def __init__(self, master, cnf={}, options=(), **kwargs):
         """create a new MultiChoicePopup
@@ -187,6 +201,7 @@ class MultiChoicePopup(tk.Button):
                 <display> will be shown to the user, while <code>
                 will be used when .get is called
         """
+        kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
         super().__init__(master, cnf, command=self.action, **kwargs)
         if not options or isinstance(options[0], str):
             self.codes = self.displays = options
@@ -201,9 +216,10 @@ class MultiChoicePopup(tk.Button):
     def set(self, values):
         """set the items to be selected"""
         self.active = [self.codes.index(x) for x in values]
+        self.set_text()
 
     def action(self, event=None):
-        """display the popup window, set self.value and update button text"""
+        """display the popup window, set self.active and update button text"""
         options = {'values': self.displays, 'activate': self.active}
         if len(self.displays) > config.gui2.popup_height:
             options.update(listbox=ActivatingListbox, height=config.gui2.popup_height)
@@ -216,24 +232,23 @@ class MultiChoicePopup(tk.Button):
                 self.master, widget, options, getter='curselection')
         except mtkd.UserExitedDialog:
             pass
+        self.set_text()
+
+    def set_text(self):
+        """set the text to the displays separated by semicolons"""
+        self['text'] = self.sep.join(self.displays[i] for i in self.active)
 
 
 class SearchMultiChoice(MultiChoicePopup):
     """MultiChoicePopup that gets values from searches"""
 
     def __init__(self, master, cnf={}, *,
-                 action_ns: core.ActionNamespace,
-                 attribute='name',
+                 action_ns: T.Type[core.ActionNamespace],
                  **kwargs):
         kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
-        options = [(getattr(o, attribute), str(o)) for o in
-                   action_ns.search((), login_context=core.internal_lc)]
+        options = [(o.id, str(o)) for o in
+                   common.NSWithLogin(action_ns).search(())]
         super().__init__(master, cnf, options=options, **kwargs)
-
-    def action(self, event=None):
-        """update the text"""
-        super().action(event)
-        self.set_text()
 
     def set(self, values):
         """update text.
@@ -243,15 +258,34 @@ class SearchMultiChoice(MultiChoicePopup):
         """
         if isinstance(values, str):
             if values:
-                values = values.split(';')
+                values = values.split(self.sep)
             else:
                 values = ()
         super().set(values)
-        self.set_text()
 
-    def set_text(self):
-        """set the text to the displays separated by semicolons"""
-        self['text'] = ';'.join(self.displays[i] for i in self.active)
+
+class FlagEnumMultiChoice(MultiChoicePopup):
+    """Display FlagEnum options"""
+    def __init__(self, master, cnf={}, *,
+                 flag_enum: T.Type[enum.Flag],
+                 get_name_prefix: str = '',
+                 **kwargs):
+        """create a new FlagEnumMultiChoice based on ``flag_enum``"""
+        self.enum = flag_enum
+        options = [(v.value, utils.get_name(get_name_prefix + k))
+                   for k, v in flag_enum.__members__.items()]
+        super().__init__(master, cnf, options, **kwargs)
+
+    def get(self):
+        return functools.reduce(operator.or_, map(self.enum, super().get()), self.enum(0))
+
+    def set(self, value):
+        # is there any way to properly do this?
+        to_set = []
+        for v in self.enum.__members__.values():
+            if v in value:
+                to_set.append(v.value)
+        super().set(to_set)
 
 
 class Header:

@@ -1,5 +1,5 @@
 """CLI for buchschloss"""
-
+import collections
 import shlex
 import argparse
 import ast
@@ -20,6 +20,7 @@ except ImportError:
 from . import core
 from . import utils
 from . import config
+from .config.main import DummyErrorFile
 
 
 class MyArgumentParser(argparse.ArgumentParser):
@@ -62,7 +63,8 @@ def execute(command, args, kwargs):
         display encountered errors
     """
     func = COMMANDS[command]
-    kwargs['login_context'] = current_login
+    if command in EXTERNAL_COMMANDS:
+        kwargs['login_context'] = current_login
     try:
         f_args = inspect.signature(func).parameters.keys()
     except (TypeError, ValueError):
@@ -168,14 +170,18 @@ def handle_user_input(ui):
 
 def ask(question):
     """Ask a yes/no question"""
-    print(utils.get_name('cli::interactive_question::' + question))
-    r = input()
-    return r and r[0].lower() in 'yj'  # TODO: make this configurable
+    r = ''
+    valid_answers = config.cli.answers.yes + config.cli.answers.no
+    while not r or r.lower() not in valid_answers:
+        r = input(question).lower()
+    return r.lower() in config.cli.answers.yes
 
 
 def start():
     """Entry point. Provide a REPL"""
-    print(config.gui2.intro.text, end='\n\n')  # TODO: have a separate config section
+    print(config.cli.intro.text, end='\n\n')
+    for script_spec in config.cli.startup_scripts:
+        utils.get_script_target(script_spec, login_context=core.internal_unpriv_lc)()
     try:
         while True:
             try:
@@ -187,12 +193,12 @@ def start():
         if isinstance(e, EOFError):
             # make the terminal prompt go onto a new line
             print()
-        if isinstance(sys.stderr, config.DummyErrorFile) and sys.stderr.error_happened:
-            if ask('send_error_report'):
+        if isinstance(sys.stderr, DummyErrorFile) and sys.stderr.error_happened:
+            if ask(utils.get_name('cli::interactive_question::send_error_report') + ' '):
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
-                except utils.requests.RequestException as e:
+                except Exception as e:
                     print('\n'.join((utils.get_name('error::error_while_sending_error_msg'),
                                      str(e))))
             sys.exit()
@@ -267,9 +273,33 @@ def foreach(iterable):
             handle_user_input(ui)
 
 
-COMMANDS = {
-    'login': login,
-    'logout': logout,
+def get_lua_data(data_spec):
+    val_funcs = {
+        'str': input,
+        'int': lambda p: int(input(p)),
+        'bool': ask,
+    }
+    r = {}
+    for k, name, val_type in data_spec:
+        while True:
+            try:
+                v = val_funcs[val_type](name + ': ')
+            except ValueError:
+                continue
+            break
+        r[k] = v  # noqa
+    return r
+
+
+core.Script.callbacks = {
+    'ask': ask,
+    'alert': print,
+    'display': pprint.pprint,
+    'get_data': get_lua_data,
+}
+
+
+EXTERNAL_COMMANDS = {
     'new_person': core.Person.new,
     'edit_person': core.Person.edit,
     'view_person': core.Person.view_str,
@@ -292,6 +322,10 @@ COMMANDS = {
     'restitute': core.Borrow.restitute,
     'view_borrow': core.Borrow.view_str,
     'search_borrow': core.Borrow.search,
+}
+INTERNAL_COMMANDS = {
+    'login': login,
+    'logout': logout,
     'help': help,
     'list': lambda x: tuple(x),
     'build_list': lambda *a: a,
@@ -303,6 +337,7 @@ COMMANDS = {
     'vars': lsvars,
     'foreach': foreach,
 }
+COMMANDS = collections.ChainMap(EXTERNAL_COMMANDS, INTERNAL_COMMANDS)
 variables = {}
 current_login = core.guest_lc
 
@@ -311,5 +346,5 @@ parser = MyArgumentParser('', add_help=False)
 parser.add_argument('action', help=utils.get_name('cli::help::action'),
                     choices=COMMANDS)
 parser.add_argument('args', nargs='*', help=utils.get_name('cli::help::args'))
-parser.add_argument('--store', help=utils.get_name('cli::help::args'))
+parser.add_argument('--store', help=utils.get_name('cli::help::store'))
 parser.add_argument('-c', '--cmd', help=utils.get_name('cli::help::cmd'))

@@ -1,5 +1,6 @@
 """model definitions"""
 import datetime
+import json
 import sys
 import typing
 
@@ -17,6 +18,7 @@ except ImportError:
         config = None
 if __name__ != '__main__':
     from . import utils
+    from . import core
 
 __all__ = [
     'db',
@@ -39,23 +41,23 @@ else:
     db = SqliteDatabase(input('Unable to locate config module. Please insert DB name -> '))
 
 
+class JSONField(peewee.TextField):
+    """Save JSON objects"""
+    def python_value(self, value):
+        return None if value is None else json.loads(value)
+
+    def db_value(self, value):
+        return None if value is None else json.dumps(value)
+
+
 class Model(peewee.Model):
     """Base class for all models."""
     DoesNotExist: peewee.DoesNotExist
     str_fields: T.Iterable[peewee.Field]
-    pk_type: T.Type
     pk_name: str = 'id'
 
     class Meta:
         database = db
-
-    def __init_subclass__(cls):
-        if hasattr(cls, 'pk_type'):
-            return
-        for k, v in vars(cls).items():
-            if isinstance(v, peewee.Field) and v.primary_key:
-                cls.pk_type = typing.get_type_hints(cls)[k]
-                break
 
     @classmethod
     def select_str_fields(cls):
@@ -71,6 +73,15 @@ class FormattedDateField(DateField):
         if isinstance(value, utils.FormattedDate):
             return value.todate()
         return value
+
+
+class ScriptPermissionField(IntegerField):
+    def python_value(self, value):
+        # noinspection PyArgumentList
+        return core.ScriptPermissions(value)
+
+    def db_value(self, value):
+        return value.value
 
 
 class Person(Model):
@@ -102,7 +113,6 @@ class Person(Model):
                                      Borrow.is_back == False)  # noqa
 
     str_fields = (id, last_name, first_name)
-    pk_type = int
 
     def __str__(self):
         return utils.get_name('Person[{}]"{}, {}"').format(
@@ -217,7 +227,28 @@ class Member(Model):
 
     def __str__(self):
         return utils.get_name("Member[{}]({})").format(
-            self.name, utils.get_level(self.level))
+            self.name, utils.level_names[self.level])
+
+
+class Script(Model):
+    """Represent a lua script"""
+    name: T.Union[str, CharField] = CharField(primary_key=True)
+    code: T.Union[str, peewee.TextField] = peewee.TextField()
+    setlevel: T.Union[int, IntegerField] = IntegerField(null=True)
+    storage: T.Union[dict, JSONField] = JSONField()
+    permissions: 'T.Union[core.ScriptPermissions, ScriptPermissionField]' \
+        = ScriptPermissionField()
+
+    str_fields = (name, setlevel)
+    pk_name = 'name'
+
+    def __str__(self):
+        if self.setlevel is None:
+            return '{}[{}]'.format(utils.get_name('Script'), self.name)
+        else:
+            return '{}[{}]({})'.format(
+                utils.get_name('Script'), self.name, utils.level_names[self.setlevel]
+            )
 
 
 class Misc(Model):
@@ -239,7 +270,7 @@ if __name__ == '__main__':
         sys.exit()
     db.create_tables(models)
     print('created tables...')
-    Misc.create(pk='check_date', data=datetime.datetime.now())
+    Misc.create(pk='last_script_invocations', data={})
     Misc.create(pk='latest_borrowers', data=[])
     Member.create(name='SAdmin',
                   password=b'\xd2Kf\xef#o\xba\xe2\x84i\x896\x13\x99\x80\x94P\xd4'

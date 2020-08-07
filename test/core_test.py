@@ -5,21 +5,7 @@ from functools import partial
 
 import pytest
 
-from buchschloss import config
-
-config.core.mapping['database name'] = ':memory:'
-
-from buchschloss import core, models, utils  # noqa
-
-
-@pytest.fixture
-def db():
-    """bind the models to the test database"""
-    # since in-memory databases clear data when closing,
-    # we don't need an explicit drop_tables
-    models.db.create_tables(models.models)
-    with models.db:
-        yield
+from buchschloss import config, core, models, utils
 
 
 def create_book(library='main', **options):
@@ -73,6 +59,9 @@ def test_auth_required(db):
         test(login_context=ctxt_guest, current_password='')
     with pytest.raises(core.BuchSchlossBaseError):
         test(login_context=ctxt_guest)
+    with pytest.raises(core.BuchSchlossBaseError):
+        test(login_context=ctxt_internal)
+    ctxt_internal.level = 1
     assert test(login_context=ctxt_internal)
 
 
@@ -108,6 +97,34 @@ def test_misc_data(db):
         core.misc_data.does_not_exist
     with pytest.raises(AttributeError):
         core.misc_data.also_doesnt_exist = None
+
+
+def test_data_ns():
+    FLAG = object()
+    class DataA(core.Dummy): pass
+    class DataB(core.Dummy): pass
+
+    def validate_datab(data_val, x_val):
+        assert isinstance(data_val, core.DataNamespace)
+        assert data_val._handlers == {'allow': 'ad'}
+        assert data_val._login_context is FLAG
+        assert data_val._data.x == x_val
+
+    core.DataNamespace.data_handling[DataA] = {
+        'allow': 'ab',
+        'wrap_iter': {'i': DataB},
+        'wrap_dns': {'d': DataB, 'n': DataB},
+    }
+    core.DataNamespace.data_handling[DataB] = {'allow': 'ad'}
+    data = core.DataNamespace(
+        DataA,
+        DataA(a=1, b=[1, 2, 3], d=DataB(x=0), i=[DataB(x=1), DataB(x=2)], n=None),
+        login_context=FLAG,
+    )
+    assert data.a == 1
+    assert data.b == [1, 2, 3]
+    validate_datab(data.d, 0)
+    validate_datab(data.i[0], 1)
 
 
 def test_person_new(db):
@@ -220,7 +237,7 @@ def test_person_view_str(db):
     )
     assert info['borrow_book_ids'] in ([1, 2], [2, 1])
 
-# since view_repr and view_attr are implemented in ActionNamespace,
+# since view_repr is implemented in ActionNamespace,
 # I hope we only need one test each. Person is chosen bc. you need level 1
 
 
@@ -231,12 +248,6 @@ def test_person_view_repr(db):
     person_view = partial(core.Person.view_repr, login_context=ctxt)
     with pytest.raises(core.BuchSchlossBaseError):
         person_view(124)
-
-
-def test_person_view_attr(db):
-    """test Person.view_attr"""
-    create_person(123)
-    for_levels(partial(core.Person.view_attr, 123, 'id'), 1, lambda r: r == 123)
 
 
 def test_book_new(db):
@@ -615,7 +626,7 @@ def test_member_view_str(db):
     assert core.Member.view_str('name', login_context=core.LoginType.INTERNAL(0)) == {
         '__str__': str(models.Member.get_by_id('name')),
         'name': 'name',
-        'level': utils.get_level(0),
+        'level': utils.level_names[0],
     }
 
 
@@ -626,7 +637,6 @@ def test_borrow_new(db):
         b.is_back = True
         b.save()
 
-    models.Misc.create(pk='latest_borrowers', data=[])
     models.Library.create(name='main')
     test_lib = models.Library.create(name='test-lib')
     models.Library.create(name='no-pay', pay_required=False)
@@ -670,14 +680,38 @@ def test_borrow_new(db):
     with pytest.raises(core.BuchSchlossBaseError):
         borrow_new(person=123, book=2, weeks=weeks)
     borrow_new(person=123, book=4, weeks=weeks)
+    # allows overriding
+    ctxt.level = 2
+    with pytest.raises(core.BuchSchlossBaseError):
+        borrow_new(2, 123, weeks, override=True)
+    ctxt.level = 4
+    borrow_new(2, 123, weeks, override=True)
+
+
+def test_borrow_restitute(db):
+    """test Borrow.restitute"""
+    models.Library.create(name='main')
+    create_person(123)
+    create_person(124)
+    create_book()
+    create_book()
+    create_book()
+    models.Borrow.create(person=123, book=1, return_date=datetime.date.today())
+    models.Borrow.create(person=123, book=2, return_date=datetime.date.today())
+    ctxt = for_levels(partial(core.Borrow.restitute, 1, 123), 1)
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Borrow.restitute(1, 123, login_context=ctxt)
+    with pytest.raises(core.BuchSchlossBaseError):
+        core.Borrow.restitute(2, 124, login_context=ctxt)
+    core.Borrow.restitute(2, 123, login_context=ctxt)
 
 
 def test_search(db):
     """test searches"""
     models.Library.create(name='main')
-    book_1 = create_book(author='author name')
-    book_2 = create_book(author='author 2', year=2000)
-    person = create_person(123, class_='cls', libraries=['main'])
+    book_1 = core.DataNamespace(core.Book, create_book(author='author name'), None)
+    book_2 = core.DataNamespace(core.Book, create_book(author='author 2', year=2000), None)
+    person = core.DataNamespace(core.Person, create_person(123, class_='cls', libraries=['main']), None)
     ctxt_person = for_levels(partial(core.Person.search, ()), 1)
     person_search = partial(core.Person.search, login_context=ctxt_person)
     book_search = partial(core.Book.search, login_context=core.LoginType.INTERNAL(0))
@@ -699,3 +733,132 @@ def test_search(db):
             == {book_2, book_1})
     assert tuple(book_search(('year', 'ge', 2001))) == ()
     assert tuple(book_search(('year', 'ge', 2000))) == (book_2,)
+    assert tuple(book_search(('id', 'in', (1, 200, 300)))) == (book_1,)
+    assert tuple(book_search(('author', 'in', ('neither', 'matches')))) == ()
+
+
+def test_script_new(db):
+    """test Script.new"""
+    ctxt = for_levels(partial(
+        core.Script.new,
+        name='test-script',
+        code='this should be valid Lua code',
+        setlevel=3,
+        permissions=core.ScriptPermissions(3)),
+        4,
+    )
+    script_new = partial(core.Script.new, login_context=ctxt)
+    script = models.Script.get_by_id('test-script')
+    assert script.name == 'test-script'
+    assert script.code == 'this should be valid Lua code'
+    assert script.setlevel == 3
+    assert script.storage == {}
+    assert script.permissions is core.ScriptPermissions(3)
+    script_new(name='with-setlevel-none', code='mode Lua code',
+               permissions=core.ScriptPermissions(0), setlevel=None)
+    assert models.Script.get_by_id('with-setlevel-none').setlevel is None
+    with pytest.raises(core.BuchSchlossBaseError):
+        script_new(name='test-script', code='with the same name',
+                   permissions=core.ScriptPermissions(0), setlevel=None)
+    with pytest.raises(ValueError):
+        script_new(name='contains:invalid"chars', code='',
+                   permissions=core.ScriptPermissions(0), setlevel=None)
+
+
+def test_script_edit(db):
+    """test Script.edit"""
+    # noinspection PyArgumentList
+    models.Script.create(name='name', code='code', setlevel=3,
+                         permissions=core.ScriptPermissions(0), storage={})
+    ctxt = for_levels(partial(
+        core.Script.edit,
+        'name',
+        code='new code'),
+        4
+    )
+    script_edit = partial(core.Script.edit, login_context=ctxt)
+    assert models.Script.get_by_id('name').code == 'new code'
+    with pytest.raises(TypeError):
+        script_edit('name', name='not allowed')
+    with pytest.raises(TypeError):
+        script_edit('name', unknown='attribute')
+    with pytest.raises(core.BuchSchlossBaseError):
+        script_edit('unknown', code='blah')
+
+
+def test_script_execute(db, monkeypatch):
+    """test Script.execute"""
+    script = models.Script.create(name='name', code='code', setlevel=None, storage={},
+                                  permissions=core.ScriptPermissions(0))
+    ctxt = core.LoginType.INTERNAL(0)
+    script_execute = partial(core.Script.execute, 'name', login_context=ctxt)
+    calls = []
+
+    def lua_prep_rt(*args, **kwargs):
+        calls.append(kwargs)
+        return type('', (), {
+            'execute': lambda c: {
+                'func': lambda: calls.append('func'),
+            }
+        })
+
+    monkeypatch.setattr('buchschloss.lua.prepare_runtime', lua_prep_rt)
+    monkeypatch.setattr(core.Script, 'callbacks', 'cls-cb-flag')
+    monkeypatch.setitem(config.scripts.lua.mapping, 'name', {'key': 'value'})
+    script_execute(callbacks='callback-flag')
+    assert calls[-1].pop('add_ui') == ('callback-flag', 'script-data::name::')
+    script.permissions |= core.ScriptPermissions.REQUESTS
+    script.save()
+    script_execute()
+    assert calls[-1].pop('add_ui') == ('cls-cb-flag', 'script-data::name::')
+    script.permissions |= core.ScriptPermissions.STORE
+    script.save()
+    monkeypatch.setattr(core.Script, 'callbacks', None)
+    monkeypatch.delitem(config.scripts.lua.mapping, 'name')
+    script_execute('func')
+    assert calls.pop() == 'func'
+    getter, setter = calls[-1].pop('add_storage')
+    assert callable(getter) and callable(setter)
+    if config.debug:
+        # GitHub actions Python 3.6 seems to have this...
+        exc = KeyError
+    else:
+        exc = core.BuchSchlossBaseError
+    with pytest.raises(exc):
+        script_execute('nonexistent')
+    calls.pop()
+    assert calls == [
+        {'add_storage': None, 'add_requests': False, 'add_config': {'key': 'value'}},
+        {'add_storage': None, 'add_requests': True, 'add_config': {'key': 'value'}},
+        {'add_requests': True, 'add_ui': None, 'add_config': {}},
+    ]
+
+
+def test_script_view_str(db):
+    """test Script.view_str"""
+    script = models.Script.create(name='name', code='code', setlevel=None, storage={},
+                                  permissions=core.ScriptPermissions(0))
+    exp_repr = utils.get_name('Script') + '[name]'
+    expected = {
+        '__str__': exp_repr, 'name': 'name',
+        'setlevel': '-----', 'permissions': ''}
+    ctxt = for_levels(partial(core.Script.view_str, 'name'), 0, lambda x: x == expected)
+    script_view_str = partial(core.Script.view_str, login_context=ctxt)
+    script.setlevel = 0
+    script.permissions = core.ScriptPermissions.STORE | core.ScriptPermissions.REQUESTS
+    script.save()
+    data = script_view_str('name')
+    assert set(data.pop('permissions').split(';')) == {
+        utils.get_name('Script::permissions::STORE'),
+        utils.get_name('Script::permissions::REQUESTS')}
+    l0 = utils.level_names[0]
+    assert data == {'name': 'name', 'setlevel': l0, '__str__': exp_repr + l0.join('()')}
+    script.setlevel = 3
+    script.permissions = core.ScriptPermissions.STORE
+    script.save()
+    l3 = utils.level_names[3]
+    assert (script_view_str('name')
+            == {'name': 'name', 'setlevel': l3, '__str__': exp_repr + l3.join('()'),
+                'permissions': utils.get_name('Script::permissions::STORE')})
+    with pytest.raises(core.BuchSchlossBaseError):
+        script_view_str('whatever')

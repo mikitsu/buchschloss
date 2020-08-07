@@ -16,7 +16,10 @@
   "error": {
     "no_permission": "permission denied",
     "must_be_{}": "For this action, you must be at least {}.",
-    "must_be_level_4_or_editee": "",
+    "must_be_level_{}_or_editee": "For changing other people's passwords, you must be {}.",
+    "no_script_perms": "The script does not have the AUTH_GRANTED permission",
+    "script_{}_exec_problem": "Problem executing the script {}.",
+    "unknown_auth_category": "You must log in",
     "Book_not_found": "book not found",
     "no_Book_with_id_{}": "There is no book with the ID {}.",
     "Person_not_found": "person not found",
@@ -65,7 +68,7 @@
       "Book_with_ISBN_{}_not_in_DNB": "A book with an ISBN of {} wasn't found in the DNB"
     }
   },
-  "actions": {
+  "action": {
     "new": "new",
     "view": "view",
     "edit": "edit",
@@ -84,70 +87,6 @@
     "name": "name",
     "current_password": "your password",
     "password2": "repeat password",
-    "Search": {
-      "search_mode": "search mode",
-      "exact_match": "require exact match"
-    },
-    "Book": {
-      "id": "ID",
-      "isbn": "ISBN",
-      "author": "author",
-      "title": "title",
-      "series": "series",
-      "language": "language",
-      "publisher": "publisher",
-      "concerned_people": "other people",
-      "year": "year",
-      "medium": "medium",
-      "genres": "genres",
-      "library": "library",
-      "groups": "groups",
-      "shelf": "shelf"
-    },
-    "Person": {
-      "id_": "ID",
-      "first_name": "first name",
-      "last_name": "last name",
-      "class_": "class",
-      "max_borrow": "max. borrowed books",
-      "libraries": "libraries",
-      "pay": "has paid"
-    },
-    "Member": {
-      "level": "level",
-      "password": "new password"
-    },
-    "ChangePassword": {
-      "member": "name",
-      "new_password": "new password"
-    },
-    "Login": {
-      "name": "name",
-      "password": "password"
-    },
-    "LibraryGroupCommon": {
-      "add": "add",
-      "remove": "remove",
-      "delete": "delete",
-      "books": "books"
-    },
-    "Group": {
-      "action": "action"
-    },
-    "Library": {
-      "action": "action",
-      "people": "people",
-      "pay_required": "payment required"
-    },
-    "GroupActivation": {
-      "name": "group",
-      "src": "source libraries",
-      "dest": "destination library"
-    },
-    "BorrowRestCommon": {
-      "person": "person",
-      "book": "book"
-    },
     "Borrow": {
       "weeks": "borrow time (weeks)"
     },
@@ -155,22 +94,92 @@
       "is_back": "was returned"
     }
   },
+  "Search": {
+    "search_mode": "search mode",
+    "exact_match": "require exact match"
+  },
   "Book": {
     "*this*": "book",
     "id": "ID",
     "new_id_{}": "The new book has the ID {}.",
     "borrowed": "borrowed",
     "available": "available",
-    "inactive": "removed"
+    "inactive": "removed",
+    "isbn": "ISBN",
+    "author": "author",
+    "title": "title",
+    "series": "series",
+    "series_number": "series number",
+    "language": "language",
+    "publisher": "publisher",
+    "concerned_people": "other people",
+    "year": "year",
+    "medium": "medium",
+    "genres": "genres",
+    "library": "library",
+    "groups": "groups",
+    "shelf": "shelf",
+    "borrowed_by": "borrowed by",
+    "return_date": "due on"
   },
   "Person": {
     "*this*": "person",
-    "id": "ID"
+    "id": "ID",
+    "id_": "ID",
+    "first_name": "first name",
+    "last_name": "last name",
+    "class_": "class",
+    "max_borrow": "max. borrowed books",
+    "libraries": "libraries",
+    "pay": "has paid"
+  },
+  "Member": {
+    "level": "level",
+    "password": "new password"
+  },
+  "ChangePassword": {
+    "member": "name",
+    "new_password": "new password"
+  },
+  "Login": {
+    "name": "name",
+    "password": "password"
+  },
+  "LibraryGroupCommon": {
+    "add": "add",
+    "remove": "remove",
+    "delete": "delete",
+    "books": "books"
+  },
+  "Group": {
+    "action": "action"
+  },
+  "Library": {
+    "action": "action",
+    "people": "people",
+    "pay_required": "payment required"
+  },
+  "GroupActivation": {
+    "name": "group",
+    "src": "source libraries",
+    "dest": "destination library"
+  },
+  "BorrowRestCommon": {
+    "person": "person",
+    "book": "book"
   },
   "Borrow": {
     "*this*": "borrowing action",
-    "is_back": "is_back",
+    "is_back": "is back",
     "until_{}": "borrowed until {}"
+  },
+  "Script": {
+    "*this*": "script",
+    "permissions": {
+      "STORE": "store data",
+      "AUTH_GRANTED": "perform authenticated tasks",
+      "REQUESTS": "access the internet"
+    }
   },
   "interactive_question": {
     "current_password": "Please enter your password",
@@ -178,7 +187,8 @@
     "password": "Please enter the password",
     "send_error_report": "Do you want to send an error report?",
     "really_exit_app": "Do you really want to exit?",
-    "isbn_autofill": "Do you want some data to be automatically filled based on the ISBN?"
+    "isbn_autofill": "Do you want some data to be automatically filled based on the ISBN?",
+    "username": "Your Username (blank for unauthenticated access): "
   },
   "cli": {
     "{}_is_invalid_command": "The command '{}' does not exist.",
@@ -188,6 +198,23 @@
       "args": "The arguments to use. Will be evaluated as Python literals or, on failure, as strings. Stored values may be used by putting the name between <angle brackets>. Pass positional arguments at their position. Pass keyword arguments as `key`=`value`, where `key` is the argument name (string) and `value` its value (evaluated as Python literal or, if that fails, as string",
       "store": "Store the result of this call in a variable with the name. The model may be retrieved by putting the name in <angle brackets>",
       "cmd": "Invoke the given command with the result of the execution as sole positional argument."
+    }
+  },
+  "script-data": {
+    "leseclub": {
+      "really_end_leseclub": "Do you really want to end the LeseClub? All related data will be deleted and you will not ba able to retrieve results.",
+      "borrow":  "leseclub:borrow",
+      "restitute": "leseclub:restitute",
+      "get_results": "leseclub:results",
+      "end_leseclub": "leseclub:end",
+      "start_leseclub": "leseclub:start",
+      "missing_config_{}": "missing configuration value \"{}\""
+    },
+    "check-late-books": {
+      "late_books_present": "Some books are late",
+      "warn_books_present": "Some books are nearly late",
+      "late": "late:",
+      "warn": "nearly late:"
     }
   }
 }

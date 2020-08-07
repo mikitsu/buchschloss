@@ -1,5 +1,5 @@
 peewee~=3.8
-ftputil~=3.4
 beautifulsoup4~=4.4
 requests~=2.12
 configobj-dev==2019.9.1
+lupa==1.9

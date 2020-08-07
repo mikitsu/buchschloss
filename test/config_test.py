@@ -6,7 +6,7 @@ import json
 
 from configobj import validate
 import pytest
-from buchschloss import config
+from buchschloss.config import main
 from buchschloss.config import validation as config_val
 
 
@@ -55,28 +55,96 @@ def test_base64bytes():
         config_val.is_base64bytes('\tA\a')
 
 
+def test_script_spec():
+    def val_script_specs(value, single=False, **kwargs):
+        rs = config_val.is_script_spec(value, single=single, **kwargs)
+        if isinstance(value, str):
+            value = [value]
+        assert all(r.pop('complete_spec') == v.strip()
+                   for r, v in zip([rs] if single else rs, value))
+        return rs
+
+    assert val_script_specs(
+        ['asdf-_ q', 'asdf-_ q!py', 'asdf!lua', 'script:func!lua', 's:f!py']
+    ) == [
+        {'name': 'asdf-_ q', 'type': 'lua', 'function': None},
+        {'name': 'asdf-_ q', 'type': 'py', 'function': None},
+        {'name': 'asdf', 'type': 'lua', 'function': None},
+        {'name': 'script', 'type': 'lua', 'function': 'func'},
+        {'name': 's', 'type': 'py', 'function': 'f'},  # doesn't really make sense
+    ]
+    get_td = lambda d, h=0, m=0: datetime.timedelta(days=d, hours=h, minutes=m)
+    assert val_script_specs(
+        ['s@1:2:3', 's!py@2:3', 's!lua@1',  's:f!py@4:5:6'],
+        with_time=True,
+    ) == [
+        {'name': 's', 'type': 'lua', 'function': None, 'invocation': get_td(1, 2, 3)},
+        {'name': 's', 'type': 'py', 'function': None, 'invocation': get_td(2, 3)},
+        {'name': 's', 'type': 'lua', 'function': None, 'invocation': get_td(1)},
+        {'name': 's', 'type': 'py', 'function': 'f', 'invocation': get_td(4, 5, 6)},
+    ]
+    assert val_script_specs(
+        ['asd', 'qwert!private', 'with:func'],
+        suffixes=('private',),
+        default_suffix='non-default',
+    ) == [
+        {'name': 'asd', 'type': 'non-default', 'function': None},
+        {'name': 'qwert', 'type': 'private', 'function': None},
+        {'name': 'with', 'type': 'non-default', 'function': 'func'}
+    ]
+    assert (val_script_specs(' 1 with whitespace\t', single=True)
+            == {'name': '1 with whitespace', 'type': 'lua', 'function': None})
+    with pytest.raises(validate.ValidateError):
+        val_script_specs('asd!invalid')
+    with pytest.raises(validate.ValidateError):
+        val_script_specs('asd!also-invalid', suffixes=('valid',))
+    with pytest.raises(validate.ValidateError):
+        val_script_specs(['too', 'many'], single=True)
+
+
 # test tasklist later when it's more than just an optionlist wrapper
 
 
 def test_load_file(tmpdir):
-    """test config.load_file"""
+    """test config.main.load_file"""
     f1, f2, f3, f4 = get_temp_files(tmpdir, 4)
     f1.write('a = 1\ninclude = {}'.format(f2))
     f2.write('b = 1\n[sec]\na = 2\ninclude = {},{}'.format(f3, f4))
     f3.write('b = 2')
     f4.write('invalid config file')
-    co, errors = config.load_file(f1)
+    co, errors = main.load_file(f1)
     assert errors == {str(f4)}
     assert co.dict() == {'a': '1', 'b': '1', 'sec': {'a': '2', 'b': '2'}}
 
 
 def test_load_file_json(tmpdir):
-    """test config.load_file"""
+    """test config.main.load_file"""
     f1, f2, f3, f4 = get_temp_files(tmpdir, 4)
     f1.write('{"a": "1", "include": "%s"}' % (f2,))
     f2.write('{"b": "1", "sec": {"a": "2", "include": ["%s", "%s"]}}' % (f3, f4))
     f3.write('{"b": "2"}')
     f4.write('invalid config file')
-    co, errors = config.load_file(f1, json.load, json.JSONDecodeError)
+    co, errors = main.load_file(f1, json.load, json.JSONDecodeError)
     assert errors == {str(f4)}
     assert co.dict() == {'a': '1', 'b': '1', 'sec': {'a': '2', 'b': '2'}}
+
+
+def test_load_names(tmpdir):
+    """test config.main.load_names"""
+    file = tmpdir.join('f')
+    file.write('{"a": [1, 2, 3], "b": "hello", "c": {"d": "hi"}}')
+    default_level_names = {i: 'level_' + str(i) for i in range(main.MAX_LEVEL + 1)}
+    assert ({'a': '', 'b': 'hello', 'c': {'d': 'hi'}, 'level names': default_level_names}
+            == main.load_names(file, 'json'))
+    expected_defaults = (
+        '{"0": "only one name"}',
+        '{"NaN": "whatever", "0": "IaN"}',
+        '"a string"',
+        '{"0": "boring", "3": {"very": "interesting"}}',
+        '{"123": "a lot", "0": "none"}',
+    )
+    for default_case in expected_defaults:
+        file.write('{"level names": %s}' % default_case)
+        assert main.load_names(file, 'json') == {'level names': default_level_names}
+    file.write('{"level names": {"4": "four", "6": "six"}}')
+    assert main.load_names(file, 'json') == {'level names': {4: 'four', 6: 'six'}}

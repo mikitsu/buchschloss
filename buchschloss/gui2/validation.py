@@ -68,3 +68,8 @@ none_on_empty = mval.Validator(lambda s: s or None)
 
 int_or_none = mval.Validator((lambda s: int(s) if s else None,
                               {ValueError: utils.get_name('must_be_int')}))
+
+script_name = mval.Validator(
+    nonempty,
+    (r'^[a-zA-Z0-9 _-]*$', utils.get_name('invalid_char')),
+)
