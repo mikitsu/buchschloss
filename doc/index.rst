@@ -10,7 +10,7 @@ Welcome to BuchSchloss's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   api.en
+   api
    core-ref
 
 Indices and tables
