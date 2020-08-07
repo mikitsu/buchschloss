@@ -173,14 +173,15 @@ def ask(question):
     r = ''
     valid_answers = config.cli.answers.yes + config.cli.answers.no
     while not r or r.lower() not in valid_answers:
-        print(utils.get_name('cli::interactive_question::' + question))
-        r = input().lower()
+        r = input(question).lower()
     return r.lower() in config.cli.answers.yes
 
 
 def start():
     """Entry point. Provide a REPL"""
     print(config.cli.intro.text, end='\n\n')
+    for script_spec in config.cli.startup_scripts:
+        utils.get_script_target(script_spec, login_context=core.internal_unpriv_lc)()
     try:
         while True:
             try:
@@ -193,11 +194,11 @@ def start():
             # make the terminal prompt go onto a new line
             print()
         if isinstance(sys.stderr, DummyErrorFile) and sys.stderr.error_happened:
-            if ask('send_error_report'):
+            if ask(utils.get_name('cli::interactive_question::send_error_report') + ' '):
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
-                except utils.requests.RequestException as e:
+                except Exception as e:
                     print('\n'.join((utils.get_name('error::error_while_sending_error_msg'),
                                      str(e))))
             sys.exit()
@@ -272,6 +273,32 @@ def foreach(iterable):
             handle_user_input(ui)
 
 
+def get_lua_data(data_spec):
+    val_funcs = {
+        'str': input,
+        'int': lambda p: int(input(p)),
+        'bool': ask,
+    }
+    r = {}
+    for k, name, val_type in data_spec:
+        while True:
+            try:
+                v = val_funcs[val_type](name + ': ')
+            except ValueError:
+                continue
+            break
+        r[k] = v  # noqa
+    return r
+
+
+core.Script.callbacks = {
+    'ask': ask,
+    'alert': print,
+    'display': pprint.pprint,
+    'get_data': get_lua_data,
+}
+
+
 EXTERNAL_COMMANDS = {
     'new_person': core.Person.new,
     'edit_person': core.Person.edit,
@@ -319,5 +346,5 @@ parser = MyArgumentParser('', add_help=False)
 parser.add_argument('action', help=utils.get_name('cli::help::action'),
                     choices=COMMANDS)
 parser.add_argument('args', nargs='*', help=utils.get_name('cli::help::args'))
-parser.add_argument('--store', help=utils.get_name('cli::help::args'))
+parser.add_argument('--store', help=utils.get_name('cli::help::store'))
 parser.add_argument('-c', '--cmd', help=utils.get_name('cli::help::cmd'))

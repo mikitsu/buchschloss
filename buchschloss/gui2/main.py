@@ -1,12 +1,14 @@
 """GUIv2 for buchschloss"""
 
+import collections
+import functools
+import operator
+import logging
 import tkinter.messagebox as tk_msg
 import tkinter.font as tk_font
 import tkinter as tk
+import types
 from functools import partial
-import queue
-import threading
-import time
 import sys
 import typing as T
 
@@ -24,62 +26,33 @@ from ..config.main import DummyErrorFile
 from . import forms
 from . import widgets
 from . import actions
-from .actions import generic_formbased_action, ShowInfoNS, show_BSE
+from . import common
+from .actions import generic_formbased_action, ShowInfo
 
 
-class NSWithLogin:
-    """Wrap around an ActionNamespace providing the current login"""
-    def __init__(self, ans: T.Type[core.ActionNamespace]):
-        self.ans = ans
-
-    def __getattr__(self, item):
-        val = getattr(self.ans, item)
-        if callable(val):
-            return lambda *a, **kw: val(*a, login_context=app.current_login, **kw)
-        else:
-            return val
-
-
-class ActionTree:
-    def __getattr__(self, name):
-        if name not in self.subactions:
-            setattr(self, name, None)
-        return self.subactions[name]
-
-    def __setattr__(self, name, value):
-        if isinstance(value, __class__):  # noqa
-            self.subactions[name] = value
-        else:
-            self.subactions[name] = type(self)(value)
-
-    def __init__(self, action=None):
-        super().__setattr__('subactions', {})
-        super().__setattr__('action', action)
-        super().__setattr__('__name__', repr(self))
-
-    def __call__(self, *args, **kwargs):
-        def call_wrapper_for_unknown_reasons(func):
-            # this also works with a class defining __call__,
-            # it might be a problem with ?? the NAME ??
-            return lambda *a, **kw: func(*a, **kw)
-
-        CWFUR = call_wrapper_for_unknown_reasons
+class ActionTree(dict):
+    def __call__(self):
         app.clear_center()
-        if self.action is None:
-            widgets.ActionChoiceWidget(
-                app.center, ((k, CWFUR(v)) for k, v in self.subactions.items()),
-                horizontal=4 + (len(self.subactions) < 6)).pack()
-        else:
-            return self.action(*args, **kwargs)
+        # this can probably be done better
+        width = config.gui2.action_width
+        orphan_n = len(self) % width or float('inf')
+        orphan_nm1 = len(self) % (width - 1 or width) or float('inf')
+        width -= (orphan_n < orphan_nm1)
+        widgets.ActionChoiceWidget(app.center, self.items(), horizontal=width).pack()
 
     @classmethod
-    def from_map(cls, mapping):
-        self = cls(mapping.pop('**here**', None))
-        for name, val in mapping.items():
-            if isinstance(val, Mapping):
-                val = cls.from_map(val)
-            setattr(self, name, val)
-        return self
+    def from_nested(cls, mapping: T.Mapping):
+        """auto-generate sub-ActionTrees"""
+        r = {}
+        for k, v in mapping.items():
+            if isinstance(v, T.Mapping):
+                action = cls.from_nested(v)
+            else:
+                def action(_f=v):
+                    app.clear_center()
+                    _f()
+            r[k] = action
+        return ActionTree(r)
 
 
 class App:
@@ -102,7 +75,6 @@ class App:
         for font_name in ('Default', 'Text', 'Menu'):
             tk_font.nametofont(font_name.join(('Tk', 'Font'))).config(**font_conf)
         self.current_login = core.guest_lc
-        self.queue = queue.Queue()
         self.on_next_reset = []
         self.greeter = tk.Label(self.root,
                                 text=config.gui2.intro.text,
@@ -111,10 +83,10 @@ class App:
         self.center = tk.Frame(self.root)
         self.header = widgets.Header(
             self.root,
-            {'text': utils.get_name('actions::login'), 'command': actions.login},
+            {'text': utils.get_name('action::login'), 'command': actions.login},
             utils.get_name('not_logged_in'),
-            {'text': utils.get_name('actions::abort'), 'command': self.reset},
-            {'text': utils.get_name('actions::exit_app'), 'command': self.onexit}
+            {'text': utils.get_name('action::abort'), 'command': self.reset},
+            {'text': utils.get_name('action::exit_app'), 'command': self.onexit}
         )
 
     def launch(self):
@@ -128,7 +100,8 @@ class App:
         self.header.pack()
         self.center.pack()
         self.display_start()
-        threading.Thread(target=self.my_event_handler, daemon=True).start()
+        for script_spec in config.gui2.startup_scripts:
+            utils.get_script_target(script_spec, login_context=core.internal_unpriv_lc)()
 
     def reset(self):
         """reset to initial view"""
@@ -150,7 +123,7 @@ class App:
 
     def onexit(self):
         """execute when the user exits the application"""
-        if tk_msg.askokcancel(utils.get_name('actions::exit_app'),
+        if tk_msg.askokcancel(utils.get_name('action::exit_app'),
                               utils.get_name('interactive_question::really_exit_app')):
             if (isinstance(sys.stderr, DummyErrorFile)
                     and sys.stderr.error_happened
@@ -159,54 +132,33 @@ class App:
                 try:
                     utils.send_email(utils.get_name('error_in_buchschloss'),
                                      '\n\n\n'.join(sys.stderr.error_texts))
-                except utils.requests.RequestException as e:
+                except Exception as e:
                     tk_msg.showerror(None, '\n'.join((
                         utils.get_name('error::error_while_sending_error_msg'), str(e))))
             self.root.destroy()
             sys.exit()
-
-    def my_event_handler(self):  # TODO: move this to a proper scheduler
-        """execute events outside of the tkinter event loop"""
-
-        # in theory, I shouldn't need this, but misc.ScrollableWidget
-        # doesn't work without calling .set_scrollregion(),
-        # which in turn can't be done from inside a tkinter callback
-        while True:
-            event = self.queue.get()
-            time.sleep(0.35)
-            event()
-
-
-def late_hook(late, warn):
-    """Add an action to view late books. This is a late handler for utils"""
-    actions.view_late = partial(actions.view_late, late, warn)
 
 
 def new_book_autofill(form):
     """automatically fill some information on a book"""
 
     def filler(event=None):
-        try:
+        with common.ignore_missing_messagebox():
             if str(form) not in str(app.root.focus_get()):
                 # going somewhere else
                 return
-        except KeyError as e:
-            if str(e) == "'__tk__messagebox'":
-                return
-            else:
-                raise
         valid, isbn = isbn_field.validate()
         if not valid:
             tk_msg.showerror(message=isbn)
             isbn_field.focus()
             return
-        if not tk_msg.askyesno(utils.get_name('actions::new__Book'),
+        if not tk_msg.askyesno(utils.get_name('book::isbn'),
                                utils.get_name('interactive_question::isbn_autofill')):
             return
         try:
             data = utils.get_book_data(isbn)
         except core.BuchSchlossBaseError as e:
-            show_BSE(e)
+            tk_msg.showerror(e.title, e.message)
         else:
             for k, v in data.items():
                 mtk.get_setter(form.widget_dict[k])(v)
@@ -215,55 +167,87 @@ def new_book_autofill(form):
     isbn_field.bind('<FocusOut>', filler)
 
 
+def get_actions(spec):
+    """return a dict of actions suitable for ActionTree.from_map"""
+    wrapped_action_ns = {
+        k: common.NSWithLogin(getattr(core, k))
+        for k in ('Book', 'Person', 'Group', 'Library', 'Borrow', 'Member', 'Script')
+    }
+    default_action_adapters = {
+        'new': lambda name, ns: generic_formbased_action('new', get_form(name), ns.new),
+        'edit': lambda name, ns: generic_formbased_action(
+            'edit', get_form(name), ns.edit, fill_data=ns.view_ns),
+        'view': lambda name, __: ShowInfo.instances.get(name),
+        'search': lambda name, ns: actions.search(
+            get_form(name + 'Search', get_form(name)), ns.search, ShowInfo.instances[name]),
+    }
+    special_action_funcs = {
+        ('Group', 'edit'): generic_formbased_action(
+            'edit', forms.GroupForm, wrapped_action_ns['Group'].edit),
+        ('Library', 'edit'): generic_formbased_action(
+            'edit', forms.LibraryForm, wrapped_action_ns['Library'].edit),
+        ('Group', 'activate'): generic_formbased_action(
+            None, forms.GroupActivationForm, wrapped_action_ns['Group'].activate),
+        ('Member', 'change_password'): generic_formbased_action(
+            None, forms.ChangePasswordForm, wrapped_action_ns['Member'].change_password),
+        ('Borrow', 'restitute'): generic_formbased_action(
+            None, forms.RestituteForm, wrapped_action_ns['Borrow'].restitute),
+        ('Book', 'new'): generic_formbased_action(
+            'new', forms.BookForm, actions.new_book, post_init=new_book_autofill),
+    }
+
+    def get_form(name, *default):
+        return getattr(forms, name + 'Form', *default)
+
+    def set_gui2_action(namespace, func, insert_key):
+        if (namespace, func) in special_action_funcs:
+            action = special_action_funcs[(namespace, func)]
+        else:
+            action_ns = wrapped_action_ns[namespace]
+            action_adapter = default_action_adapters.get(func)
+            if action_adapter is None:
+                logging.warning('unknown action "{}"'.format(':'.join((namespace, func))))
+                action = None
+            else:
+                action = action_adapter(namespace, action_ns)
+        if action is not None:
+            cur_r[insert_key] = action
+
+    RType = T.DefaultDict[str, T.Union['RType', T.Callable[[T.Optional[tk.Event]], None]]]
+    r: RType = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
+    for k, v in spec.items():
+        cur_r = functools.reduce(operator.getitem, k.split('::')[:-1], r)
+        if v['type'] == 'gui2':
+            if v['name'] not in wrapped_action_ns:
+                logging.warning('unknown action namespace "{}"'.format(v['name']))
+                continue
+            if v['function'] is None:
+                core_ans = getattr(core, v['name'])
+                cur_r = cur_r[k]
+                action_type = (types.FunctionType, types.MethodType)
+                for func_name in dir(core_ans):
+                    func_v = getattr(core_ans, func_name)
+                    if (func_name.startswith(('_', 'view'))
+                            or not isinstance(func_v, action_type)):
+                        continue
+                    set_gui2_action(v['name'], func_name, func_name)
+                set_gui2_action(v['name'], 'view', 'view')
+            else:
+                set_gui2_action(v['name'], v['function'], k)
+        else:
+            cur_r[k] = actions.get_script_action(v)
+    return r
+
+
 app = App()
 
-FORMS = {
-    'book': forms.BookForm,
-    'person': forms.PersonForm,
-    'library': forms.LibraryForm,
-    'group': forms.GroupForm,
-    'activate_group': forms.GroupActivationForm,
-    'member': forms.MemberForm,
-    'change_password': forms.ChangePasswordForm,
-}
-wrapped_action_ns = {
-    k: NSWithLogin(getattr(core, k.capitalize()))
-    for k in ('book', 'person', 'group', 'library', 'borrow', 'member')
-}
+action_tree = ActionTree.from_nested(get_actions(config.gui2.actions.mapping))
 
-action_tree = ActionTree.from_map({
-    'new': {  # TODO: add an AddDict to misc to be able to insert the stuff here
-        k: generic_formbased_action('new', FORMS[k], wrapped_action_ns[k].new)
-        for k in ('book', 'person', 'library', 'group', 'member')
-        # book here to keep it 1st with insertion ordered dicts
-    },
-    'view': {
-        'book': ShowInfoNS.book,
-        'person': ShowInfoNS.person,
-    },
-    'edit': {k: generic_formbased_action('edit', FORMS[k], wrapped_action_ns[k].edit,
-                                         fill_data=wrapped_action_ns[k].view_ns)
-             for k in ('book', 'person', 'member')
-    },  # noqa
-    'search': {k: actions.search(f, wrapped_action_ns[k].search, getattr(ShowInfoNS, k))
-               for f, k in (
-        (forms.BookForm, 'book'),
-        (forms.PersonForm, 'person'),
-        (forms.BorrowSearchForm, 'borrow'),
-    )
-    },
-    'borrow': actions.borrow_restitute(
-        forms.BorrowForm, wrapped_action_ns['borrow'].new),
-    'restitute': actions.borrow_restitute(
-        forms.RestituteForm, wrapped_action_ns['borrow'].restitute),
-})
-action_tree.new.book = generic_formbased_action(
-    'new', FORMS['book'], actions.new_book, post_init=new_book_autofill)
-action_tree.edit.change_password = generic_formbased_action(
-    'edit', FORMS['change_password'], wrapped_action_ns['member'].change_password)
-action_tree.edit.activate_group = generic_formbased_action(
-    'edit', FORMS['activate_group'], wrapped_action_ns['group'].activate)
-action_tree.edit.library = generic_formbased_action(
-    'edit', FORMS['library'], wrapped_action_ns['library'].edit)
-action_tree.edit.group = generic_formbased_action(
-    'edit', FORMS['group'], wrapped_action_ns['group'].edit)
+
+lua_callbacks = {
+    'ask': partial(tk_msg.askyesno, None),
+    'alert': partial(tk_msg.showinfo, None),
+    'display': actions.display_lua_data,
+    'get_data': actions.handle_lua_get_data,
+}
+core.Script.callbacks = lua_callbacks

@@ -12,7 +12,7 @@ os.chdir(os.environ.get('BUCHSCHLOSS_DIR', '.'))
 
 parser = ArgumentParser(description='Launcher for Buchschloss Interfaces')
 parser.add_argument('interface', help='The interface type to run',
-                    choices=('cli', 'gui2', 'cli2', 'config'))
+                    choices=('cli', 'gui2', 'lua', 'config'))
 parser.add_argument('--no-tasks', action='store_false', dest='do_tasks',
                     help="Don't run tasks specified in config")
 args = parser.parse_args()
@@ -24,6 +24,6 @@ except ImportError:
 
 if args.do_tasks:
     from . import utils
-    Thread(target=utils.run).start()
+    Thread(target=utils.get_runner()).start()
 mod.start()
 sys.exit()

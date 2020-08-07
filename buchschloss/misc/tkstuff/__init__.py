@@ -40,7 +40,7 @@ class ContainingWidget(tk.Widget):
             first direction, when the maximum number of widgets for this
             direction is reached, the next row/column is selected by the
             second element
-            e.g.: 
+            e.g.:
                 (RIGHT, BOTTOM) will fill out left to right, then top to bottom
                 (TOP, RIGHT) will fill out bottom to top, then left to right
             note the second element is ignored if the number of widgets for
@@ -292,7 +292,7 @@ class ScrollableWidget:
             >>> ScrollableLabel = ScrollableWidget(...)(tk.Label)
 
         +-------------------------------------------------+
-        | WARNING: multiple calling of a geometry manager |     
+        | WARNING: multiple calling of a geometry manager |
         |          *will*  *mess*  *things*  *up*         |
         +-------------------------------------------------+
     """
@@ -319,18 +319,35 @@ class ScrollableWidget:
                     inst = wrapped_cls.__new__(cls, canvas, *a, **kw)
                 inst.scroll_direction = self.direction
                 inst.container = container
-                inst.__init__(master, *a, container=container, **kw)
                 return inst
 
             def __init__(self, master, *args, **kwargs):
                 canvas = self.container.widgets[0]
-                super().__init__(canvas, *args, **kwargs)
+                super().__init__(canvas, *args, container=self.container, **kwargs)
                 canvas.create_window((0, 0), window=self)
+                self.set_scrollregion()
+                canvas.bind('<Configure>', self.set_scrollregion)
+                self.bind('<Configure>', self.set_scrollregion)
+                self.bind_all('<MouseWheel>', self.global_scroll, add=True)
+                self.bind_all('<Button-4>', self.global_scroll, add=True)
+                self.bind_all('<Button-5>', self.global_scroll, add=True)
 
-            def set_scrollregion(self):
+            def set_scrollregion(self, event=None):
                 canvas = self.container.widgets[0]
-                sw, sh = self.winfo_width(), self.winfo_height()
-                canvas.config(scrollregion=(-sw // 2, -sh // 2, sw // 2, sh // 2))
+                canvas.config(scrollregion=canvas.bbox('all'))
+
+            def global_scroll(self, event):
+                # https://stackoverflow.com/questions/17355902
+                # for this and evet bindings
+                canvas = self.container.widgets[0]
+                try:
+                    is_subwidget = str(event.widget).startswith(str(self.master))
+                except tk.TclError:
+                    # widget destoryed
+                    is_subwidget = False
+                if is_subwidget:
+                    f = getattr(canvas, self.scroll_direction + 'view_scroll')
+                    f((event.delta > 0 or event.num == 5)*2 - 1, 'units')
 
             @misc.temp_function
             @staticmethod

@@ -223,6 +223,20 @@ def merge_ui(config):
         del config['ui']
 
 
+def flatten_gui2_actions(config):
+    """flatten the nested actions/subactions"""
+    def flatten_one_layer(prefix, layer):
+        r = {}
+        for k, v in layer.items():
+            if isinstance(v, dict):
+                r.update(flatten_one_layer(prefix + (k,), v))
+            else:
+                r['::'.join(prefix + (k,))] = v
+        return r
+    flat = flatten_one_layer((), config.get('gui2', {}).get('actions', {}))
+    config.get('gui2', {})['actions'] = flat
+
+
 def insert_name_data(config):
     """load name data into [utils][names]"""
     name_data = load_names(
@@ -259,7 +273,7 @@ def redirect_stderr(config):
 def apply_permission_level_defaults(config):
     """apply default values for permission levels"""
     conf = config['core']['required levels']
-    for k in ('Book', 'Person', 'Group', 'Library', 'Member'):
+    for k in ('Book', 'Person', 'Group', 'Library', 'Member', 'Script'):
         if conf[k]['search'] is None:
             conf[k]['search'] = conf[k]['view']
         if conf[k]['edit'] is None:
@@ -289,7 +303,10 @@ def create_borrow_time_list(config):
     return config
 
 
-pre_validation = [merge_ui]
+pre_validation = (
+    merge_ui,
+    flatten_gui2_actions,
+)
 post_validation = (
     insert_name_data,
     apply_ui_intro_text_default,
