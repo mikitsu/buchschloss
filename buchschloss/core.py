@@ -1206,12 +1206,12 @@ class Script(ActionNamespace):
         else:
             add_storage = None
         runtime = lua.prepare_runtime(
-                script_lc,
-                add_ui=(ui_callbacks and (ui_callbacks, get_name_prefix)),
-                add_storage=add_storage,
-                add_requests=(ScriptPermissions.REQUESTS in script.permissions),
-                add_config=script_config,
-            )
+            script_lc,
+            add_ui=(ui_callbacks and (ui_callbacks, get_name_prefix)),
+            add_storage=add_storage,
+            add_requests=(ScriptPermissions.REQUESTS in script.permissions),
+            add_config=script_config,
+        )
         try:
             ns = runtime.execute(script.code)
             if function is not None:

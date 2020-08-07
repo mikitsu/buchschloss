@@ -1,7 +1,6 @@
 """Lua-based scripting and command line interface"""
 
 import getpass
-import logging
 import traceback
 import typing as T
 import os
