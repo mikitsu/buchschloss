@@ -1118,11 +1118,13 @@ class Script(ActionNamespace):
         raise a BuchSchlossError if a script with the names name already exists
         see models.Script for details on arguments
         """
-        if not (name and set(name) <= cls.allowed_chars):
+        if not name:
+            raise ValueError('Name is empty')
+        if not set(name) <= cls.allowed_chars:
             raise ValueError("Name contains illegal characters {}"
                              .format(''.join(set(name) - cls.allowed_chars)))
-        if setlevel and setlevel > login_context.level:
-            raise BuchSchlossPermError(setlevel)
+        if setlevel is not None:
+            check_level(login_context, setlevel, 'Script.new.setlevel')
         try:
             new = models.Script.create(
                 name=name, code=code, setlevel=setlevel,
@@ -1186,10 +1188,10 @@ class Script(ActionNamespace):
         # avoid problems with circular import
         # core -> lua.__init__ -> lua.objects -> core
         from . import lua
-        if script.setlevel is not None:
-            script_lc_level = script.setlevel
-        else:
+        if script.setlevel is None:
             script_lc_level = login_context.level
+        else:
+            script_lc_level = script.setlevel
         script_lc = LoginType.SCRIPT(
             script_lc_level, name=script.name, invoker=login_context)
         ui_callbacks = callbacks or cls.callbacks
@@ -1203,30 +1205,32 @@ class Script(ActionNamespace):
             )
         else:
             add_storage = None
-        ns = lua.execute_script(
-            script.code,
-            script_lc,
-            add_ui=(None if ui_callbacks is None else (ui_callbacks, get_name_prefix)),
-            add_storage=add_storage,
-            add_requests=(ScriptPermissions.REQUESTS in script.permissions),
-            add_config=script_config,
-        )
-        if function is not None:
-            try:
+        runtime = lua.prepare_runtime(
+                script_lc,
+                add_ui=(ui_callbacks and (ui_callbacks, get_name_prefix)),
+                add_storage=add_storage,
+                add_requests=(ScriptPermissions.REQUESTS in script.permissions),
+                add_config=script_config,
+            )
+        try:
+            ns = runtime.execute(script.code)
+            if function is not None:
                 ns[function]()
-            except Exception as e:
-                if config.debug:
-                    raise
-                logging.error('error executing script function: ' + str(e))
-                display = ':'.join((script.name, function))
-                raise BuchSchlossError('Script::execute', 'script_{}_exec_problem', display)
+        except Exception as e:
+            if config.debug:
+                raise
+            logging.error('error executing script function: ' + str(e))
+            display = ':'.join((script.name, function))
+            raise BuchSchlossError('Script::execute', 'script_{}_exec_problem', display)
 
 
 class DataNamespace:
     """class for data namespaces returned by view_ns"""
-    def __init__(self, ans: T.Type[ActionNamespace],
+    def __init__(self,
+                 ans: T.Type[ActionNamespace],
                  raw_data: T.Any,
-                 login_context: LoginContext):
+                 login_context: LoginContext,
+                 ):
         """initialize this namespace with data from the database"""
         self._data = raw_data
         self._handlers = self.data_handling[ans]
@@ -1254,24 +1258,22 @@ class DataNamespace:
         return str(self._data)
 
     def __getattr__(self, item):
-        def get_id(obj):
-            """I hate myself for not calling the IDs 'id'"""
-            return getattr(obj, type(obj).pk_name)
-
         if item in self._handlers['allow']:
             return getattr(self._data, item)
         elif item in self._handlers.get('wrap_iter', {}):
-            view_ns = self._handlers['wrap_iter'][item].view_ns
-            return [view_ns(get_id(o), login_context=self._login_context)
-                    for o in getattr(self._data, item)]
+            new_dns = partial(type(self),
+                              self._handlers['wrap_iter'][item],
+                              login_context=self._login_context)
+            return tuple(map(new_dns, getattr(self._data, item)))
         elif item in self._handlers.get('wrap_dns', {}):
             obj = getattr(self._data, item)
             if obj is None:
                 return None
             else:
-                return self._handlers['wrap_dns'][item].view_ns(
-                    get_id(obj),
-                    login_context=self._login_context
+                return type(self)(
+                    self._handlers['wrap_dns'][item],
+                    obj,
+                    login_context=self._login_context,
                 )
         elif item == 'id':
             # Not making the same mistake twice

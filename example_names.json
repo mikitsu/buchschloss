@@ -170,7 +170,7 @@
   },
   "Borrow": {
     "*this*": "borrowing action",
-    "is_back": "is_back",
+    "is_back": "is back",
     "until_{}": "borrowed until {}"
   },
   "Script": {

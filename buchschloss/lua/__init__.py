@@ -17,6 +17,10 @@ from .. import utils
 from . import objects
 
 
+with open(os.path.join(os.path.dirname(__file__), 'builtins.lua')) as f:
+    BUILTINS_CODE = f.read()
+
+
 def data_to_table(runtime, data):
     """Convert JSON-type (maps and arrays) data to a lua table"""
     if isinstance(data, (str, int, float, bool, type(None))):
@@ -41,10 +45,6 @@ def table_to_data(table):
         return table
 
 
-with open(os.path.join(os.path.dirname(__file__), 'builtins.lua')) as f:
-    BUILTINS_CODE = f.read()
-
-
 def lua_set(obj, name, value):
     """delegate attribute setting from Lua"""
     return obj.lua_set(name, value)
@@ -52,7 +52,7 @@ def lua_set(obj, name, value):
 
 def lua_get(obj, name):
     """handle attribute access from Lua, delegating if possible"""
-    with objects.CheckLuaAccessForbidden():
+    with objects.check_lua_access_forbidden():
         return obj.lua_get(name)
     # noinspection PyUnreachableCode
     try:
@@ -80,7 +80,7 @@ def restrict_runtime(runtime, whitelist):
             {'var_1': None, 'var_2': None, 'table_1': '*',
             'table_2': {'x': None, 'y': None, 'nested': ['value']}}
 
-            _G and _VERSION are implicit
+            _G and _VERSION are always preserved
     """
     gv = runtime.globals()
     lua_type = gv['type']
@@ -132,7 +132,7 @@ def prepare_runtime(login_context: core.LoginContext, *,
     })
     wrapped_lc = objects.LuaLoginContext(login_context, runtime=runtime)
     g['buchschloss']['login_context'] = wrapped_lc
-    if add_ui:
+    if add_ui is not None:
         g['ui'] = objects.LuaUIInteraction(*add_ui, runtime=runtime)
     if add_storage is not None:
         getter, setter = add_storage
@@ -145,17 +145,6 @@ def prepare_runtime(login_context: core.LoginContext, *,
     for k, v in dict(runtime.execute(BUILTINS_CODE)).items():
         g[k] = v
     return runtime
-
-
-def execute_script(code: str, login_context: core.LoginContext, **kwargs):
-    """execute the given code in a new runtime.
-        See prepare_runtime for arguments"""
-    rt = prepare_runtime(login_context, **kwargs)
-    try:
-        return rt.execute(code)
-    except Exception as e:
-        logging.error('Problem executing Lua code: {}'.format(e))
-        return {}
 
 
 def start():

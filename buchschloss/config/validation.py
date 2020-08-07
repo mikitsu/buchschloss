@@ -49,14 +49,16 @@ def is_script_spec(value,
                    default_suffix='lua'):
     """check whether the value is syntactically a script spec and return components"""
     spec_regex_parts = [
-        r'^\s*(?P<name>[-\w ]+)(?::(?P<function>\w+))?',
+        r'^\s*(?P<complete_spec>'
+        r'(?P<name>[-\w ]+)(?::(?P<function>\w+))?',
         '|'.join(suffixes).join((r'(?:!(?P<type>', '))?')),
     ]
     if with_time:
         spec_regex_parts.append(r'@(?P<invocation>\d+(?::\d+(?::\d+)?)?)')
-    spec_regex = re.compile(''.join(spec_regex_parts) + r'\s*$')
+    spec_regex_parts.append(r')\s*$')
+    spec_regex = re.compile(''.join(spec_regex_parts))
     if isinstance(value, str):
-        value = value.split(',')
+        value = [value]
     r = []
     for v in value:
         m = spec_regex.match(v)
@@ -66,7 +68,7 @@ def is_script_spec(value,
             script_data = m.groupdict()
             script_data['type'] = script_data['type'] or default_suffix
             if 'invocation' in script_data:
-                script_data['invocation'] = is_timedelta(script_data['invocation'])
+                script_data['invocation'] = is_timedelta(script_data['invocation'])  # noqa
             r.append(script_data)
     if single:
         if len(r) != 1:

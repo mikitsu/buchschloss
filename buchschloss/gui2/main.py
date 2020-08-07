@@ -37,8 +37,7 @@ class ActionTree(dict):
         width = config.gui2.action_width
         orphan_n = len(self) % width or float('inf')
         orphan_nm1 = len(self) % (width - 1 or width) or float('inf')
-        if orphan_n < orphan_nm1:
-            width -= 1
+        width -= (orphan_n < orphan_nm1)
         widgets.ActionChoiceWidget(app.center, self.items(), horizontal=width).pack()
 
     @classmethod
@@ -180,7 +179,7 @@ def get_actions(spec):
             'edit', get_form(name), ns.edit, fill_data=ns.view_ns),
         'view': lambda name, __: ShowInfo.instances.get(name),
         'search': lambda name, ns: actions.search(
-            get_form(name + '_search', get_form(name)), ns.search, ShowInfo.instances[name]),
+            get_form(name + 'Search', get_form(name)), ns.search, ShowInfo.instances[name]),
     }
     special_action_funcs = {
         ('Group', 'edit'): generic_formbased_action(
@@ -198,7 +197,7 @@ def get_actions(spec):
     }
 
     def get_form(name, *default):
-        return getattr(forms, name.title().replace('_', '') + 'Form', *default)
+        return getattr(forms, name + 'Form', *default)
 
     def set_gui2_action(namespace, func, insert_key):
         if (namespace, func) in special_action_funcs:

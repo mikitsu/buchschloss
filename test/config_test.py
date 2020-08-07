@@ -56,7 +56,15 @@ def test_base64bytes():
 
 
 def test_script_spec():
-    assert config_val.is_script_spec(
+    def val_script_specs(value, single=False, **kwargs):
+        rs = config_val.is_script_spec(value, single=single, **kwargs)
+        if isinstance(value, str):
+            value = [value]
+        assert all(r.pop('complete_spec') == v.strip()
+                   for r, v in zip([rs] if single else rs, value))
+        return rs
+
+    assert val_script_specs(
         ['asdf-_ q', 'asdf-_ q!py', 'asdf!lua', 'script:func!lua', 's:f!py']
     ) == [
         {'name': 'asdf-_ q', 'type': 'lua', 'function': None},
@@ -66,7 +74,7 @@ def test_script_spec():
         {'name': 's', 'type': 'py', 'function': 'f'},  # doesn't really make sense
     ]
     get_td = lambda d, h=0, m=0: datetime.timedelta(days=d, hours=h, minutes=m)
-    assert config_val.is_script_spec(
+    assert val_script_specs(
         ['s@1:2:3', 's!py@2:3', 's!lua@1',  's:f!py@4:5:6'],
         with_time=True,
     ) == [
@@ -75,7 +83,7 @@ def test_script_spec():
         {'name': 's', 'type': 'lua', 'function': None, 'invocation': get_td(1)},
         {'name': 's', 'type': 'py', 'function': 'f', 'invocation': get_td(4, 5, 6)},
     ]
-    assert config_val.is_script_spec(
+    assert val_script_specs(
         ['asd', 'qwert!private', 'with:func'],
         suffixes=('private',),
         default_suffix='non-default',
@@ -84,10 +92,14 @@ def test_script_spec():
         {'name': 'qwert', 'type': 'private', 'function': None},
         {'name': 'with', 'type': 'non-default', 'function': 'func'}
     ]
+    assert (val_script_specs(' 1 with whitespace\t', single=True)
+            == {'name': '1 with whitespace', 'type': 'lua', 'function': None})
     with pytest.raises(validate.ValidateError):
-        config_val.is_script_spec('asd!invalid')
+        val_script_specs('asd!invalid')
     with pytest.raises(validate.ValidateError):
-        config_val.is_script_spec('asd!also-invalid', suffixes=('valid',))
+        val_script_specs('asd!also-invalid', suffixes=('valid',))
+    with pytest.raises(validate.ValidateError):
+        val_script_specs(['too', 'many'], single=True)
 
 
 # test tasklist later when it's more than just an optionlist wrapper

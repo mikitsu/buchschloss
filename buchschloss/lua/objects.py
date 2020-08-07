@@ -4,6 +4,7 @@ import abc
 import functools
 import typing as T
 import warnings
+import contextlib
 
 import lupa
 import bs4
@@ -21,15 +22,14 @@ class LuaAccessForbidden(AttributeError):
         super().__init__("access to {!r}.{} not possible".format(obj, name))
 
 
-class CheckLuaAccessForbidden:
+@contextlib.contextmanager
+def check_lua_access_forbidden():
     """context manager to suppress AttributeErrors except LuaAccessForbidden"""
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if (not isinstance(exc_val, LuaAccessForbidden)
-                and isinstance(exc_val, AttributeError)):
-            return True
+    try:
+        yield
+    except AttributeError as e:
+        if isinstance(e, LuaAccessForbidden):
+            raise
 
 
 class LuaObject(abc.ABC):
@@ -80,7 +80,10 @@ class LuaActionNS(LuaObject):
 
     def lua_get(self, name):
         """Allow access to names stored in self.action_ns"""
-        with CheckLuaAccessForbidden():
+        # This can return a function we override here (e.g. search) directly
+        # If not, we do our generic wrapping after getting
+        # the function form the action NS.
+        with check_lua_access_forbidden():
             return super().lua_get(name)
         # noinspection PyUnreachableCode
         val = getattr(self.action_ns, name)
@@ -169,7 +172,6 @@ class LuaUIInteraction(LuaObject):
                 return callbacks['get_data']((question, 'key', 'bool'))['key']
             callbacks['ask'] = ask
         callbacks.setdefault('alert', callbacks['display'])
-        callbacks.setdefault('register_action', lambda name, cb_id: None)
 
     @lupa.unpacks_lua_table_method
     def ask(self, question, *format_args, **format_kwargs):

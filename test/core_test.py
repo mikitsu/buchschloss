@@ -102,16 +102,13 @@ def test_misc_data(db):
 def test_data_ns():
     FLAG = object()
     class DataA(core.Dummy): pass
-    class DataB(core.Dummy):
-        pk_name = 'x'
-        cur_id = 0
+    class DataB(core.Dummy): pass
 
-        @classmethod
-        def view_ns(cls, id_, login_context):
-            assert id_ == cls.cur_id
-            cls.cur_id += 1
-            assert login_context is FLAG
-            return FLAG
+    def validate_datab(data_val, x_val):
+        assert isinstance(data_val, core.DataNamespace)
+        assert data_val._handlers == {'allow': 'ad'}
+        assert data_val._login_context is FLAG
+        assert data_val._data.x == x_val
 
     core.DataNamespace.data_handling[DataA] = {
         'allow': 'ab',
@@ -126,8 +123,8 @@ def test_data_ns():
     )
     assert data.a == 1
     assert data.b == [1, 2, 3]
-    assert data.d is FLAG
-    assert data.i[0] is FLAG
+    validate_datab(data.d, 0)
+    validate_datab(data.i[0], 1)
 
 
 def test_person_new(db):
@@ -797,13 +794,15 @@ def test_script_execute(db, monkeypatch):
     script_execute = partial(core.Script.execute, 'name', login_context=ctxt)
     calls = []
 
-    def lua_execute(*args, **kwargs):
+    def lua_prep_rt(*args, **kwargs):
         calls.append(kwargs)
-        return {
-            'func': lambda: calls.append('func'),
-        }
+        return type('', (), {
+            'execute': lambda c: {
+                'func': lambda: calls.append('func'),
+            }
+        })
 
-    monkeypatch.setattr('buchschloss.lua.execute_script', lua_execute)
+    monkeypatch.setattr('buchschloss.lua.prepare_runtime', lua_prep_rt)
     monkeypatch.setattr(core.Script, 'callbacks', 'cls-cb-flag')
     monkeypatch.setitem(config.scripts.lua.mapping, 'name', {'key': 'value'})
     script_execute(callbacks='callback-flag')

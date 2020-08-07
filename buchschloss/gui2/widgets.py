@@ -13,6 +13,7 @@ from ..misc.tkstuff import dialogs as mtkd
 from ..misc.tkstuff.blocks import PasswordEntry, CheckbuttonWithVar
 
 from . import validation
+from . import common
 from .. import utils
 from .. import config
 from .. import core
@@ -94,11 +95,10 @@ class ActionChoiceWidget(mtk.ContainingWidget):
 class OptionsFromSearch(mtk.OptionChoiceWidget):
     """an option widget that gets its options from search results"""
 
-    def __init__(self, master, *, action_ns: core.ActionNamespace,
+    def __init__(self, master, *, action_ns: T.Type[core.ActionNamespace],
                  allow_none=False, **kwargs):
-        # TODO: Rather use a WrappedNS here?
         values = [(o.id, str(o)) for o in
-                  action_ns.search((), login_context=core.internal_priv_lc)]
+                  common.NSWithLogin(action_ns).search(())]
         if allow_none:
             values.insert(0, (None, ''))
         super().__init__(master, values=values, **kwargs)
@@ -243,12 +243,11 @@ class SearchMultiChoice(MultiChoicePopup):
     """MultiChoicePopup that gets values from searches"""
 
     def __init__(self, master, cnf={}, *,
-                 action_ns: core.ActionNamespace,
+                 action_ns: T.Type[core.ActionNamespace],
                  **kwargs):
         kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
-        # TODO: use a WrappedNS here?y
         options = [(o.id, str(o)) for o in
-                   action_ns.search((), login_context=core.internal_priv_lc)]
+                   common.NSWithLogin(action_ns).search(())]
         super().__init__(master, cnf, options=options, **kwargs)
 
     def set(self, values):

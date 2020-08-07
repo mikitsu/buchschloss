@@ -210,7 +210,7 @@ class ShowInfo:
             except mtkd.UserExitedDialog:
                 main.app.reset()
                 return
-        return self.display_information(id_)
+        self.display_information(id_)
 
     def display_information(self, id_):
         """actually display information"""
@@ -268,10 +268,6 @@ ShowInfo.instances = {
              (widgets.Button, {
                  'text': d['book'],
                  'command': partial(ShowInfo.instances['Book'], d['book_id'])
-             }),
-         'is_back': lambda d:
-             (widgets.Label, {
-                 'text': utils.get_name(str(d['is_back']))
              }),
          },
         int,
@@ -331,8 +327,7 @@ def display_lua_data(data):
     popup.grab_set()
     widget_cls, kwargs = get_lua_data_widget(popup, data)
     widget_cls = mtk.ScrollableWidget(**config.gui2.widget_size.popup.mapping)(widget_cls)
-    widget = widget_cls(popup, *kwargs.pop('*args', ()), **kwargs)
-    widget.pack()
+    widget_cls(popup, *kwargs.pop('*args', ()), **kwargs).pack()
     tk.Button(popup, command=popup.destroy, text='OK').pack()
 
 

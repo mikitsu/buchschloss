@@ -4,10 +4,8 @@ contents (for use):
     - get_runner() -- get a task running function
     - send_email() -- send an email
     - get_name() -- get a pretty name
+    - level_names -- get a pretty level representation
     - get_book_data() -- attempt to get data about a book based on the ISBN
-
-to add late handlers, append them to late_handlers.
-they will receive arguments as specified in late_books
 """
 
 import collections
@@ -143,8 +141,8 @@ def get_book_data(isbn: int):
         pass
     else:
         new_data = core.Book.view_str(book.id, login_context=core.internal_priv_lc)
-        del new_data['id'], new_data['status'], new_data['return_date']
-        del new_data['borrowed_by_id'], new_data['__str__'], new_data['borrowed_by']
+        for k in 'id status return_date borrowed_by_id __str__ borrowed_by'.split():
+            del new_data[k]
         data.update(new_data)
 
     return data
@@ -154,26 +152,39 @@ def get_script_target(spec, *, ui_callbacks=None, login_context, propagate_bse=F
     """get a script target function"""
     if spec['type'] == 'py':
         if spec['name'] in py_scripts.__all__:
-            return functools.partial(getattr(py_scripts, spec['name']),
-                                     callbacks=ui_callbacks,
-                                     login_context=login_context)
-        return functools.partial(logging.error, 'no such script: {}!py'.format(spec['name']))
+            target = functools.partial(
+                getattr(py_scripts, spec['name']),
+                callbacks=ui_callbacks,
+                login_context=login_context
+            )
+        else:
+            target = functools.partial(
+                logging.error, 'no such script: {}!py'.format(spec['name']))
     elif spec['type'] == 'lua':
-        def target(_name=spec['name'], _func=spec['function']):
-            try:
-                core.Script.execute(
-                    _name, _func, callbacks=ui_callbacks, login_context=login_context)
-            except Exception as e:
-                if isinstance(e, core.BuchSchlossBaseError) and propagate_bse:
-                    raise
-                elif config.debug:
-                    raise
-                else:
-                    logging.error('error while executing script {}!lua: {}'.format(_name, e))
-        return target
+        target = functools.partial(
+            core.Script.execute,
+            spec['name'],
+            spec['function'],
+            callbacks=ui_callbacks,
+            login_context=login_context,
+        )
     else:
         raise AssertionError("spec['type'] == {0[type]!r} not in ('py', 'lua')"
                              .format(spec))
+
+    def wrapped_target():
+        """handle errors while executing script"""
+        try:
+            target()
+        except Exception as e:
+            if isinstance(e, core.BuchSchlossBaseError) and propagate_bse:
+                raise
+            elif config.debug:
+                raise
+            else:
+                logging.error('error while executing script {}: {}'
+                              .format(spec['complete_spec'], e))
+    return wrapped_target
 
 
 def get_runner():

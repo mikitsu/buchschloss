@@ -8,19 +8,14 @@ if borrow_weeks == nil then
     return {}
 end
 local lc_library_name = config['library name'] or 'leseclub'
+local manage_level = config['management level'] or 3
 
 local storage = buchschloss.get_storage()
 
 
 local function check_leseclub_active(wanted_active)
-    local is_active
-    if storage.pending_borrows and storage.read_books then
-        is_active = true
-    else if not (storage.pending_borrows or storage.read_books) then
-        is_active = false
-    else
-        error('storage corrupt')
-    end end
+    -- no toboolean()?
+    local is_active = storage.read_books and true or false
     if wanted_active == is_active then
         return false
     else
@@ -74,21 +69,19 @@ local function get_results()
 end
 
 local function start_leseclub()
-    if check_level(3) then return end
+    if check_level(manage_level) then return end
     if check_leseclub_active(false) then return end
-    storage.pending_borrows = {}
     storage.read_books = {}
     buchschloss.set_storage(storage)
     ui.alert('leseclub_started')
 end
 
 local function end_leseclub()
-    if check_level(3) then return end
+    if check_level(manage_level) then return end
     if check_leseclub_active(true) then return end
     if not ui.ask('really_end_leseclub') then
         return
     end
-    storage.pending_borrows = nil
     storage.read_books = nil
     buchschloss.set_storage(storage)
     ui.alert('leseclub_ended')

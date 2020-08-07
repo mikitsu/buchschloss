@@ -18,4 +18,5 @@ if title_element ~= nil then
     r.title = title_element.text
 end
 
+-- actually send the data
 ui.display(r)

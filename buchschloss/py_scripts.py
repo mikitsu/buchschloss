@@ -44,7 +44,7 @@ def local_backup():
             pass
 
     data = get_database_bytes(conf.secret_key)
-    with open(config.core.database_name + '.1', 'wb') as f:
+    with open(number_name(1), 'wb') as f:
         f.write(data)
 
 

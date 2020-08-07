@@ -7,20 +7,22 @@
 local interval = 86400 * (config.warn_days or 0)
 
 local function get_books()
-    local today = os.date('%y-%m-%d')
-    local check = os.date('%Y-%m-%d', os.time() - interval)
+    -- REMINDER:
+    -- (late) < [today] < (warn) < [today + x] < (OK)
+    -- e.g. yesterday     tomorrow              next month
+    local check = os.date('%Y-%m-%d', os.time() + interval)
     local late = Borrow{{'is_back','eq',false},
-                         'and',{'return_date','gt',today}}
-    local warn = Borrow{{{'is_back','eq',false},
-                         'and',{'return_date','gt',check}},
                          'and',{'return_date','lt',today}}
+    local warn = Borrow{{{'is_back','eq',false},
+                         'and',{'return_date','lt',check}},
+                         'and',{'return_date','gt',today}}
     return reformat_borrows(late), reformat_borrows(warn)
 end
 
 local function reformat_borrows(borrows)
     local r = {}
     for k, v in pairs(borrows) do
-        r[k] = {person=v.person, book=v.book, return_date=v.return_date}
+        r[k] = {v.person, v.book, v.return_date}
     end
     return r
 end
