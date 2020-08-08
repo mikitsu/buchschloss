@@ -100,7 +100,7 @@ def restrict_runtime(runtime, whitelist):
     return runtime
 
 
-def prepare_runtime(login_context: core.LoginContext, *,
+def prepare_runtime(login_context: 'core.LoginContext', *,
                     add_ui=None, add_storage=None, add_requests=False, add_config=None):
     """create and initialize a new Lua runtime
 
