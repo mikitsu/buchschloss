@@ -315,7 +315,10 @@ def check_level(login_context, level, resource):
     if login_context.level < level:
         logging.info('{} was denied access to {} (level)'
                      .format(login_context, resource))
-        raise BuchSchlossPermError(level)
+        if login_context.type is LoginType.GUEST:
+            raise BuchSchlossError('no_permission', 'must_log_in')
+        else:
+            raise BuchSchlossPermError(level)
 
 
 def auth_required(f):
