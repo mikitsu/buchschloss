@@ -21,10 +21,8 @@ from os import urandom
 import sys
 import warnings
 import operator
-import re
 import enum
 import abc
-import builtins
 import logging
 import logging.handlers
 
@@ -499,13 +497,7 @@ class ActionNamespace:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
     @classmethod
-    def search(cls,
-               condition: tuple,
-               complex_params: T.Iterable['ComplexSearch'] = (),
-               complex_action: str = None,
-               *,
-               login_context
-               ):
+    def search(cls, condition: tuple = (), *, login_context):
         """search for records.
 
         :param condition: is a tuple of the form (<a>, <op>, <b>)
@@ -521,21 +513,68 @@ class ActionNamespace:
 
             If the top-level condition is empty, all existing values are returned.
 
-        :param complex_params: is a sequence of ComplexSearch instances to apply after
-            executing the SQL SELECT.
-
-        :param complex_action: is "and" or "or" and specifies how to handle multiple
-            complex cases. If finer granularity is needed, it can be achieved with
-            bitwise operators, providing bools are used.
-
         .. note::
 
             For ``condition``, there is no "not" available.
             Use the inverse comparision operator instead
         """
         check_level(login_context, cls.required_levels.search, cls.__name__ + '.search')
-        result = search(cls.model, condition, *complex_params,
-                        complex_action=complex_action)
+
+        def follow_path(path, q):
+            def handle_many_to_many():
+                through = fv.through_model.alias()
+                cond_1 = (getattr(cur, cur.pk_name)
+                          == getattr(through, fv.model.__name__.lower() + '_id'))
+                cond_2 = (getattr(through, mod.__name__.lower() + '_id')
+                          == getattr(mod, mod.pk_name))
+                return q.join(through, on=cond_1).join(mod, on=cond_2)
+
+            *path, end = path.split('.')
+            cur = mod = cls.model
+            for fn in path:
+                fv = getattr(mod, fn)
+                mod = fv.rel_model.alias()
+                if isinstance(fv, peewee.ManyToManyField):
+                    q = handle_many_to_many()
+                elif isinstance(fv, peewee.BackrefAccessor):
+                    q = q.join(mod, on=(getattr(cur, cur.pk_name)
+                                        == getattr(mod, fv.field.name)))
+                else:
+                    q = q.join(mod, on=(fv == getattr(mod, mod.pk_name)))
+                cur = mod
+            fv = getattr(mod, end)
+            if isinstance(fv, peewee.ManyToManyField):
+                mod = fv.rel_model
+                q = handle_many_to_many()
+                fv = getattr(mod, mod.pk_name)
+            return fv, q
+
+        def handle_condition(cond, q):
+            if not cond:
+                return q
+            a, op, b = cond
+            if op in ('and', 'or'):
+                if not a:
+                    return handle_condition(b, q)
+                elif not b:
+                    return handle_condition(a, q)
+                else:
+                    return getattr(operator, op + '_')(handle_condition(a, q),
+                                                       handle_condition(b, q))
+            else:
+                a, q = follow_path(a, q)
+                if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
+                    return q.where(getattr(operator, op)(a, b))
+                elif op == 'in':
+                    return q.where(a << b)
+                elif op == 'contains':
+                    return q.where(a.contains(b))
+                else:
+                    raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
+                                     '"ge", "le" or "contains"')
+
+        query = cls.model.select_str_fields()
+        result = handle_condition(condition, query)
         return (DataNamespace(cls, value, login_context) for value in result)
 
 
@@ -1381,187 +1420,6 @@ class DataNamespace:
             'allow': ('code', 'setlevel', 'name', 'storage'),
         },
     }
-
-
-def search(o: T.Type[models.Model], condition: T.Tuple = None,
-           *complex_params: 'ComplexSearch', complex_action: str = 'or',
-           ):
-    """Search for objects. See ActionNamespace.search for details"""
-
-    def follow_path(path, q):
-        def handle_many_to_many():
-            through = fv.through_model.alias()
-            cond_1 = (getattr(cur, cur.pk_name)
-                      == getattr(through, fv.model.__name__.lower() + '_id'))
-            cond_2 = (getattr(through, mod.__name__.lower() + '_id')
-                      == getattr(mod, mod.pk_name))
-            return q.join(through, on=cond_1).join(mod, on=cond_2)
-
-        *path, end = path.split('.')
-        cur = mod = o
-        for fn in path:
-            fv = getattr(mod, fn)
-            mod = fv.rel_model.alias()
-            if isinstance(fv, peewee.ManyToManyField):
-                q = handle_many_to_many()
-            elif isinstance(fv, peewee.BackrefAccessor):
-                q = q.join(mod, on=(getattr(cur, cur.pk_name)
-                                    == getattr(mod, fv.field.name)))
-            else:
-                q = q.join(mod, on=(fv == getattr(mod, mod.pk_name)))
-            cur = mod
-        fv = getattr(mod, end)
-        if isinstance(fv, peewee.ManyToManyField):
-            mod = fv.rel_model
-            q = handle_many_to_many()
-            fv = getattr(mod, mod.pk_name)
-        return fv, q
-
-    def handle_condition(cond, q):
-        if not cond:
-            return q
-        a, op, b = cond
-        if op in ('and', 'or'):
-            if not a:
-                return handle_condition(b, q)
-            elif not b:
-                return handle_condition(a, q)
-            else:
-                return getattr(operator, op + '_')(handle_condition(a, q),
-                                                   handle_condition(b, q))
-        else:
-            a, q = follow_path(a, q)
-            if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
-                return q.where(getattr(operator, op)(a, b))
-            elif op == 'in':
-                return q.where(a << b)
-            elif op == 'contains':
-                return q.where(a.contains(b))
-            else:
-                raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
-                                 '"ge", "le" or "contains"')
-
-    query = o.select_str_fields()
-    result = handle_condition(condition, query)
-    if complex_params:
-        return _do_complex_search(complex_action, result, complex_params)
-    else:
-        return result
-
-
-def _do_complex_search(kind: str, objects: T.Iterable[models.Model], complex_params):
-    """Perform the ComplexSearch operations.
-        Once __search_old is removed, this can be merged into search"""
-    results = set()
-    for o in objects:
-        for c in complex_params:
-            if c.apply_lookups(o):
-                if kind == 'or':
-                    results.add(o)
-                    break
-            elif kind == 'and':
-                break
-        else:
-            if kind == 'and':
-                results.add(o)
-    return results
-
-
-def _cs_lookup(name):
-    def wrapper(self, other):
-        self.lookups.append((name, other))
-        return self
-
-    return wrapper
-
-
-class ComplexSearch:  # TODO: use misc.Instance for this
-    """Allow complex lookups and comparisons when using search().
-
-    To later perform attr and/or item lookups on objects when searching,
-    perform these lookups in an instance of ComplexSearch.
-    e.g.: 'tim' in ComplexSearch().metadata['author'] TODO: update example
-    Store attribute and item lookups internally, to actually perform them, call apply_lookups()
-    Treat comparisons (== != < <= > >= in) as item lookups
-
-    to use iterations, call iter and perform the operations you would perform
-        on the individual items on the return model
-    e.g.: [c['y'] for b in a for c in b.x] becomes iter(iter(ComplexSearch()).x)['y']
-    where `a` is the base instance
-
-    You can call a function on a lookup (or a sequence like above) by
-    accessing the attribute ._call__<name>_
-        where name is a key in .CALLABLE_FUNCTIONS that maps to the desired function.
-        Currently included by default are `min`, `max`, `all`, `any`, `len` and `sum`
-    e.g.: ``any(x in g.name for g in book.groups)`` becomes
-        ``iter(ComplexSearch().groups).name._call__any_``;
-          ``sum(x == b.c for b in a) >= 3`` becomes
-        ``(iter(ComplexSearch()).c == x)._call__sum_ >= 3``;
-          ``sum(any(a.b in x for a in c) for c in d) in y`` becomes
-          ``(iter(c).b in x)._call__any_._call__sum_ in y``
-          bad-looking ~ complexity * use_of_functions ** 3
-
-    Comparisons also work if they are only supported by the known (not simulated)
-    object **IF** the simulated one
-        returns NotImplemented in the comparison function
-    """
-    CALLABLE_FUNCTIONS = {k: getattr(builtins, k) for k in
-                          'min max all any len sum'.split()}
-
-    def __init__(self, return_first_item=True):
-        """Initialise self.
-
-        see ComplexSearch.__doc__ for more inforamtion.
-        see apply_lookups.__doc__ for information on return_first_item"""
-        self.lookups = []
-        self.return_first_item = return_first_item
-
-    def __iter__(self):
-        self.lookups.append(('__iter__', None))
-        return self
-
-    def __next__(self):
-        # not really sure what to do here, could also raise TypeError or not include __next__
-        raise StopIteration
-
-    #  avoid "attr not found" and "does not support item lookups" warnings
-    __getitem__ = _cs_lookup('__getitem__')
-
-    def __getattr__(self, item):
-        self.lookups.append(('__getattribute__', item))
-        return self
-
-    for op in 'eq ne ge gt le lt contains'.split():
-        op = '__%s__' % op
-        locals()[op] = _cs_lookup(op)
-
-    def apply_lookups(self, to):
-        """Apply the stored lookups to ``to``
-
-        handle __iter__ and _call__<name>_ uses as stated in the class __doc__
-        if return_first_item (set in __init__) is True, return only the first item.
-            if only one item is expected, this is the way to go"""
-        to = [to]
-        for k, v in self.lookups:
-            m = re.match('_call__(%s)_' % '|'.join(self.CALLABLE_FUNCTIONS.keys()), k)
-            if m:
-                to = self.CALLABLE_FUNCTIONS[m.group(1)](to if len(to) > 1 else to[0])
-            elif k == '__iter__':
-                new = []
-                for obj in to:
-                    for new_obj in iter(obj):
-                        new.append(new_obj)
-                to = new
-            else:
-                for i, obj in enumerate(to):
-                    new = getattr(obj, k)(v)
-                    if new is NotImplemented:
-                        new = getattr(v, k)(obj)
-                        if new is NotImplemented:
-                            raise TypeError('unsupported operation %s between %s and %s'
-                                            % (k, obj, v))
-                    to[i] = new
-        return to[0] if self.return_first_item else to
 
 
 internal_priv_lc = LoginType.INTERNAL(config.MAX_LEVEL)
