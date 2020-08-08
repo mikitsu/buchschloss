@@ -61,11 +61,15 @@ def form_get_name(form_name):
 class BaseForm(mtkf.Form, template=True):
     """Base class for forms.
 
-        handles autocompletes and appropriate get_name handling
+        handles autocompletes, default content and appropriate get_name handling
     """
     def __init_subclass__(cls, *, template=None, **kwargs):
         form_name = cls.__name__.replace('Form', '')
         cls.get_name = form_get_name(form_name)
+        # no .setdefault() :-(
+        form_widget = vars(cls).get('FormWidget', type('ForWidget', (), {}))
+        form_widget.default_content = config.gui2.entry_defaults.get(form_name).mapping
+        cls.FormWidget = form_widget
         autocompletes = config.gui2.get('autocomplete').get(form_name)
         for k, v in vars(cls).items():
             if isinstance(v, tuple) and len(v) == 2:
@@ -117,8 +121,6 @@ class SearchForm(BaseForm, template=True):
 
 class BookForm(SearchForm):
     class FormWidget(mtkf.FormWidget):
-        default_content = config.gui2.get('entry defaults').get('Book').mapping
-
         def __init__(self, *args, **kwargs):
             """hack"""
             super().__init__(*args, **kwargs)
@@ -159,9 +161,6 @@ class BookForm(SearchForm):
 
 
 class PersonForm(SearchForm):
-    class FormWidget:
-        default_content = config.gui2.get('entry defaults').get('Person').mapping
-
     id_: GroupElement.NO_SEARCH = IntEntry
     first_name: mtkf.Element = NonEmptyEntry
     last_name: mtkf.Element = NonEmptyEntry
@@ -240,9 +239,6 @@ class BorrowRestCommonForm(BaseForm, template=True):
 
 
 class BorrowForm(BorrowRestCommonForm):
-    class FormWidget:
-        default_content = {'weeks': '4'}
-
     weeks: mtkf.Element = IntEntry
     override: mtkf.Element = CheckbuttonWithVar
 
