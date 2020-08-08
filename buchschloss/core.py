@@ -391,7 +391,8 @@ def authenticate(m, password):
     return False
 
 
-def login(name: str, password: str):
+@from_db(models.Member)
+def login(name: T.Union[models.Member, str], password: str):
     """attempt to login the Member with the given name and password.
 
     :return LoginContext: on success
@@ -401,11 +402,7 @@ def login(name: str, password: str):
 
     :raise BuchSchlossBaseError: on failure
     """
-    try:
-        with models.db:
-            m = models.Member.get_by_id(name)
-    except models.Member.DoesNotExist:
-        raise BuchSchlossNotFoundError('Member', name)
+    m: models.Member = name
     if authenticate(m, password):
         logging.info('login success {}'.format(m))
         return LoginType.MEMBER(m.level, name=m.name)
