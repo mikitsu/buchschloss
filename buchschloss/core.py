@@ -25,12 +25,7 @@ import enum
 import abc
 import logging
 import logging.handlers
-
-try:
-    # noinspection PyPep8Naming
-    import typing as T
-except ImportError:
-    T = None
+import typing as T  # noqa
 
 import peewee
 
@@ -44,33 +39,35 @@ __all__ = [
     'login', 'ScriptPermissions',
 ]
 
-log_conf = config.core.log
-if log_conf.file:
-    if log_conf.rotate.how == 'none':
-        handler = logging.FileHandler(log_conf.file)
-    elif log_conf.rotate.how == 'size':
-        handler = logging.handlers.RotatingFileHandler(
-            log_conf.file,
-            maxBytes=2 ** 10 * log_conf.rotate.size,
-            backupCount=log_conf.rotate.copy_count,
-        )
-    elif log_conf.rotate.how == 'time':
-        handler = logging.handlers.TimedRotatingFileHandler(
-            log_conf.file,
-            when=log_conf.interval_unit,
-            interval=log_conf.interval_value,
-        )
+
+def _get_log_handler(conf):
+    if conf.file:
+        if conf.rotate.how == 'none':
+            return logging.FileHandler(conf.file)
+        elif conf.rotate.how == 'size':
+            return logging.handlers.RotatingFileHandler(
+                conf.file,
+                maxBytes=2 ** 10 * conf.rotate.size,
+                backupCount=conf.rotate.copy_count,
+            )
+        elif conf.rotate.how == 'time':
+            return logging.handlers.TimedRotatingFileHandler(
+                conf.file,
+                when=conf.interval_unit,
+                interval=conf.interval_value,
+            )
+        else:
+            raise ValueError('config.core.log.rotate.how had an invalid value')
     else:
-        raise ValueError('config.core.log.rotate.how had an invalid value')
-else:
-    handler = logging.StreamHandler(sys.stdout)
-del log_conf
+        return logging.StreamHandler(sys.stdout)
+
+
 # noinspection PyArgumentList
 logging.basicConfig(level=getattr(logging, config.core.log.level),
                     format='{asctime} - {levelname}: {msg}',
                     datefmt='%Y-%m-%d %H:%M:%S',
                     style='{',
-                    handlers=[handler],
+                    handlers=[_get_log_handler(config.core.log)],
                     )
 
 
