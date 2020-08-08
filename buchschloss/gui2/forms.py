@@ -249,14 +249,17 @@ class RestituteForm(BorrowRestCommonForm):
 
 class BorrowSearchForm(SearchForm):
     book__id: mtkf.Element = IntEntry
-    book__library: mtkf.Element = Entry
-    book__groups: mtkf.Element = Entry
+    book__title: mtkf.Element = Entry
+    book__author: mtkf.Element = Entry
+    book__library: mtkf.Element = (OptionsFromSearch,
+                                   {'action_ns': core.Library, 'allow_none': True})
+    book__groups: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Group})
 
     person__id: mtkf.Element = IntEntry
     person__first_name: mtkf.Element = Entry
     person__last_name: mtkf.Element = Entry
     person__class_: mtkf.Element = ClassEntry
-    person__libraries: mtkf.Element = ListEntry
+    person__libraries: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
 
     is_back: mtkf.Element = OptionalCheckbuttonWithVar
 
