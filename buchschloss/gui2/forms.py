@@ -67,8 +67,9 @@ class BaseForm(mtkf.Form, template=True):
         form_name = cls.__name__.replace('Form', '')
         cls.get_name = form_get_name(form_name)
         # no .setdefault() :-(
-        form_widget = vars(cls).get('FormWidget', type('ForWidget', (), {}))
+        form_widget = vars(cls).get('FormWidget', type('FormWidget', (), {}))
         form_widget.default_content = config.gui2.entry_defaults.get(form_name).mapping
+        form_widget.error_display_options = {}  # workaround
         cls.FormWidget = form_widget
         autocompletes = config.gui2.get('autocomplete').get(form_name)
         for k, v in vars(cls).items():
@@ -89,8 +90,6 @@ class BaseForm(mtkf.Form, template=True):
         take_focus = True
         submit_on_return = mtkf.FormWidget.SubmitOnReturn.NOT_FIRST
         submit_button = {'text': get_name('btn_do')}
-        # workaround, this isn't needed if we decide to update misc
-        error_display_options = {'popup_field_name_resolver': get_name}
 
 
 class SearchForm(BaseForm, template=True):
