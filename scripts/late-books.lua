@@ -10,6 +10,7 @@ local function get_books()
     -- REMINDER:
     -- (late) < [today] < (warn) < [today + x] < (OK)
     -- e.g. yesterday     tomorrow              next month
+    local today = os.date('%Y-%m-%d')
     local check = os.date('%Y-%m-%d', os.time() + interval)
     local late = Borrow{{'is_back','eq',false},
                          'and',{'return_date','lt',today}}
