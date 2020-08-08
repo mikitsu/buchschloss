@@ -1361,7 +1361,7 @@ class DataNamespace:
         ))
 
     def __hash__(self):
-        return hash(self._data)
+        return hash(self.id)
 
     def __str__(self):
         return str(self._data)
