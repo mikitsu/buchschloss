@@ -79,7 +79,7 @@ class BaseForm(mtkf.Form, template=True):
                 c = v
                 o = {}
             if isinstance(c, type) and issubclass(c, tk.Entry):
-                values = autocompletes.get(k).mapping
+                values = dict(autocompletes.get(k).mapping)
                 if values:
                     c = type('Autocompleted' + c.__name__, (mtk.AutocompleteEntry, c), {})
                     o['autocompletes'] = values
