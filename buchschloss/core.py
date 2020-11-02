@@ -480,19 +480,25 @@ class ActionNamespace:
         """Return a namespace of information"""
         check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_ns')
         try:
-            return DataNamespace(cls, cls.model.get_by_id(id_), login_context)
+            r = DataNamespace(cls, cls.model.get_by_id(id_), login_context)
         except cls.model.DoesNotExist:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
+        else:
+            logging.info('{} viewed {}'.format(login_context, r))
+            return r
 
     @classmethod
     def view_repr(cls, id_: T.Union[str, int], *, login_context) -> str:
         """Return a string representation"""
         check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_repr')
         try:
-            return str(next(iter(cls.model.select_str_fields().where(
+            r = str(next(iter(cls.model.select_str_fields().where(
                 getattr(cls.model, cls.model.pk_name) == id_).limit(1))))
         except StopIteration:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
+        else:
+            logging.info('{} viewed {}'.format(login_context, r))
+            return r
 
     @classmethod
     def search(cls, condition: tuple = (), *, login_context):
@@ -514,7 +520,7 @@ class ActionNamespace:
         .. note::
 
             For ``condition``, there is no "not" available.
-            Use the inverse comparision operator instead
+            Use the inverse comparison operator instead
         """
         check_level(login_context, cls.required_levels.search, cls.__name__ + '.search')
 
@@ -573,6 +579,7 @@ class ActionNamespace:
 
         query = cls.model.select_str_fields()
         result = handle_condition(condition, query)
+        logging.info('{} searched {}'.format(login_context, cls.__name__))
         return (DataNamespace(cls, value, login_context) for value in result)
 
 
@@ -607,8 +614,7 @@ class Book(ActionNamespace):
                     b.groups.add(models.Group.get_or_create(name=g)[0])
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', library)
-            else:
-                logging.info('{} created {}'.format(login_context, b))
+        logging.info('{} created {}'.format(login_context, b))
         return b.id
 
     @classmethod
@@ -812,6 +818,7 @@ class Library(ActionNamespace):
                 lib.people = people
                 models.Book.update({models.Book.library: lib}
                                    ).where(models.Book.id << books).execute()
+        logging.info('{} created {}'.format(login_context, lib))
 
     @staticmethod
     def edit(action: LibraryGroupAction, name: str, *,
@@ -864,6 +871,7 @@ class Library(ActionNamespace):
             if pay_required is not None:
                 lib.pay_required = pay_required
                 lib.save()
+        logging.info('{} edited {}'.format(login_context, lib))
 
     @staticmethod
     @from_db(models.Library)
@@ -877,6 +885,7 @@ class Library(ActionNamespace):
         - ``people``: the IDs of the people in the Library, separated by ';'
         - ``books``: the IDs of the books in the Library, separated by ';'
         """
+        logging.info('{} viewed {}'.format(login_context, lib))
         return {
             '__str__': str(lib),
             'name': lib.name,
@@ -907,6 +916,7 @@ class Group(ActionNamespace):
                     raise
             else:
                 group.books = books
+        logging.info('{} created {}'.format(login_context, group))
 
     @staticmethod
     def edit(action: LibraryGroupAction,
@@ -945,6 +955,7 @@ class Group(ActionNamespace):
                 else:
                     for book in books:
                         getattr(group.books, action.value)(book)
+        logging.info('{} edited {}'.format(login_context, group))
 
     @staticmethod
     @from_db(models.Group)
@@ -981,6 +992,7 @@ class Group(ActionNamespace):
         (models.Book.update(library=dest)
          .where(models.Book.id << [b.id for b in books_to_update])
          .execute())
+        logging.info('{} activated {}'.format(login_context, group))
 
     @staticmethod
     @from_db(models.Group)
@@ -993,6 +1005,7 @@ class Group(ActionNamespace):
         - ``name``: the name of the Group
         - ``books``: the IDs of the books in the Group separated by ';'
         """
+        logging.info('{} viewed {}'.format(login_context, group))
         return {
             '__str__': str(group),
             'name': group.name,
@@ -1106,6 +1119,7 @@ class Borrow(ActionNamespace):
             by which the book has to be returned
         - ``is_back``: a string indicating whether the Book has been returned
         """
+        logging.info('{} viewed {}'.format(login_context, borrow))
         return {
             '__str__': str(borrow),
             'person': str(borrow.person),
@@ -1199,6 +1213,7 @@ class Member(ActionNamespace):
         - ``name``: the Member's name
         - ``level``: the Member's level
         """
+        logging.info('{} viewed {}'.format(login_context, member))
         return {
             '__str__': str(member),
             'name': member.name,
@@ -1266,6 +1281,7 @@ class Script(ActionNamespace):
         'setlevel': the script's setlevel status ('-----' if not set)
         'permissions': the scripts permissions, separated by ';'
         """
+        logging.info('{} viewed {}'.format(login_context, script))
         return {
             '__str__': str(script),
             'name': script.name,
@@ -1316,6 +1332,7 @@ class Script(ActionNamespace):
             add_requests=(ScriptPermissions.REQUESTS in script.permissions),
             add_config=script_config,
         )
+        logging.info('{} executed {}'.format(login_context, script))
         try:
             ns = runtime.execute(script.code)
             if function is not None:
