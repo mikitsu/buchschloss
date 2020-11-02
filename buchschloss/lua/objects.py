@@ -5,6 +5,7 @@ import functools
 import typing as T
 import warnings
 import contextlib
+import logging
 
 import lupa
 import bs4
@@ -242,6 +243,7 @@ class LuaRequestsInterface(LuaObject):
     def get(self, url, result='auto'):
         """wrap requests.get"""
         if config.lua.requests.url_regex.search(url) is None:
+            logging.warning('blocked request to unallowed URL: ' + url)
             return None
         try:
             r = requests.get(url)
