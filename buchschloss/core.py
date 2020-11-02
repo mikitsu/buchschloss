@@ -80,7 +80,7 @@ class ScriptPermissions(enum.Flag):
     """permissions scripts can have
 
     - AUTH_GRANTED: execute functions that require a password when
-        executed with a Member LoginContext
+      executed with a Member LoginContext
     - REQUESTS: access the internet, confined to configured URLs and HTTP methods
     - STORE: store data
     """

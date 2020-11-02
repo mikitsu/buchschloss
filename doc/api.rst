@@ -45,7 +45,7 @@ Note that circular imports are used quite a lot (I have no idea on how to change
 dependencies between submodules in a way that makes sense and avoids circular imports),
 so the import order is important.
 
-data overview
+Data overview
 -------------
 
 The following data types are present:
@@ -53,8 +53,8 @@ The following data types are present:
 - Book: this represents a book. It saves bibliographic data, such as ISBN, author,
   title, a Library (see below), any number of Groups (see below) and, if applicable,
   the Person who has currently borrowed the book [#borrow-in-book]_.
-- Person: this represents someone who can borrow some books. Next to personal details,
-  available Libraries and information on borrowing restrictions is stored.
+- Person: this represents someone who can borrow some books. Personal details,
+  available Libraries and information on borrowing restrictions are stored.
 - Library: Libraries contain a group of books whose borrowing conditions are the same.
   Each Library also stores a "pay_required" (old name, should change to "restricted")
   value.
@@ -67,8 +67,8 @@ The following data types are present:
   borrow books to People, create new Books and, in general, change stuff
 - Script: a Lua script with special permissions and its code
 
-.. [#borrow-in-book] The current Borrow instance is actually a property
-    which executes a query, but you can pretend it is stored.
+.. [#borrow-in-book] Actually, the current Borrow instance is available,
+    but you can access the Person via ``.borrow.person``
 
 .. note::
 
@@ -100,7 +100,7 @@ The data type independent interface for all ``ActionNamespace`` s is:
 - ``view_str(id, /)`` for getting a dictionary with string keys and string values
   (with few exceptions). This is useful for displaying data to an end-user
 - ``view_repr(id, /)`` for getting a string representation. This is fully equivalent to
-  ``str(view_ns(<id>))``, but just gets the required fileds from the database
+  ``str(view_ns(<id>))``, but gets just the required fields from the database
 - ``search(condition)`` for searching. Refer to the docstring for
   information on the condition format.
 
@@ -115,7 +115,7 @@ user in some way.
 
 See the :ref:`reference for the core module<core-ref>` for details.
 
-permissions, authentication and authorization
+Permissions, authentication and authorization
 ---------------------------------------------
 
 The ``login`` function returns a ``LoginContext`` object. This object needs to be

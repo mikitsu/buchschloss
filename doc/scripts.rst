@@ -37,17 +37,17 @@ The ``AUTH_GRANTED`` permission allows a script to execute functions that otherw
 require a user to retype their password. These functions include Member and Script
 editing, so in general a script shouldn't need it.
 
-The ``REQUESTS`` permission give the script access to the requests API (a very thin
+The ``REQUESTS`` permission gives the script access to the requests API (a very thin
 and mostly just option-restricting wrapper wrapper around the Python requests module).
-This permission is needed if the script has to access the internet. Notable book data
+This permission is needed if the script has to access the internet. Notably, book data
 scripts will require it.
 
 The ``STORE`` permission allows a script to store data in the database in JSON format
 and provides the storage API. This data can be viewed via ``Script.view_ns``,
-so it shouldn't include especially secret information. To configure a script,
+so it shouldn't include particularly secret information. To configure a script,
 use the appropriate section in the configuration file.
 
-Scripts may also have a ``setlevel`` attribute with will set the scripts execution
+Scripts may also have a ``setlevel`` attribute which will set the script's execution
 login context to that level, regardless of the invoker's level. This can be used
 to grant users extra capabilities when specific conditions are met or to use
 otherwise unavailable functions when the script is run as startup or periodic srcipt,
@@ -76,10 +76,10 @@ object [#views-are-lazy]_, so to edit the Book with the ID 3, you would ``Book[3
 Special functions (i.e. only ``Group.activate``) are also called on the viewing
 object: ``Group.gname:activate{...}`` (or ``Group['gname']:activate{...}``).
 
-For convenience, there also exists a builtin function ``check_level``, which takes a level
-to compare against as first argument and an optional second argument that decides
+For convenience, the builtin function ``check_level`` is also provided.
+It takes a level to compare against as first argument and an optional second argument that decides
 whether to show an alert on failure (``true`` by default). It compares the *script invoker's*
-level to the passed one and return ``true`` if the invoker's level is lower.
+level to the passed one and returns ``true`` if the invoker's level is lower.
 While this may sound unintuitive, it allows you to write ``if check_level(req_level) then return end``
 at the beginning of functions to check for a level. Use this if you want to restrict access to
 script-specific functions. Errors with standard functions will be correctly shown to the user
@@ -98,10 +98,10 @@ It takes a URL and an optional response-type parameter. The URL will be checked 
 a regular expression defined in the lua configuration section. GET parameters have to
 be included in the URL.
 
-The response-type parameter may be ``auto``, the default, in which case an appropriate type
+The response-type parameter may be ``'auto'``, the default, in which case an appropriate type
 is extracted from the ``Content-Type`` header. This is not recommended.
-Other recognized values are ``json``, which will return a table with the response data
-parse as JSON and ``html`` or ``xml`` which will return a BeautifulSoup wrapper described below.
+Other recognized values are ``'json'``, which will return a table with the response data
+parse as JSON and ``'html'`` or ``'xml'`` which will return a BeautifulSoup wrapper described below.
 All unrecognized response-types will return the response data as text.
 
 The BeautifulSoup wrapper provides access to ``select`` and ``select_one``,
