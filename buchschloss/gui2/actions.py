@@ -289,8 +289,11 @@ def login():
         except core.BuchSchlossBaseError as e:
             tk_msg.showerror(e.title, e.message)
             return
-        main.app.header.set_info_text(utils.get_name('logged_in_as_{}'
-                                                     ).format(main.app.current_login))
+        main.app.header.set_info_text(
+            utils.get_name('logged_in_as_{}').format(
+                utils.get_name('Member[{}]({})').format(
+                    main.app.current_login.name,
+                    utils.level_names[main.app.current_login.level])))
         main.app.header.set_login_text(utils.get_name('action::logout'))
     else:
         main.app.current_login = core.guest_lc
