@@ -14,6 +14,7 @@ __all__ exports:
 import inspect
 import itertools
 import string
+import textwrap
 from hashlib import pbkdf2_hmac
 from functools import wraps, partial
 from datetime import timedelta, date
@@ -364,13 +365,15 @@ def auth_required(f):
         doc_indent = last_doc_line
     else:
         doc_indent = last_doc_line[:-len(last_doc_line.lstrip())]
-    auth_required_wrapper.__doc__ += (
-        '\n\n' + doc_indent + ('\n'+doc_indent).join((
-            'When called with a MEMBER LoginContext,',
-            'this function requires authentication in form of',
-            'a ``current_password`` argument containing the currently',
-            "logged in member's password."))
-    )
+    auth_required_wrapper.__doc__ += '\n\n' + textwrap.indent(textwrap.dedent("""
+    When called with a MEMBER LoginContext,
+    this function requires authentication in form of
+    a ``current_password`` argument containing the currently
+    logged in member's password.
+    It is not callable by GUEST and unprivileged SYSTEM
+    LoginContexts as well as SCRIPT LoginContexts without
+    the AUTH_GRANTED permission.
+    """), doc_indent)
     auth_required.functions.append(f.__qualname__)
     return auth_required_wrapper
 auth_required.functions = []  # noqa
@@ -1066,7 +1069,7 @@ class Borrow(ActionNamespace):
         - ``book``: a string representation of the borrowed Book
         - ``book_id``: the ID of the borrowed Book
         - ``return_date``: a string representation of the date
-            by which the book has to be returned
+          by which the book has to be returned
         - ``is_back``: a string indicating whether the Book has been returned
         """
         return {
@@ -1120,7 +1123,7 @@ class Member(ActionNamespace):
         .. warning::
 
             DO NOT change password with this function.
-            Use Member.change_password instead
+            Use ``Member.change_password`` instead
         """
         old_str = str(member)
         if (not set(kwargs.keys()) <= {'level'}) or 'name' in kwargs:
@@ -1224,10 +1227,10 @@ class Script(ActionNamespace):
     def view_str(script: T.Union[models.Script, str], *, login_context) -> dict:
         """return a dict with the following items:
 
-        '__str__': a string representation of the script
-        'name': the script name
-        'setlevel': the script's setlevel status ('-----' if not set)
-        'permissions': the scripts permissions, separated by ';'
+        - ``__str__``: a string representation of the script
+        - ``name``: the script name
+        - ``setlevel``: the script's setlevel status (``'-----'`` if not set)
+        - ``permissions``: the scripts permissions, separated by ``';'``
         """
         return {
             '__str__': str(script),
