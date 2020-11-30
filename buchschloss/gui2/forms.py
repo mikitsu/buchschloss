@@ -16,7 +16,7 @@ from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
                       IntListEntry, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
                       SeriesEntry, OptionsFromSearch, SearchMultiChoice,
-                      FlagEnumMultiChoice, ScriptNameEntry)
+                      FlagEnumMultiChoice, ScriptNameEntry, MultiChoicePopup)
 
 
 class ElementGroup(enum.Enum):
@@ -150,7 +150,15 @@ class BookForm(SearchForm):
     concerned_people: mtkf.Element = (NullREntry, {'rem_key': 'book-cpeople'})
     year: mtkf.Element = IntEntry
     medium: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-medium'})
-    genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
+    if config.gui2.genres.options is None:
+        genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
+    else:
+        genres: mtkf.Element = (
+            type('StrMultiChoicePopup', (MultiChoicePopup,),
+                 {'get': lambda s: s.sep.join(super(MultiChoicePopup, s).get())}),
+            {'options': config.gui2.genres.options,
+             'sep': config.gui2.genres.sep}
+        )
 
     library: GroupElement.NO_SEARCH = (OptionsFromSearch, {'action_ns': core.Library})
     library_search_alt: GroupElement.ONLY_SEARCH = (
