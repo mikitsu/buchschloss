@@ -803,7 +803,8 @@ class Library(ActionNamespace):
             :param name: is the name of the Library to modify
             :param people: is an iterable of the IDs of the people to modify
             :param books: is an iterable of IDs of the books to modify
-            :param pay_required: will set the Library's payment requirement to itself if not None
+            :param pay_required: will set the Library's payment
+              requirement to itself if not None
 
             :raise BuchSchlossBaseError: if the Library doesn't exist
         """
