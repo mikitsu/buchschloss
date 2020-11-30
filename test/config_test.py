@@ -102,9 +102,6 @@ def test_script_spec():
         val_script_specs(['too', 'many'], single=True)
 
 
-# test tasklist later when it's more than just an optionlist wrapper
-
-
 def test_load_file(tmpdir):
     """test config.main.load_file"""
     f1, f2, f3, f4 = get_temp_files(tmpdir, 4)
@@ -113,7 +110,7 @@ def test_load_file(tmpdir):
     f3.write('b = 2')
     f4.write('invalid config file')
     co, errors = main.load_file(f1)
-    assert errors == {str(f4)}
+    assert set(map(str, errors)) == {str(f4)}
     assert co.dict() == {'a': '1', 'b': '1', 'sec': {'a': '2', 'b': '2'}}
 
 
@@ -125,7 +122,7 @@ def test_load_file_json(tmpdir):
     f3.write('{"b": "2"}')
     f4.write('invalid config file')
     co, errors = main.load_file(f1, json.load, json.JSONDecodeError)
-    assert errors == {str(f4)}
+    assert set(map(str, errors)) == {str(f4)}
     assert co.dict() == {'a': '1', 'b': '1', 'sec': {'a': '2', 'b': '2'}}
 
 
