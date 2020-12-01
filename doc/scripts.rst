@@ -1,7 +1,7 @@
 Lua scripting
 =============
 
-Lua scripting can be used to enhance BuchSchloss. Scripts can bu used as GUI
+Lua scripting can be used to enhance BuchSchloss. Scripts can be used as GUI
 actions, either supplementing existing actions or doing completely new stuff.
 They can be started at regular intervals, so they can perform e.g. cleanup jobs.
 Since it is possible to always run them with the same level,
@@ -21,7 +21,7 @@ Direct Lua UI
 -------------
 
 The Lua environment can also be started as UI (``python -m buchschloss lua``).
-In this case, only the main APIs (including abstractions) will be available.
+In this case, only the `main APIs <#the-main-api>`_ (including abstractions) will be available.
 The login context can be set at the beginning of the session. To be able to use
 authentication-protected functions, a global ``getpass()`` function is also provided.
 Due to technical incompetence or laziness, multi-line expressions/statements
@@ -37,13 +37,14 @@ The ``AUTH_GRANTED`` permission allows a script to execute functions that otherw
 require a user to retype their password. These functions include Member and Script
 editing, so in general a script shouldn't need it.
 
-The ``REQUESTS`` permission gives the script access to the requests API (a very thin
-and mostly just option-restricting wrapper wrapper around the Python requests module).
+The ``REQUESTS`` permission gives the script access to the `requests API <#the-requests-api>`_
+(a very thin and mostly just option-restricting wrapper around the
+`Python requests library <https://requests.readthedocs.io>`_).
 This permission is needed if the script has to access the internet. Notably, book data
 scripts will require it.
 
 The ``STORE`` permission allows a script to store data in the database in JSON format
-and provides the storage API. This data can be viewed via ``Script.view_ns``,
+and provides the `storage API <#the-storage-api>`_. This data can be viewed via ``Script.view_ns``,
 so it shouldn't include particularly secret information. To configure a script,
 use the appropriate section in the configuration file.
 
@@ -59,7 +60,7 @@ The main API
 The basic script API lives in the ``buchschloss`` table. It includes subtables named
 as the action namespaces in the Python API, i.e. ``Book``, ``Person``, ``Library``,
 ``Group``, ``Borrow``, ``Member`` and ``Script``. Each of these subtables include the
-corresponding function. Arguments should be passed as a table. This allows both positional
+corresponding functions. Arguments should be passed as a table. This allows both positional
 arguments and keyword arguments to be used. The functions map one-to-one to the
 Python functions (see the :ref:`reference<core-ref>`), with the exception that
 the ``login_context`` argument is automatically provided.
@@ -70,9 +71,9 @@ Values may be retrieved by indexing with the ID, so e.g. ``Book[1].title`` will 
 the title of the book with ID 1. Searching is available through calling:
 ``Person{}`` will provide a table of all ``Person`` objects
 and ``Borrow{'is_back','eq',false}`` will provide all not-yet-returned borrows.
-Creating is unchanged, but must be access through Lua "method syntax"[#lua-method-syntax-name]_,
+Creating is unchanged, but must be accessed through Lua "method syntax"[#lua-method-syntax-name]_,
 i.e. ``Book:new{...}``. Editing has the minor difference of being called on a viewing
-object [#views-are-lazy]_, so to edit the Book with the ID 3, you would ``Book[3]:edit{...}``.
+object [#views-are-lazy]_, so to edit the Book with the ID 3, you would call ``Book[3]:edit{...}``.
 Special functions (i.e. only ``Group.activate``) are also called on the viewing
 object: ``Group.gname:activate{...}`` (or ``Group['gname']:activate{...}``).
 
@@ -95,19 +96,21 @@ The requests API
 If correctly configured, i.e. having the ``REQUESTS`` permission, a script will be able
 to access a global variable ``requests``. Currently, the only supported method is ``get``.
 It takes a URL and an optional response-type parameter. The URL will be checked against
-a regular expression defined in the lua configuration section. GET parameters have to
+a regular expression defined in the ``[lua]`` configuration section. GET parameters have to
 be included in the URL.
 
 The response-type parameter may be ``'auto'``, the default, in which case an appropriate type
 is extracted from the ``Content-Type`` header. This is not recommended.
 Other recognized values are ``'json'``, which will return a table with the response data
-parse as JSON and ``'html'`` or ``'xml'`` which will return a BeautifulSoup wrapper described below.
+parsed as JSON and ``'html'`` or ``'xml'`` which will return a BeautifulSoup wrapper described below.
 All unrecognized response-types will return the response data as text.
 
-The BeautifulSoup wrapper provides access to ``select`` and ``select_one``,
+The BeautifulSoup_ wrapper provides access to ``select`` and ``select_one``,
 which take a CSS selector and return all or a single found tag, respectively,
 as well as ``text``, which is the tag's text content and ``attrs``, which is a
 table of the tag's attributes.
+
+.. _BeautifulSoup: https://www.crummy.com/software/BeautifulSoup/bs4/
 
 The storage API
 ---------------
@@ -115,7 +118,7 @@ The storage API
 If configured, a script will have access to persistent storage in the database.
 To use this storage, two functions are provided in the ``buchschloss`` table:
 
-- ``get_storage`` returns the current stored data as a table
+- ``get_storage`` returns the currently stored data as a table
 - ``set_storage`` takes data to store
 
 Stored data must be JSON-representable. Essentially, this means that you should stick
@@ -124,7 +127,7 @@ to string keys and not try to store weird stuff (like functions etc.).
 .. note::
     - There is no locking mechanism. If the same script is ever run simultaneously
       while modifying data, bad stuff will happen.
-    - Data is viewable via ``view_ns`` and writable via ``edit``.
+    - Data is viewable via ``Script.view_ns`` and writable via ``Script.edit``.
 
 The UI API
 ----------
@@ -140,8 +143,8 @@ following functions:
   the passed data preserving hierarchies. Use this for displaying lists or mappings.
 - ``get_data`` can be used to get data of different types. It accepts a table mapping
   names to types, where a type is one of ``'int', 'bool', 'str'`` (as a string).
-  The names will be passed through ``get_name``. When the user has selected the data,
-  a table mappign the names to the chosen data, which is of the requests types, is returned.
+  The names will be passed through ``get_name``. When the user has provided the requested data,
+  a table mapping the names to the data, provided as the requested type, is returned.
   If the user exits the data selection, ``nil`` is returned.
 - ``get_name`` provides access to the configured name file. Lookups are automatically
   prefixed with ``'script-data::<script name>::``. You may use ``{}`` formatting.
@@ -168,8 +171,8 @@ Once Lua scripts have been added to the database, they can be executed in differ
   at startup time. In this case, UI interaction may not be possible. In other cases,
   it should.
 - Via UI startup: For scripts that want to run on startup, but need to interact with users.
-  They are configured in the individual UI sections, but you'l probably want to run them
-  with every ui, so they can go in ``[ui][startup scripts]``.
+  They are configured in the individual UI sections, but you'll probably want to run them
+  with every UI, so they can go in ``[ui][startup scripts]``.
 - Via gui2 actions: For scripts that should run on explicit user choice. Typically,
   these will provide extra functions. See the ``leseclub.lua`` script for an example.
 
