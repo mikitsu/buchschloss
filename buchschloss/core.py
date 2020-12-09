@@ -14,6 +14,7 @@ __all__ exports:
 import inspect
 import itertools
 import string
+import textwrap
 from hashlib import pbkdf2_hmac
 from functools import wraps, partial
 from datetime import timedelta, date
@@ -21,18 +22,24 @@ from os import urandom
 import sys
 import warnings
 import operator
+import re
 import enum
 import abc
+import builtins
 import logging
 import logging.handlers
-import typing as T  # noqa
+
+try:
+    # noinspection PyPep8Naming
+    import typing as T
+except ImportError:
+    T = None
 
 import peewee
 
 from . import config
 from . import utils
 from . import models
-from . import lua
 
 __all__ = [
     'BuchSchlossBaseError', 'misc_data',
@@ -40,35 +47,33 @@ __all__ = [
     'login', 'ScriptPermissions',
 ]
 
-
-def _get_log_handler(conf):
-    if conf.file:
-        if conf.rotate.how == 'none':
-            return logging.FileHandler(conf.file)
-        elif conf.rotate.how == 'size':
-            return logging.handlers.RotatingFileHandler(
-                conf.file,
-                maxBytes=2 ** 10 * conf.rotate.size,
-                backupCount=conf.rotate.copy_count,
-            )
-        elif conf.rotate.how == 'time':
-            return logging.handlers.TimedRotatingFileHandler(
-                conf.file,
-                when=conf.interval_unit,
-                interval=conf.interval_value,
-            )
-        else:
-            raise ValueError('config.core.log.rotate.how had an invalid value')
+log_conf = config.core.log
+if log_conf.file:
+    if log_conf.rotate.how == 'none':
+        handler = logging.FileHandler(log_conf.file)
+    elif log_conf.rotate.how == 'size':
+        handler = logging.handlers.RotatingFileHandler(
+            log_conf.file,
+            maxBytes=2 ** 10 * log_conf.rotate.size,
+            backupCount=log_conf.rotate.copy_count,
+        )
+    elif log_conf.rotate.how == 'time':
+        handler = logging.handlers.TimedRotatingFileHandler(
+            log_conf.file,
+            when=log_conf.interval_unit,
+            interval=log_conf.interval_value,
+        )
     else:
-        return logging.StreamHandler(sys.stdout)
-
-
+        raise ValueError('config.core.log.rotate.how had an invalid value')
+else:
+    handler = logging.StreamHandler(sys.stdout)
+del log_conf
 # noinspection PyArgumentList
 logging.basicConfig(level=getattr(logging, config.core.log.level),
                     format='{asctime} - {levelname}: {msg}',
                     datefmt='%Y-%m-%d %H:%M:%S',
                     style='{',
-                    handlers=[_get_log_handler(config.core.log)],
+                    handlers=[handler],
                     )
 
 
@@ -76,7 +81,7 @@ class ScriptPermissions(enum.Flag):
     """permissions scripts can have
 
     - AUTH_GRANTED: execute functions that require a password when
-        executed with a Member LoginContext
+      executed with a MEMBER LoginContext
     - REQUESTS: access the internet, confined to configured URLs and HTTP methods
     - STORE: store data
     """
@@ -316,10 +321,7 @@ def check_level(login_context, level, resource):
     if login_context.level < level:
         logging.info('{} was denied access to {} (level)'
                      .format(login_context, resource))
-        if login_context.type is LoginType.GUEST:
-            raise BuchSchlossError('no_permission', 'must_log_in')
-        else:
-            raise BuchSchlossPermError(level)
+        raise BuchSchlossPermError(level)
 
 
 def auth_required(f):
@@ -363,13 +365,15 @@ def auth_required(f):
         doc_indent = last_doc_line
     else:
         doc_indent = last_doc_line[:-len(last_doc_line.lstrip())]
-    auth_required_wrapper.__doc__ += (
-        '\n\n' + doc_indent + ('\n'+doc_indent).join((
-            'When called with a MEMBER LoginContext,',
-            'this function requires authentication in form of',
-            'a ``current_password`` argument containing the currently',
-            "logged in member's password."))
-    )
+    auth_required_wrapper.__doc__ += '\n\n' + textwrap.indent(textwrap.dedent("""
+    When called with a MEMBER LoginContext,
+    this function requires authentication in form of
+    a ``current_password`` argument containing the currently
+    logged in member's password.
+    It is not callable by GUEST and unprivileged SYSTEM
+    LoginContexts as well as SCRIPT LoginContexts without
+    the AUTH_GRANTED permission.
+    """), doc_indent)
     auth_required.functions.append(f.__qualname__)
     return auth_required_wrapper
 auth_required.functions = []  # noqa
@@ -391,8 +395,7 @@ def authenticate(m, password):
     return False
 
 
-@from_db(models.Member)
-def login(name: T.Union[models.Member, str], password: str):
+def login(name: str, password: str):
     """attempt to login the Member with the given name and password.
 
     :return LoginContext: on success
@@ -402,7 +405,11 @@ def login(name: T.Union[models.Member, str], password: str):
 
     :raise BuchSchlossBaseError: on failure
     """
-    m: models.Member = name
+    try:
+        with models.db:
+            m = models.Member.get_by_id(name)
+    except models.Member.DoesNotExist:
+        raise BuchSchlossNotFoundError('Member', name)
     if authenticate(m, password):
         logging.info('login success {}'.format(m))
         return LoginType.MEMBER(m.level, name=m.name)
@@ -480,28 +487,28 @@ class ActionNamespace:
         """Return a namespace of information"""
         check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_ns')
         try:
-            r = DataNamespace(cls, cls.model.get_by_id(id_), login_context)
+            return DataNamespace(cls, cls.model.get_by_id(id_), login_context)
         except cls.model.DoesNotExist:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
-        else:
-            logging.info('{} viewed {}'.format(login_context, r))
-            return r
 
     @classmethod
     def view_repr(cls, id_: T.Union[str, int], *, login_context) -> str:
         """Return a string representation"""
         check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_repr')
         try:
-            r = str(next(iter(cls.model.select_str_fields().where(
+            return str(next(iter(cls.model.select_str_fields().where(
                 getattr(cls.model, cls.model.pk_name) == id_).limit(1))))
         except StopIteration:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
-        else:
-            logging.info('{} viewed {}'.format(login_context, r))
-            return r
 
     @classmethod
-    def search(cls, condition: tuple = (), *, login_context):
+    def search(cls,
+               condition: tuple,
+               complex_params: T.Iterable['ComplexSearch'] = (),
+               complex_action: str = None,
+               *,
+               login_context
+               ):
         """search for records.
 
         :param condition: is a tuple of the form (<a>, <op>, <b>)
@@ -517,69 +524,21 @@ class ActionNamespace:
 
             If the top-level condition is empty, all existing values are returned.
 
+        :param complex_params: is a sequence of ComplexSearch instances to apply after
+            executing the SQL SELECT.
+
+        :param complex_action: is "and" or "or" and specifies how to handle multiple
+            complex cases. If finer granularity is needed, it can be achieved with
+            bitwise operators, providing bools are used.
+
         .. note::
 
             For ``condition``, there is no "not" available.
-            Use the inverse comparison operator instead
+            Use the inverse comparision operator instead
         """
         check_level(login_context, cls.required_levels.search, cls.__name__ + '.search')
-
-        def follow_path(path, q):
-            def handle_many_to_many():
-                through = fv.through_model.alias()
-                cond_1 = (getattr(cur, cur.pk_name)
-                          == getattr(through, fv.model.__name__.lower() + '_id'))
-                cond_2 = (getattr(through, mod.__name__.lower() + '_id')
-                          == getattr(mod, mod.pk_name))
-                return q.join(through, on=cond_1).join(mod, on=cond_2)
-
-            *path, end = path.split('.')
-            cur = mod = cls.model
-            for fn in path:
-                fv = getattr(mod, fn)
-                mod = fv.rel_model.alias()
-                if isinstance(fv, peewee.ManyToManyField):
-                    q = handle_many_to_many()
-                elif isinstance(fv, peewee.BackrefAccessor):
-                    q = q.join(mod, on=(getattr(cur, cur.pk_name)
-                                        == getattr(mod, fv.field.name)))
-                else:
-                    q = q.join(mod, on=(fv == getattr(mod, mod.pk_name)))
-                cur = mod
-            fv = getattr(mod, end)
-            if isinstance(fv, peewee.ManyToManyField):
-                mod = fv.rel_model
-                q = handle_many_to_many()
-                fv = getattr(mod, mod.pk_name)
-            return fv, q
-
-        def handle_condition(cond, q):
-            if not cond:
-                return q
-            a, op, b = cond
-            if op in ('and', 'or'):
-                if not a:
-                    return handle_condition(b, q)
-                elif not b:
-                    return handle_condition(a, q)
-                else:
-                    return getattr(operator, op + '_')(handle_condition(a, q),
-                                                       handle_condition(b, q))
-            else:
-                a, q = follow_path(a, q)
-                if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
-                    return q.where(getattr(operator, op)(a, b))
-                elif op == 'in':
-                    return q.where(a << b)
-                elif op == 'contains':
-                    return q.where(a.contains(b))
-                else:
-                    raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
-                                     '"ge", "le" or "contains"')
-
-        query = cls.model.select_str_fields()
-        result = handle_condition(condition, query)
-        logging.info('{} searched {}'.format(login_context, cls.__name__))
+        result = search(cls.model, condition, *complex_params,
+                        complex_action=complex_action)
         return (DataNamespace(cls, value, login_context) for value in result)
 
 
@@ -614,7 +573,8 @@ class Book(ActionNamespace):
                     b.groups.add(models.Group.get_or_create(name=g)[0])
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', library)
-        logging.info('{} created {}'.format(login_context, b))
+            else:
+                logging.info('{} created {}'.format(login_context, b))
         return b.id
 
     @classmethod
@@ -818,7 +778,6 @@ class Library(ActionNamespace):
                 lib.people = people
                 models.Book.update({models.Book.library: lib}
                                    ).where(models.Book.id << books).execute()
-        logging.info('{} created {}'.format(login_context, lib))
 
     @staticmethod
     def edit(action: LibraryGroupAction, name: str, *,
@@ -844,7 +803,8 @@ class Library(ActionNamespace):
             :param name: is the name of the Library to modify
             :param people: is an iterable of the IDs of the people to modify
             :param books: is an iterable of IDs of the books to modify
-            :param pay_required: will set the Library's payment requirement to itself if not None
+            :param pay_required: will set the Library's payment
+              requirement to itself if not None
 
             :raise BuchSchlossBaseError: if the Library doesn't exist
         """
@@ -871,7 +831,6 @@ class Library(ActionNamespace):
             if pay_required is not None:
                 lib.pay_required = pay_required
                 lib.save()
-        logging.info('{} edited {}'.format(login_context, lib))
 
     @staticmethod
     @from_db(models.Library)
@@ -885,7 +844,6 @@ class Library(ActionNamespace):
         - ``people``: the IDs of the people in the Library, separated by ';'
         - ``books``: the IDs of the books in the Library, separated by ';'
         """
-        logging.info('{} viewed {}'.format(login_context, lib))
         return {
             '__str__': str(lib),
             'name': lib.name,
@@ -916,7 +874,6 @@ class Group(ActionNamespace):
                     raise
             else:
                 group.books = books
-        logging.info('{} created {}'.format(login_context, group))
 
     @staticmethod
     def edit(action: LibraryGroupAction,
@@ -955,7 +912,6 @@ class Group(ActionNamespace):
                 else:
                     for book in books:
                         getattr(group.books, action.value)(book)
-        logging.info('{} edited {}'.format(login_context, group))
 
     @staticmethod
     @from_db(models.Group)
@@ -992,7 +948,6 @@ class Group(ActionNamespace):
         (models.Book.update(library=dest)
          .where(models.Book.id << [b.id for b in books_to_update])
          .execute())
-        logging.info('{} activated {}'.format(login_context, group))
 
     @staticmethod
     @from_db(models.Group)
@@ -1005,7 +960,6 @@ class Group(ActionNamespace):
         - ``name``: the name of the Group
         - ``books``: the IDs of the books in the Group separated by ';'
         """
-        logging.info('{} viewed {}'.format(login_context, group))
         return {
             '__str__': str(group),
             'name': group.name,
@@ -1116,10 +1070,9 @@ class Borrow(ActionNamespace):
         - ``book``: a string representation of the borrowed Book
         - ``book_id``: the ID of the borrowed Book
         - ``return_date``: a string representation of the date
-            by which the book has to be returned
+          by which the book has to be returned
         - ``is_back``: a string indicating whether the Book has been returned
         """
-        logging.info('{} viewed {}'.format(login_context, borrow))
         return {
             '__str__': str(borrow),
             'person': str(borrow.person),
@@ -1171,7 +1124,7 @@ class Member(ActionNamespace):
         .. warning::
 
             DO NOT change password with this function.
-            Use Member.change_password instead
+            Use ``Member.change_password`` instead
         """
         old_str = str(member)
         if (not set(kwargs.keys()) <= {'level'}) or 'name' in kwargs:
@@ -1213,7 +1166,6 @@ class Member(ActionNamespace):
         - ``name``: the Member's name
         - ``level``: the Member's level
         """
-        logging.info('{} viewed {}'.format(login_context, member))
         return {
             '__str__': str(member),
             'name': member.name,
@@ -1276,12 +1228,11 @@ class Script(ActionNamespace):
     def view_str(script: T.Union[models.Script, str], *, login_context) -> dict:
         """return a dict with the following items:
 
-        '__str__': a string representation of the script
-        'name': the script name
-        'setlevel': the script's setlevel status ('-----' if not set)
-        'permissions': the scripts permissions, separated by ';'
+        - ``__str__``: a string representation of the script
+        - ``name``: the script name
+        - ``setlevel``: the script's setlevel status (``'-----'`` if not set)
+        - ``permissions``: the scripts permissions, separated by ``';'``
         """
-        logging.info('{} viewed {}'.format(login_context, script))
         return {
             '__str__': str(script),
             'name': script.name,
@@ -1308,6 +1259,9 @@ class Script(ActionNamespace):
         :param callbacks: may be an alternative UI callback
             dictionary to the default one
         """
+        # avoid problems with circular import
+        # core -> lua.__init__ -> lua.objects -> core
+        from . import lua
         if script.setlevel is None:
             script_lc_level = login_context.level
         else:
@@ -1332,7 +1286,6 @@ class Script(ActionNamespace):
             add_requests=(ScriptPermissions.REQUESTS in script.permissions),
             add_config=script_config,
         )
-        logging.info('{} executed {}'.format(login_context, script))
         try:
             ns = runtime.execute(script.code)
             if function is not None:
@@ -1373,7 +1326,7 @@ class DataNamespace:
         ))
 
     def __hash__(self):
-        return hash(self.id)
+        return hash(self._data)
 
     def __str__(self):
         return str(self._data)
@@ -1429,9 +1382,190 @@ class DataNamespace:
             'allow': ('name', 'level'),
         },
         Script: {
-            'allow': ('code', 'setlevel', 'name', 'storage', 'permissions'),
+            'allow': ('code', 'setlevel', 'name', 'storage'),
         },
     }
+
+
+def search(o: T.Type[models.Model], condition: T.Tuple = None,
+           *complex_params: 'ComplexSearch', complex_action: str = 'or',
+           ):
+    """Search for objects. See ActionNamespace.search for details"""
+
+    def follow_path(path, q):
+        def handle_many_to_many():
+            through = fv.through_model.alias()
+            cond_1 = (getattr(cur, cur.pk_name)
+                      == getattr(through, fv.model.__name__.lower() + '_id'))
+            cond_2 = (getattr(through, mod.__name__.lower() + '_id')
+                      == getattr(mod, mod.pk_name))
+            return q.join(through, on=cond_1).join(mod, on=cond_2)
+
+        *path, end = path.split('.')
+        cur = mod = o
+        for fn in path:
+            fv = getattr(mod, fn)
+            mod = fv.rel_model.alias()
+            if isinstance(fv, peewee.ManyToManyField):
+                q = handle_many_to_many()
+            elif isinstance(fv, peewee.BackrefAccessor):
+                q = q.join(mod, on=(getattr(cur, cur.pk_name)
+                                    == getattr(mod, fv.field.name)))
+            else:
+                q = q.join(mod, on=(fv == getattr(mod, mod.pk_name)))
+            cur = mod
+        fv = getattr(mod, end)
+        if isinstance(fv, peewee.ManyToManyField):
+            mod = fv.rel_model
+            q = handle_many_to_many()
+            fv = getattr(mod, mod.pk_name)
+        return fv, q
+
+    def handle_condition(cond, q):
+        if not cond:
+            return q
+        a, op, b = cond
+        if op in ('and', 'or'):
+            if not a:
+                return handle_condition(b, q)
+            elif not b:
+                return handle_condition(a, q)
+            else:
+                return getattr(operator, op + '_')(handle_condition(a, q),
+                                                   handle_condition(b, q))
+        else:
+            a, q = follow_path(a, q)
+            if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
+                return q.where(getattr(operator, op)(a, b))
+            elif op == 'in':
+                return q.where(a << b)
+            elif op == 'contains':
+                return q.where(a.contains(b))
+            else:
+                raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
+                                 '"ge", "le" or "contains"')
+
+    query = o.select_str_fields()
+    result = handle_condition(condition, query)
+    if complex_params:
+        return _do_complex_search(complex_action, result, complex_params)
+    else:
+        return result
+
+
+def _do_complex_search(kind: str, objects: T.Iterable[models.Model], complex_params):
+    """Perform the ComplexSearch operations.
+        Once __search_old is removed, this can be merged into search"""
+    results = set()
+    for o in objects:
+        for c in complex_params:
+            if c.apply_lookups(o):
+                if kind == 'or':
+                    results.add(o)
+                    break
+            elif kind == 'and':
+                break
+        else:
+            if kind == 'and':
+                results.add(o)
+    return results
+
+
+def _cs_lookup(name):
+    def wrapper(self, other):
+        self.lookups.append((name, other))
+        return self
+
+    return wrapper
+
+
+class ComplexSearch:  # TODO: use misc.Instance for this
+    """Allow complex lookups and comparisons when using search().
+
+    To later perform attr and/or item lookups on objects when searching,
+    perform these lookups in an instance of ComplexSearch.
+    e.g.: 'tim' in ComplexSearch().metadata['author'] TODO: update example
+    Store attribute and item lookups internally, to actually perform them, call apply_lookups()
+    Treat comparisons (== != < <= > >= in) as item lookups
+
+    to use iterations, call iter and perform the operations you would perform
+        on the individual items on the return model
+    e.g.: [c['y'] for b in a for c in b.x] becomes iter(iter(ComplexSearch()).x)['y']
+    where `a` is the base instance
+
+    You can call a function on a lookup (or a sequence like above) by
+    accessing the attribute ._call__<name>_
+        where name is a key in .CALLABLE_FUNCTIONS that maps to the desired function.
+        Currently included by default are `min`, `max`, `all`, `any`, `len` and `sum`
+    e.g.: ``any(x in g.name for g in book.groups)`` becomes
+        ``iter(ComplexSearch().groups).name._call__any_``;
+          ``sum(x == b.c for b in a) >= 3`` becomes
+        ``(iter(ComplexSearch()).c == x)._call__sum_ >= 3``;
+          ``sum(any(a.b in x for a in c) for c in d) in y`` becomes
+          ``(iter(c).b in x)._call__any_._call__sum_ in y``
+          bad-looking ~ complexity * use_of_functions ** 3
+
+    Comparisons also work if they are only supported by the known (not simulated)
+    object **IF** the simulated one
+        returns NotImplemented in the comparison function
+    """
+    CALLABLE_FUNCTIONS = {k: getattr(builtins, k) for k in
+                          'min max all any len sum'.split()}
+
+    def __init__(self, return_first_item=True):
+        """Initialise self.
+
+        see ComplexSearch.__doc__ for more inforamtion.
+        see apply_lookups.__doc__ for information on return_first_item"""
+        self.lookups = []
+        self.return_first_item = return_first_item
+
+    def __iter__(self):
+        self.lookups.append(('__iter__', None))
+        return self
+
+    def __next__(self):
+        # not really sure what to do here, could also raise TypeError or not include __next__
+        raise StopIteration
+
+    #  avoid "attr not found" and "does not support item lookups" warnings
+    __getitem__ = _cs_lookup('__getitem__')
+
+    def __getattr__(self, item):
+        self.lookups.append(('__getattribute__', item))
+        return self
+
+    for op in 'eq ne ge gt le lt contains'.split():
+        op = '__%s__' % op
+        locals()[op] = _cs_lookup(op)
+
+    def apply_lookups(self, to):
+        """Apply the stored lookups to ``to``
+
+        handle __iter__ and _call__<name>_ uses as stated in the class __doc__
+        if return_first_item (set in __init__) is True, return only the first item.
+            if only one item is expected, this is the way to go"""
+        to = [to]
+        for k, v in self.lookups:
+            m = re.match('_call__(%s)_' % '|'.join(self.CALLABLE_FUNCTIONS.keys()), k)
+            if m:
+                to = self.CALLABLE_FUNCTIONS[m.group(1)](to if len(to) > 1 else to[0])
+            elif k == '__iter__':
+                new = []
+                for obj in to:
+                    for new_obj in iter(obj):
+                        new.append(new_obj)
+                to = new
+            else:
+                for i, obj in enumerate(to):
+                    new = getattr(obj, k)(v)
+                    if new is NotImplemented:
+                        new = getattr(v, k)(obj)
+                        if new is NotImplemented:
+                            raise TypeError('unsupported operation %s between %s and %s'
+                                            % (k, obj, v))
+                    to[i] = new
+        return to[0] if self.return_first_item else to
 
 
 internal_priv_lc = LoginType.INTERNAL(config.MAX_LEVEL)
