@@ -9,11 +9,7 @@ __pycache__/*
 *-ignore/*
 .idea/*
 .coverage
-doc/*.pdf
-doc/*.synctex*
-doc/*.out
-doc/*.toc
-doc/old/*
+doc/_build
 *.cfg
 !exampleconfig.cfg
 !configspec.cfg

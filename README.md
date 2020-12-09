@@ -43,11 +43,13 @@ The actual files are in the ``buchschloss`` directory. Inside, there is:
     - ``objects.py`` object wrappers exported to lua
     - ``builtins.lua`` abstraction of core APIs
 
-### <del>Documentation</del> <small>TODO</small>
+### Documentation
 
-I am more or less in the process of writing documentation. See the documentation branch
-(specifically the doc/ directory) for what I have written up to now.
+I am more-or-less in the process of documenting the internal parts (see ``doc/``).
+
 
 ### Tests
 
-As of now, only some basic functions are tested. I will try to add relevant tests whenever I change something.
+As of now, only some basic functions are tested, 
+notably excluding (in the sense of not being tested) the GUI.
+I will try to add relevant tests whenever I change something.

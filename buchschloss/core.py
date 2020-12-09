@@ -14,6 +14,7 @@ __all__ exports:
 import inspect
 import itertools
 import string
+import textwrap
 from hashlib import pbkdf2_hmac
 from functools import wraps, partial
 from datetime import timedelta, date
@@ -41,7 +42,7 @@ from . import utils
 from . import models
 
 __all__ = [
-    'BuchSchlossBaseError', 'misc_data', 'ComplexSearch',
+    'BuchSchlossBaseError', 'misc_data',
     'Person', 'Book', 'Member', 'Borrow', 'Library', 'Group', 'Script',
     'login', 'ScriptPermissions',
 ]
@@ -77,6 +78,13 @@ logging.basicConfig(level=getattr(logging, config.core.log.level),
 
 
 class ScriptPermissions(enum.Flag):
+    """permissions scripts can have
+
+    - AUTH_GRANTED: execute functions that require a password when
+      executed with a Member LoginContext
+    - REQUESTS: access the internet, confined to configured URLs and HTTP methods
+    - STORE: store data
+    """
     AUTH_GRANTED = enum.auto()
     REQUESTS = enum.auto()
     STORE = enum.auto()
@@ -352,11 +360,20 @@ def auth_required(f):
                          .format(login_context, f.__qualname__))
             raise BuchSchlossError('auth_failure', status)
 
-    auth_required_wrapper.__doc__ += (
-        '\n\nWhen called with a MEMBER LoginContext,\n'
-        'this function requires authentication in form of\n'
-        'a `current_password` argument containing the currently\n'
-        "logged in member's password.\n")
+    last_doc_line = f.__doc__.splitlines()[-1]
+    if last_doc_line.isspace():
+        doc_indent = last_doc_line
+    else:
+        doc_indent = last_doc_line[:-len(last_doc_line.lstrip())]
+    auth_required_wrapper.__doc__ += '\n\n' + textwrap.indent(textwrap.dedent("""
+    When called with a MEMBER LoginContext,
+    this function requires authentication in form of
+    a ``current_password`` argument containing the currently
+    logged in member's password.
+    It is not callable by GUEST and unprivileged SYSTEM
+    LoginContexts as well as SCRIPT LoginContexts without
+    the AUTH_GRANTED permission.
+    """), doc_indent)
     auth_required.functions.append(f.__qualname__)
     return auth_required_wrapper
 auth_required.functions = []  # noqa
@@ -381,11 +398,12 @@ def authenticate(m, password):
 def login(name: str, password: str):
     """attempt to login the Member with the given name and password.
 
-    Return a LoginContext on success
+    :return LoginContext: on success
 
-    Try all iterations specified in config.HASH_ITERATIONS
-        and update to newest (first) one where applicable
-    raise a BuchSchlossBaseError on failure
+    Try all iterations specified in the configuration
+    and update to newest (first) one where applicable
+
+    :raise BuchSchlossBaseError: on failure
     """
     try:
         with models.db:
@@ -491,7 +509,33 @@ class ActionNamespace:
                *,
                login_context
                ):
-        """search for records. see search for details on arguments"""
+        """search for records.
+
+        :param condition: is a tuple of the form (<a>, <op>, <b>)
+            with <op> being a logical operation ("and" or "or") and <a>
+            and <b> in that case being condition tuples
+
+            or a comparison operation ("contains", "eq", "ne", "gt", "ge", "lt" or "le")
+            in which case <a> is a (possibly dotted) string corresponding
+            to the attribute name and <b> is the value to compare to.
+
+            It (condition) may be empty, in which case it has no effect, i.e. is True
+            when used with an 'and' and False when used with an 'or'.
+
+            If the top-level condition is empty, all existing values are returned.
+
+        :param complex_params: is a sequence of ComplexSearch instances to apply after
+            executing the SQL SELECT.
+
+        :param complex_action: is "and" or "or" and specifies how to handle multiple
+            complex cases. If finer granularity is needed, it can be achieved with
+            bitwise operators, providing bools are used.
+
+        .. note::
+
+            For ``condition``, there is no "not" available.
+            Use the inverse comparision operator instead
+        """
         check_level(login_context, cls.required_levels.search, cls.__name__ + '.search')
         result = search(cls.model, condition, *complex_params,
                         complex_action=complex_action)
@@ -512,7 +556,8 @@ class Book(ActionNamespace):
         """Attempt to create a new Book with the given arguments and return the ID
 
         automatically create groups as needed
-        raise a BuchSchlossBaseError on failure
+
+        :raise BuchSchlossBaseError: on failure
 
         See models.Book.__doc__ for details on arguments"""
         with models.db:
@@ -537,10 +582,12 @@ class Book(ActionNamespace):
     def edit(cls, book: T.Union[int, models.Book], *, login_context, **kwargs):
         """Edit a Book based on the arguments given.
 
-        See Book.__doc__ for more information on the arguments
-        raise a BuchSchlossBaseError if the Book isn't found
+        See models.Book.__doc__ for more information on the arguments.
+
+        :raise BuchSchlossBaseError: if the Book isn't found
             or the new library does not exist
-        return a set of error messages for errors during group changes
+
+        Return a set of error messages for errors during group changes.
         """
         if ((not set(kwargs.keys()) <= cls._model_fields)
                 or 'id' in kwargs):
@@ -569,16 +616,18 @@ class Book(ActionNamespace):
         """Return data about a Book.
 
         Return a dictionary consisting of the following items as strings:
+
             - author, isbn, title, series, series_number, language, publisher,
-                concerned_people, year, medium, genres, shelf, id
+              concerned_people, year, medium, genres, shelf, id
             - the name of the Library the Book is in
             - groups as a string consisting of group names separated by ';'
             - the book's status (available, borrowed or inactive)
-            - return_date: either '-----' or the date the book will be returned
-            - borrowed_by: '-----' or a representation of the borrowing Person
-            - __str__: the string representation of the Book
-        and 'borrowed_by_id', the ID of the Person that borrowed the Book (int)
-            or None if not borrowed
+            - ``return_date``: either ``'-----'`` or the date the book will be returned
+            - ``borrowed_by``: ``'-----'`` or a representation of the borrowing Person
+            - ``__str__``: the string representation of the Book
+
+        and ``'borrowed_by_id'``, the ID of the Person that borrowed the Book (int)
+        or None if not borrowed
         """
         r = {k: str(getattr(book, k) or '') for k in
              ('author', 'isbn', 'title', 'series', 'series_number', 'language',
@@ -610,12 +659,14 @@ class Person(ActionNamespace):
             login_context):
         """Attempt to create a new Person with the given arguments.
 
-        raise a BuchSchlossBaseError on failure.
-        Silently ignore nonexistent libraries
+        :raise BuchSchlossBaseError: on failure
 
-        See Person for details on arguments
+        Silently ignore nonexistent libraries.
+
+        See models.Person.__doc__ for details on arguments.
+
         If ``pay`` is True and ``borrow_permission`` is None,
-            set the borrow_permission to ``today + 52 weeks``
+        set the borrow_permission to ``today + 52 weeks``.
         """
         if borrow_permission is None and pay:
             borrow_permission = date.today() + timedelta(weeks=52)
@@ -641,12 +692,13 @@ class Person(ActionNamespace):
     def edit(cls, person: T.Union[int, models.Person], *, login_context, **kwargs):
         """Edit a Person based on the arguments given.
 
-        See Person.__doc__ for more information on the arguments
-        if ``pay`` is True, ``borrow_permission`` will be incremented
-            by 52 weeks. (assuming a value of today if None)
+        :raise BuchSchlossBaseError: if the Person isn't found.
+        :return: a set of errors found during updating the person's libraries
 
-        raise a BuchSchlossBaseError if the Person isn't found.
-        Return a set of errors found during updating the person's libraries
+        See Person.__doc__ for more information on the arguments.
+
+        If ``pay`` is True, ``borrow_permission`` will be incremented
+        by 52 weeks. (assuming a value of today if None)
         """
         if not set(kwargs.keys()) <= cls._model_fields | {'pay'} or 'id' in kwargs:
             raise TypeError('unexpected kwarg')
@@ -673,12 +725,15 @@ class Person(ActionNamespace):
         """Return data about a Person.
 
         Return a dict consisting of the following items as strings:
-            - id, first_name, last_name, class_ max_borrow, borrow_permission attributes
-            - libraries as a string, individual libraries separated by ;
+
+            - id, first_name, last_name, `class_` max_borrow, borrow_permission attributes
+            - libraries as a string, individual libraries separated by ';'
             - borrows as a tuple of strings representing the borrows
-            - __str__ , the string representation
-        and 'borrow_book_ids', a sequence of the IDs of the borrowed books
-            in the same order their representations appear in 'borrows'"""
+            - ``__str__``: the string representation
+
+        and ``'borrow_book_ids'``, a sequence of the IDs of the borrowed books
+        in the same order their representations appear in 'borrows'
+        """
         r = {k: str(getattr(person, k) or '') for k in
              'id first_name last_name class_ max_borrow borrow_permission'.split()}
         borrows = person.borrows
@@ -701,15 +756,15 @@ class Library(ActionNamespace):
             pay_required: bool = True,
             login_context):
         """Create a new Library with the specified name and add it to the specified
-                people and books.
+            people and books.
 
-            ``people`` and ``books`` are sequences of the IDs of the people and books
-                to gain access / be transferred to the new library
+            :param books: and
+            :param people: are sequences of the IDs of
+              the people and books to gain access / be transferred to the new library
+            :param pay_required: indicates whether people need to have paid
+              in order to borrow from the library
 
-            ``pay_required`` indicates whether people need to have paid
-                in order to borrow from the library
-
-            raise a BuchSchlossBaseError if the Library exists
+            :raise BuchSchlossBaseError: if the Library exists
         """
         with models.db:
             try:
@@ -732,23 +787,26 @@ class Library(ActionNamespace):
              login_context):
         """Perform the given action on the Library with the given name
 
-            DELETE will remove the reference to the library from all people
-                and books (setting their library to 'main'),
-                but not actually delete the Library itself
-                ``people`` and ``books`` are ignored in this case
-            ADD will add the Library to all given people and set the library
-                of all the given books to the specified one
-            REMOVE will remove the reference to the given Library in the given people
-                and set the library of the given books to 'main'
-            NONE will ignore ``people`` and ``books`` and
-                take no action other than setting ``pay_required``
+            :param action: may be one of the following LibraryGroupAction constants:
 
-            ``name`` is the name of the Library to modify
-            ``people`` is an iterable of the IDs of the people to modify
-            ``books`` is an iterable of IDs of the books to modify
-            ``pay_required`` will set the Library's payment requirement to itself if not None
+                - ``DELETE`` will remove the reference to the library from all people
+                  and books (setting their library to 'main'),
+                  but not actually delete the Library itself
+                  ``people`` and ``books`` are ignored in this case
+                - ``ADD`` will add the Library to all given people and set the library
+                  of all the given books to the specified one
+                - ``REMOVE`` will remove the reference to the given Library in the given
+                  people and set the library of the given books to 'main'
+                - ``NONE`` will ignore ``people`` and ``books`` and
+                  take no action other than setting ``pay_required``
 
-            raise a BuchSchlossBaseError if the Library doesn't exist
+            :param name: is the name of the Library to modify
+            :param people: is an iterable of the IDs of the people to modify
+            :param books: is an iterable of IDs of the books to modify
+            :param pay_required: will set the Library's payment
+              requirement to itself if not None
+
+            :raise BuchSchlossBaseError: if the Library doesn't exist
         """
         try:
             lib: models.Library = models.Library.get_by_id(name)
@@ -779,11 +837,12 @@ class Library(ActionNamespace):
     def view_str(lib, *, login_context):
         """Return information on the Library
 
-            Return a dict with the following items as strings:
-            - __str__: a string representation of the Library
-            - name: the name of the Library
-            - people: the IDs of the people in the Library, separated by ';'
-            - books: the IDs of the books in the Library, separated by ';'
+        Return a dict with the following items as strings:
+
+        - ``__str__``: a string representation of the Library
+        - ``name``: the name of the Library
+        - ``people``: the IDs of the people in the Library, separated by ';'
+        - ``books``: the IDs of the books in the Library, separated by ';'
         """
         return {
             '__str__': str(lib),
@@ -801,8 +860,9 @@ class Group(ActionNamespace):
     def new(name: str, books: T.Sequence[int] = (), *, login_context):  # noqa
         """Create a new Group with the given name and books
 
-            raise a BuchSchlossBaseError if the Group exists
-            ignore nonexistent Books
+        :raise BuchSchlossBaseError: if the Group exists
+
+        Ignore nonexistent Books.
         """
         with models.db:
             try:
@@ -822,13 +882,22 @@ class Group(ActionNamespace):
              *, login_context):
         """Perform the given action on the Group with the given name
 
-            DELETE will remove all references to the Group,
-                but not delete the Group itself. ``books`` is ignored in this case
-            ADD will add the given Group to the given books
-                ignore IDs of non-existing books
-            REMOVE will remove the reference to the Group in all of the given books
-                ignore books not in the Group and IDs of nonexistent books
-            NONE does nothing
+        :param action: may be one of the following LibraryGroupAction constants:
+
+            - ``DELETE`` will remove all references to the Group,
+              but not delete the Group itself. ``books`` is ignored in this case
+
+            - ``ADD`` will add the given Group to the given books
+              ignore IDs of non-existing books
+
+            - ``REMOVE`` will remove the reference to the Group in all of the given books
+              ignore books not in the Group and IDs of nonexistent books
+
+            - ``NONE`` does nothing
+
+        :param books: specifies the books to add/remove.delete
+        :param name: specifies the name of the Group
+        :raise BuchSchlossBaseError: if the Group doesn't exist
         """
         with models.db:
             try:
@@ -849,12 +918,13 @@ class Group(ActionNamespace):
     def activate(group, src: T.Sequence[str] = (), dest: str = 'main', *, login_context):
         """Activate a Group
 
-            ``src`` is an iterable of the names of origin libraries
-                if it is falsey (empty), books are taken from all libraries
-            ``dest`` is the name of the target Library
+        :param src: is an iterable of the names of origin libraries.
+            If it is falsey (empty), books are taken from all libraries
 
-            raise a BuchSchlossBaseError it the Group, the target Library
-                or a source Library does not exist
+        :param dest: is the name of the target Library
+
+        :raise BuchSchlossBaseError: if the Group, the target Library
+            or a source Library does not exist
         """
         if src and (models.Library.select(None)
                     .where(models.Library.name << src).count()
@@ -884,11 +954,11 @@ class Group(ActionNamespace):
     def view_str(group, *, login_context):
         """Return data on a Group
 
-            Return a dict with the following items as strings:
-            - __str__: a string representation of the Group
-            - name: the name of the Group
-            - books: the IDs of the books in the Group
-                separated by ';'
+        Return a dict with the following items as strings:
+
+        - ``__str__``: a string representation of the Group
+        - ``name``: the name of the Group
+        - ``books``: the IDs of the books in the Group separated by ';'
         """
         return {
             '__str__': str(group),
@@ -906,22 +976,24 @@ class Borrow(ActionNamespace):
     def new(cls, book, person, weeks, *, override=False, login_context):
         """Borrow a book.
 
-            ``book`` is the ID of the Book begin borrowed
-            ``person`` is the ID of the Person borrowing the book
-            ``weeks`` is the time to borrow in weeks.
-            ``override`` may be specified to ignore some issues (b, c, e)
+        :param book: is the ID of the Book begin borrowed
+        :param person: is the ID of the Person borrowing the book
+        :param weeks: is the time to borrow in weeks.
+        :param override: may be specified to ignore some issues (b, c, e)
 
-            raise an error if
-                a) the Person or Book does not exist
-                b) the Person has reached their limit set in max_borrow
-                c) the Person is not allowed to access the library the book is in
-                d) the Book is not available
-                e) the Person's borrow_permission has expired
-                f) ``weeks`` exceeds the one allowed to the executing member
-                g) ``weeks`` is <= 0
+        :raise BuchSchlossBaseError: if
 
-            the maximum amount of time a book may be borrowed for is defined
-            in the configuration settings
+            a) the Person or Book does not exist
+            b) the Person has reached their limit set in max_borrow
+            c) the Person is not allowed to access the library the book is in
+            d) the Book is not available
+            e) the Person 's
+               borrow_permission has expired
+            f) ``weeks`` exceeds the one allowed to the executing member
+            g) ``weeks`` is <= 0
+
+        The maximum amount of time a book may be borrowed for is defined
+        in the configuration settings.
         """
         req_level = next(i for i, allowed_weeks in
                          enumerate([*config.core.borrow_time_limit, float('inf')])
@@ -964,16 +1036,14 @@ class Borrow(ActionNamespace):
     def restitute(book, person, *, login_context):
         """return a book
 
-            ``book`` is the ID of the Book to be returned
-            ``person`` may be the ID of the returning Person or None
+        :param book: is the ID of the Book to be returned
+        :param person: may be the ID of the returning Person or None
 
-            if ``person`` is not None, verify that the specified Person
-            actually has borrowed the Book before making modifications
-            and raise a BuchSchlossBaseError if that is not the case
-            Also raise a BuchSchlossBaseError if the book hasn't been borrowed,
-            even if ``person`` is None
+        :raise BuchSchlossBaseError: if the Book hasn't been borrowed
+        :raise BuchSchlossBaseError: if the Book ahs been borrowed by someone
+          else and ``person`` is not None
 
-            return the returned Book's shelf
+        :return: the returned Book's shelf
         """
         borrow = book.borrow
         if borrow is None:
@@ -992,15 +1062,16 @@ class Borrow(ActionNamespace):
     def view_str(borrow, *, login_context):
         """Return information about a Borrow
 
-            Return a dictionary containing the following items:
-            - __str__: a string representation of the Borrow
-            - person: a string representation of the borrowing Person
-            - person_id: the ID of the borrowing Person
-            - book: a string representation of the borrowed Book
-            - book_id: the ID of the borrowed Book
-            - return_date: a string representation of the date
-                by which the book has to be returned
-            - is_back: a string indicating whether the Book has been returned
+        Return a dictionary containing the following items:
+
+        - ``__str__``: a string representation of the Borrow
+        - ``person``: a string representation of the borrowing Person
+        - ``person_id``: the ID of the borrowing Person
+        - ``book``: a string representation of the borrowed Book
+        - ``book_id``: the ID of the borrowed Book
+        - ``return_date``: a string representation of the date
+          by which the book has to be returned
+        - ``is_back``: a string indicating whether the Book has been returned
         """
         return {
             '__str__': str(borrow),
@@ -1022,8 +1093,8 @@ class Member(ActionNamespace):
     def new(name: str, password: str, level: int, *, login_context):
         """Create a new Member
 
-            ``name`` must be unique among members and is case-sensitive
-            ``level`` must be between 0 and 4, inclusive
+        :param name: must be unique among members and is case-sensitive
+        :param level: must be between 0 and 4, inclusive
         """
         salt = urandom(config.core.salt_length)
         pass_hash = pbkdf(password.encode(), salt)
@@ -1044,14 +1115,16 @@ class Member(ActionNamespace):
     def edit(member, *, login_context, **kwargs):
         """Edit the given member.
 
-            Set the given attributes on the given Member.
-            As of now, only the level can be set.
+        Set the given attributes on the given Member.
+        As of now, only the level can be set.
 
-            If the editee is currently logged in, a new level
-            applies to all future actions immediately
+        If the editee is currently logged in, a new level
+        applies to all future actions immediately
 
-            ATTENTION: DO NOT change password with this function
-            use Member.change_password instead
+        .. warning::
+
+            DO NOT change password with this function.
+            Use ``Member.change_password`` instead
         """
         old_str = str(member)
         if (not set(kwargs.keys()) <= {'level'}) or 'name' in kwargs:
@@ -1067,9 +1140,9 @@ class Member(ActionNamespace):
     def change_password(cls, member, new_password, *, login_context):
         """Change a Member's password
 
-            editing a password requires having the configured level or being the editee
-            If the editee is currently logged in, the new password
-            needs to be used for authentication immediately
+        Editing a password requires having the configured level or being the editee.
+        If the editee is currently logged in, the new password
+        needs to be used for authentication immediately.
         """
         req_level = cls.required_levels.change_password
         if (login_context.level < req_level
@@ -1087,10 +1160,11 @@ class Member(ActionNamespace):
     def view_str(member, *, login_context):
         """Return information about a Member
 
-            Return a dictionary with the following string items:
-            - __str__: a representation of the Member
-            - name: the Member's name
-            - level: the Member's level
+        Return a dictionary with the following string items:
+
+        - ``__str__``: a representation of the Member
+        - ``name``: the Member's name
+        - ``level``: the Member's level
         """
         return {
             '__str__': str(member),
@@ -1154,10 +1228,10 @@ class Script(ActionNamespace):
     def view_str(script: T.Union[models.Script, str], *, login_context) -> dict:
         """return a dict with the following items:
 
-        '__str__': a string representation of the script
-        'name': the script name
-        'setlevel': the script's setlevel status ('-----' if not set)
-        'permissions': the scripts permissions, separated by ';'
+        - ``__str__``: a string representation of the script
+        - ``name``: the script name
+        - ``setlevel``: the script's setlevel status (``'-----'`` if not set)
+        - ``permissions``: the scripts permissions, separated by ``';'``
         """
         return {
             '__str__': str(script),
@@ -1316,29 +1390,7 @@ class DataNamespace:
 def search(o: T.Type[models.Model], condition: T.Tuple = None,
            *complex_params: 'ComplexSearch', complex_action: str = 'or',
            ):
-    """THIS IS AN INTERNAL FUNCTION -- for user searches, use *.search
-
-        Search for objects.
-
-        `condition` is a tuple of the form (<a>, <op>, <b>)
-            with <op> being a logical operation ("and" or "or") and <a>
-                and <b> in that case being condition tuples
-            or a comparison operation ("contains", "eq", "ne", "gt", "ge",
-                "lt" or "le")
-                in which case <a> is a (possibly dotted) string corresponding
-                to the attribute name and <b> is the model to compare to.
-            It may be empty, in which case it has no effect, i.e. is True
-                when used with an 'and' and False when used with an 'or'
-            If the top-level condition is empty, all existing values are returned
-        `complex_params` is a sequence of ComplexSearch instances to apply after
-            executing the SQL SELECT
-        `complex_action` is "and" or "or" and specifies how to handle multiple
-            complex cases. If finer granularity is needed, it can be achieved with
-            bitwise operators, providing bools are used.
-
-        Note: for `condition`, there is no "not" available.
-            Use the inverse comparision operator instead
-    """
+    """Search for objects. See ActionNamespace.search for details"""
 
     def follow_path(path, q):
         def handle_many_to_many():
