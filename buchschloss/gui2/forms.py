@@ -12,7 +12,7 @@ from .. import utils
 from ..utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
-                      IntEntry, NullREntry, ListEntry, Text,
+                      IntEntry, NullREntry, Text,
                       IntListEntry, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
                       SeriesEntry, OptionsFromSearch, SearchMultiChoice,
@@ -155,7 +155,7 @@ class BookForm(SearchForm):
     else:
         genres: mtkf.Element = (
             type('StrMultiChoicePopup', (MultiChoicePopup,),
-                 {'get': lambda s: s.sep.join(super(MultiChoicePopup, s).get())}),
+                 {'get': lambda s: s.sep.join(MultiChoicePopup.get(s))}),
             {'options': config.gui2.genres.options,
              'sep': config.gui2.genres.sep}
         )
