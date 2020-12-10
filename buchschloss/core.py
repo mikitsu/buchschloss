@@ -40,6 +40,7 @@ import peewee
 from . import config
 from . import utils
 from . import models
+from . import lua
 
 __all__ = [
     'BuchSchlossBaseError', 'misc_data',
@@ -1259,9 +1260,6 @@ class Script(ActionNamespace):
         :param callbacks: may be an alternative UI callback
             dictionary to the default one
         """
-        # avoid problems with circular import
-        # core -> lua.__init__ -> lua.objects -> core
-        from . import lua
         if script.setlevel is None:
             script_lc_level = login_context.level
         else:
