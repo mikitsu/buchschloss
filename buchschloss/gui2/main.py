@@ -194,6 +194,11 @@ def get_actions(spec):
             None, forms.RestituteForm, wrapped_action_ns['Borrow'].restitute),
         ('Book', 'new'): generic_formbased_action(
             'new', forms.BookForm, actions.new_book, post_init=new_book_autofill),
+        ('Book', 'search'): actions.search(
+            forms.BookForm,
+            lambda c: wrapped_action_ns['Book'].search((c, 'and', ('is_active', 'eq', True))),
+            actions.ShowInfo.instances['Book'],
+        )
     }
 
     def get_form(name, *default):
