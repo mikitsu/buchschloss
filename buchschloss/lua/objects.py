@@ -5,6 +5,7 @@ import functools
 import typing as T
 import warnings
 import contextlib
+import logging
 
 import lupa
 import bs4
@@ -69,8 +70,8 @@ class LuaActionNS(LuaObject):
     """wrap an ActionNamespace for use with Lua"""
     get_allowed = ('new', 'view_ns', 'edit', 'search')
 
-    def __init__(self, action_ns: T.Type[core.ActionNamespace],
-                 login_context: core.LoginContext,
+    def __init__(self, action_ns: 'T.Type[core.ActionNamespace]',
+                 login_context: 'core.LoginContext',
                  extra_get_allowed: T.Tuple[str, ...] = (),
                  **kwargs):
         super().__init__(**kwargs)
@@ -142,7 +143,7 @@ class LuaLoginContext(LuaObject):
     """wrap a LoginContext for consumption by Lua scripts"""
     get_allowed = ('level', 'type', 'name', 'invoker')
 
-    def __init__(self, login_context: core.LoginContext, **kwargs):
+    def __init__(self, login_context: 'core.LoginContext', **kwargs):
         super().__init__(**kwargs)
         self.type = login_context.type.name
         self.level = login_context.level
@@ -242,6 +243,7 @@ class LuaRequestsInterface(LuaObject):
     def get(self, url, result='auto'):
         """wrap requests.get"""
         if config.lua.requests.url_regex.search(url) is None:
+            logging.warning('blocked request to unallowed URL: ' + url)
             return None
         try:
             r = requests.get(url)

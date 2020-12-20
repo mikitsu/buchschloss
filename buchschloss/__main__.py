@@ -23,6 +23,7 @@ except ImportError:
     raise ImportError("interface couldn't be located. Did you run with the -m flag?")
 
 if args.do_tasks:
+    from . import core  # noqa -- circular imports
     from . import utils
     Thread(target=utils.get_runner()).start()
 mod.start()

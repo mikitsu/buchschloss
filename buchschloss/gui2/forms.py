@@ -12,11 +12,11 @@ from .. import utils
 from ..utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
-                      IntEntry, NullREntry, ListEntry, Text,
+                      IntEntry, NullREntry, Text,
                       IntListEntry, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
                       SeriesEntry, OptionsFromSearch, SearchMultiChoice,
-                      FlagEnumMultiChoice, ScriptNameEntry)
+                      FlagEnumMultiChoice, ScriptNameEntry, MultiChoicePopup)
 
 
 class ElementGroup(enum.Enum):
@@ -61,11 +61,16 @@ def form_get_name(form_name):
 class BaseForm(mtkf.Form, template=True):
     """Base class for forms.
 
-        handles autocompletes and appropriate get_name handling
+        handles autocompletes, default content and appropriate get_name handling
     """
     def __init_subclass__(cls, *, template=None, **kwargs):
         form_name = cls.__name__.replace('Form', '')
         cls.get_name = form_get_name(form_name)
+        # no .setdefault() :-(
+        form_widget = vars(cls).get('FormWidget', type('FormWidget', (), {}))
+        form_widget.default_content = config.gui2.entry_defaults.get(form_name).mapping
+        form_widget.error_display_options = {}  # workaround
+        cls.FormWidget = form_widget
         autocompletes = config.gui2.get('autocomplete').get(form_name)
         for k, v in vars(cls).items():
             if isinstance(v, tuple) and len(v) == 2:
@@ -74,7 +79,7 @@ class BaseForm(mtkf.Form, template=True):
                 c = v
                 o = {}
             if isinstance(c, type) and issubclass(c, tk.Entry):
-                values = autocompletes.get(k).mapping
+                values = dict(autocompletes.get(k).mapping)
                 if values:
                     c = type('Autocompleted' + c.__name__, (mtk.AutocompleteEntry, c), {})
                     o['autocompletes'] = values
@@ -85,8 +90,6 @@ class BaseForm(mtkf.Form, template=True):
         take_focus = True
         submit_on_return = mtkf.FormWidget.SubmitOnReturn.NOT_FIRST
         submit_button = {'text': get_name('btn_do')}
-        # workaround, this isn't needed if we decide to update misc
-        error_display_options = {'popup_field_name_resolver': get_name}
 
 
 class SearchForm(BaseForm, template=True):
@@ -117,8 +120,6 @@ class SearchForm(BaseForm, template=True):
 
 class BookForm(SearchForm):
     class FormWidget(mtkf.FormWidget):
-        default_content = config.gui2.get('entry defaults').get('Book').mapping
-
         def __init__(self, *args, **kwargs):
             """hack"""
             super().__init__(*args, **kwargs)
@@ -149,7 +150,15 @@ class BookForm(SearchForm):
     concerned_people: mtkf.Element = (NullREntry, {'rem_key': 'book-cpeople'})
     year: mtkf.Element = IntEntry
     medium: mtkf.Element = (NonEmptyREntry, {'rem_key': 'book-medium'})
-    genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
+    if config.gui2.genres.options is None:
+        genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
+    else:
+        genres: mtkf.Element = (
+            type('StrMultiChoicePopup', (MultiChoicePopup,),
+                 {'get': lambda s: s.sep.join(MultiChoicePopup.get(s))}),
+            {'options': config.gui2.genres.options,
+             'sep': config.gui2.genres.sep}
+        )
 
     library: GroupElement.NO_SEARCH = (OptionsFromSearch, {'action_ns': core.Library})
     library_search_alt: GroupElement.ONLY_SEARCH = (
@@ -159,9 +168,6 @@ class BookForm(SearchForm):
 
 
 class PersonForm(SearchForm):
-    class FormWidget:
-        default_content = config.gui2.get('entry defaults').get('Person').mapping
-
     id_: GroupElement.NO_SEARCH = IntEntry
     first_name: mtkf.Element = NonEmptyEntry
     last_name: mtkf.Element = NonEmptyEntry
@@ -240,9 +246,6 @@ class BorrowRestCommonForm(BaseForm, template=True):
 
 
 class BorrowForm(BorrowRestCommonForm):
-    class FormWidget:
-        default_content = {'weeks': '4'}
-
     weeks: mtkf.Element = IntEntry
     override: mtkf.Element = CheckbuttonWithVar
 
@@ -253,14 +256,17 @@ class RestituteForm(BorrowRestCommonForm):
 
 class BorrowSearchForm(SearchForm):
     book__id: mtkf.Element = IntEntry
-    book__library: mtkf.Element = Entry
-    book__groups: mtkf.Element = Entry
+    book__title: mtkf.Element = Entry
+    book__author: mtkf.Element = Entry
+    book__library: mtkf.Element = (OptionsFromSearch,
+                                   {'action_ns': core.Library, 'allow_none': True})
+    book__groups: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Group})
 
     person__id: mtkf.Element = IntEntry
     person__first_name: mtkf.Element = Entry
     person__last_name: mtkf.Element = Entry
     person__class_: mtkf.Element = ClassEntry
-    person__libraries: mtkf.Element = ListEntry
+    person__libraries: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
 
     is_back: mtkf.Element = OptionalCheckbuttonWithVar
 

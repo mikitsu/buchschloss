@@ -40,7 +40,7 @@ for _, tr in ipairs(data_table.select('tr')) do
         if key == 'Titel' then
             r['title'] = value
         end if key == 'Person(en)' then
-            for person, role in string.gmatch(value, '(%a+, %a+) %((%a+)%)') do
+            for person, role in string.gmatch(value, '([%a %-]+, [%a %-]+) %(([%a %-]+)%)') do
                 if role == 'Verfasser' then
                     r.author = person
                 else

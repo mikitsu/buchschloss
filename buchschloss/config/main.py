@@ -4,6 +4,7 @@ import sys
 import datetime
 import json
 import contextlib
+import pathlib
 from collections.abc import Mapping
 import typing as T
 
@@ -102,12 +103,14 @@ def load_file(path: ActuallyPathLike,
                     continue  # could also raise an error or add some filename to errors
                 del section[k]
                 for new_file in v:
-                    new_section, new_errors = load_file(new_file, loader, load_error)
+                    file_path = file_dir / new_file
+                    new_section, new_errors = load_file(file_path, loader, load_error)
                     section.merge(new_section)
                     errors.update(new_errors)
             elif isinstance(v, configobj.Section):
                 include_config(v)
 
+    file_dir = pathlib.Path(path).parent
     errors = set()
     try:
         f = open(path)

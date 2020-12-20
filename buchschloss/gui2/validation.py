@@ -5,14 +5,8 @@ import itertools
 import typing as T
 from ..misc import validation as mval
 from .. import misc
-
-try:
-    from .. import utils
-except (ImportError, ValueError):
-    class utils:
-        @staticmethod
-        def get_name(x):
-            return x
+from .. import config
+from .. import utils
 
 
 def clean_isbn(user_isbn: str) -> T.Sequence[int]:
@@ -54,10 +48,10 @@ ISBN_validator = mval.Validator(
 nonempty = mval.Validator((misc.Instance().__call_bool,
                            utils.get_name('error_empty')))
 
-class_validator = mval.Validator(str.upper,  # v -- G9 is coming
-                                 # TODO: move class regex to config
-                                 (r'^(EF|Q1|Q2|10([A-Z\s])+|[5-9][A-Z\s]+)$',
-                                  utils.get_name('error_invalid_class')))
+class_validator = mval.Validator(
+    str.upper,
+    (config.gui2.class_regex.pattern, utils.get_name('error_invalid_class')),
+)
 
 int_list = mval.Validator((lambda L: list(map(int, L)),
                            {ValueError: utils.get_name('must_be_int_list')}))

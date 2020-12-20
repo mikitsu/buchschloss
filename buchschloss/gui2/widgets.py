@@ -191,15 +191,14 @@ class ScrolledListbox(tk.Listbox):
 
 class MultiChoicePopup(tk.Button):
     """Button that displays a multi-choice listbox popup dialog on click"""
-    sep = ';'
-
-    def __init__(self, master, cnf={}, options=(), **kwargs):
+    def __init__(self, master, cnf={}, options=(), sep=';', **kwargs):
         """create a new MultiChoicePopup
 
             ``root`` is the master of the generated popup
             ``options`` is a sequence of (<code>, <display>) tuples
                 <display> will be shown to the user, while <code>
                 will be used when .get is called
+            ``sep`` is the separator used to join results for display
         """
         kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
         super().__init__(master, cnf, command=self.action, **kwargs)
@@ -208,6 +207,7 @@ class MultiChoicePopup(tk.Button):
         else:
             self.codes, self.displays = zip(*options)
         self.active = ()
+        self.sep = sep
 
     def get(self):
         """get the last selected items"""
