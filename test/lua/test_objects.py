@@ -116,9 +116,9 @@ def test_login_context():
     rt.globals()['guest_lc'] = llc(core.guest_lc)
     rt.globals()['internal_lc'] = llc(core.internal_priv_lc)
     rt.globals()['member_lc'] = llc(
-        core.LoginType.MEMBER(name='asdf', level=3))
+        core.LoginContext(core.LoginType.MEMBER, name='asdf', level=3))
     rt.globals()['script_lc'] = llc(
-        core.LoginType.SCRIPT(name='qwert', level=2, invoker=core.guest_lc)
+        core.LoginContext(core.LoginType.SCRIPT, name='qwert', level=2, invoker=core.guest_lc)
     )
     assert rt.eval('guest_lc.type == "GUEST"')
     assert rt.eval('internal_lc.level == 10')

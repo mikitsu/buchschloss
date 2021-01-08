@@ -95,10 +95,6 @@ class LoginType(enum.Enum):
     SCRIPT = 'Script[{name}]({level})<-{invoker}'
     INTERNAL = 'SYSTEM({level})'
 
-    def __call__(self, level: int, **kwargs):
-        self.value.format(type=self, level=level, **kwargs)
-        return LoginContext(self, level, **kwargs)
-
 
 class LoginContext:
     """data about a logged in user"""
@@ -411,7 +407,7 @@ def login(name: str, password: str):
         raise BuchSchlossNotFoundError('Member', name)
     if authenticate(m, password):
         logging.info('login success {}'.format(m))
-        return LoginType.MEMBER(m.level, name=m.name)
+        return LoginContext(LoginType.MEMBER, m.level, name=m.name)
     else:
         logging.info('login fail {}'.format(m))
         raise BuchSchlossError('login', 'wrong_password')
@@ -1303,8 +1299,8 @@ class Script(ActionNamespace):
             script_lc_level = login_context.level
         else:
             script_lc_level = script.setlevel
-        script_lc = LoginType.SCRIPT(
-            script_lc_level, name=script.name, invoker=login_context)
+        script_lc = LoginContext(
+            LoginType.SCRIPT, script_lc_level, name=script.name, invoker=login_context)
         ui_callbacks = callbacks or cls.callbacks
         get_name_prefix = 'script-data::{}::'.format(script.name)
         script_config = config.scripts.lua.get(script.name).mapping
@@ -1363,7 +1359,7 @@ class DataNamespace:
         ))
 
     def __hash__(self):
-        return hash(self._data)
+        return hash(self.id)
 
     def __str__(self):
         return str(self._data)
@@ -1424,9 +1420,9 @@ class DataNamespace:
     }
 
 
-internal_priv_lc = LoginType.INTERNAL(config.MAX_LEVEL)
-internal_unpriv_lc = LoginType.INTERNAL(0)
-guest_lc = LoginType.GUEST(0)
+internal_priv_lc = LoginContext(LoginType.INTERNAL, config.MAX_LEVEL)
+internal_unpriv_lc = LoginContext(LoginType.INTERNAL, 0)
+guest_lc = LoginContext(LoginType.GUEST, 0)
 misc_data = MiscData()
 
 logging.info('core operational')

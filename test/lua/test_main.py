@@ -35,7 +35,7 @@ def test_table_conversion():
 
 
 def test_prepare_runtime():
-    lc = core.LoginType.INTERNAL(5)
+    lc = core.LoginContext(core.LoginType.INTERNAL, 5)
     rt = lua.prepare_runtime(lc)
     assert not set(rt.globals()) & {'ui', 'requests'}
     def storage_setter(v): storage_setter.v = v  # noqa

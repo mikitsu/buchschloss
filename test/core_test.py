@@ -23,7 +23,7 @@ def create_person(id_, **options):
 
 def for_levels(func, perm_level, assert_func=lambda x: True):
     """test for correct level testing"""
-    ctxt = core.LoginType.INTERNAL(0)
+    ctxt = core.internal_unpriv_lc
     for level in range(perm_level):
         ctxt.level = level
         with pytest.raises(core.BuchSchlossBaseError):
@@ -37,17 +37,14 @@ def test_auth_required(db):
     """test the @auth_required decorator"""
     models.Member.create(
         name='name', salt=b'', level=0, password=core.pbkdf(b'Pa$$w0rd', b''))
-    ctxt_member = core.LoginType.MEMBER(0, name='name')
-    ctxt_internal = core.LoginType.INTERNAL(0)
-    # noinspection PyTypeChecker
-    ctxt_guest = core.LoginType.GUEST(0)
+    ctxt_member = core.LoginContext(core.LoginType.MEMBER, 0, name='name')
+    ctxt_internal = core.internal_unpriv_lc
 
     @core.auth_required
     def test(login_context):
         """the initial docstring"""
         return True
 
-    test.__doc__: str
     assert test.__doc__.startswith('the initial docstring')
     assert test.__doc__ != 'the initial docstring'
     assert test(login_context=ctxt_member, current_password='Pa$$w0rd')
@@ -56,9 +53,9 @@ def test_auth_required(db):
     with pytest.raises(TypeError):
         test(login_context=ctxt_member)
     with pytest.raises(core.BuchSchlossBaseError):
-        test(login_context=ctxt_guest, current_password='')
+        test(login_context=core.guest_lc, current_password='')
     with pytest.raises(core.BuchSchlossBaseError):
-        test(login_context=ctxt_guest)
+        test(login_context=core.guest_lc)
     with pytest.raises(core.BuchSchlossBaseError):
         test(login_context=ctxt_internal)
     ctxt_internal.level = 1
@@ -101,7 +98,7 @@ def test_misc_data(db):
 
 def test_data_ns():
     FLAG = object()
-    class DataA(core.Dummy): pass
+    class DataA(core.Dummy): pk_name = 'a'
     class DataB(core.Dummy): pass
 
     def validate_datab(data_val, x_val):
@@ -125,6 +122,8 @@ def test_data_ns():
     assert data.b == [1, 2, 3]
     validate_datab(data.d, 0)
     validate_datab(data.i[0], 1)
+    assert data == 1
+    assert {data: 'xyz'}[1] == 'xyz' == {1: 'xyz'}[data]
 
 
 def test_person_new(db):
@@ -341,7 +340,7 @@ def test_book_view_str(db):
                        shelf='A5')
     b = models.Book.get_by_id(1)
     book_view = partial(core.Book.view_str,
-                        login_context=core.LoginType.INTERNAL(0))
+                        login_context=core.internal_unpriv_lc)
     assert book_view(1) == {
         'id': '1',
         'isbn': '123',
@@ -457,7 +456,7 @@ def test_library_view_str(db):
     p_1 = create_person(123)
     p_2 = create_person(124)
     library_view = partial(core.Library.view_str,
-                           login_context=core.LoginType.INTERNAL(0))
+                           login_context=core.internal_unpriv_lc)
     with pytest.raises(core.BuchSchlossBaseError):
         library_view('does not exist')
     assert library_view('lib') == {
@@ -564,7 +563,8 @@ def test_group_view_str(db):
     models.Group.create(name='group-1')
     create_book()
     create_book()
-    group_view = partial(core.Group.view_str, login_context=core.LoginType.INTERNAL(0))
+    group_view = partial(core.Group.view_str,
+                         login_context=core.internal_unpriv_lc)
     assert group_view('group-1') == {
         '__str__': str(models.Group.get_by_id('group-1')),
         'name': 'group-1',
@@ -610,8 +610,8 @@ def test_member_change_password(db):
     models.Member.create(name='other', level=0, salt=b'', password=core.pbkdf(b'', b''))
     for_levels(partial(core.Member.change_password, 'name', 'new'), 4)
     assert core.authenticate(models.Member.get_by_id('name'), 'new')
-    ctxt_editee = core.LoginType.MEMBER(0, name='name')
-    ctxt_other = core.LoginType.MEMBER(0, name='other')
+    ctxt_editee = core.LoginContext(core.LoginType.MEMBER, 0, name='name')
+    ctxt_other = core.LoginContext(core.LoginType.MEMBER, 0, name='other')
     core.Member.change_password(
         'name', 'other', login_context=ctxt_editee, current_password='new')
     assert core.authenticate(models.Member.get_by_id('name'), 'other')
@@ -623,7 +623,7 @@ def test_member_change_password(db):
 def test_member_view_str(db):
     """test Member.view_str"""
     models.Member.create(name='name', level=0, salt=b'', password=b'')
-    assert core.Member.view_str('name', login_context=core.LoginType.INTERNAL(0)) == {
+    assert core.Member.view_str('name', login_context=core.internal_unpriv_lc) == {
         '__str__': str(models.Member.get_by_id('name')),
         'name': 'name',
         'level': utils.level_names[0],
@@ -648,7 +648,7 @@ def test_borrow_new(db):
                       borrow_permission=(datetime.date.today()
                                          + datetime.timedelta(days=1)),
                       libraries=['main', 'no-pay'])
-    ctxt = core.LoginType.INTERNAL(0)
+    ctxt = core.internal_unpriv_lc
     borrow_new = partial(core.Borrow.new, login_context=ctxt)
     # follows config settings
     for i in range(5):
@@ -714,7 +714,7 @@ def test_search(db):
     person = core.DataNamespace(core.Person, create_person(123, class_='cls', libraries=['main']), None)
     ctxt_person = for_levels(partial(core.Person.search, ()), 1)
     person_search = partial(core.Person.search, login_context=ctxt_person)
-    book_search = partial(core.Book.search, login_context=core.LoginType.INTERNAL(0))
+    book_search = partial(core.Book.search, login_context=core.internal_unpriv_lc)
     assert tuple(book_search(('author', 'eq', 'author name'))) == (book_1,)
     assert set(book_search(())) == {book_1, book_2}
     assert (tuple(book_search((('author', 'ne', 'author name'), 'or', ())))
@@ -790,7 +790,7 @@ def test_script_execute(db, monkeypatch):
     """test Script.execute"""
     script = models.Script.create(name='name', code='code', setlevel=None, storage={},
                                   permissions=core.ScriptPermissions(0))
-    ctxt = core.LoginType.INTERNAL(0)
+    ctxt = core.internal_unpriv_lc
     script_execute = partial(core.Script.execute, 'name', login_context=ctxt)
     calls = []
 
