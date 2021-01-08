@@ -3,6 +3,7 @@ import enum
 import functools
 import operator
 import tkinter as tk
+import tkinter.ttk as ttk
 from tkinter import Entry, Label, Button
 from functools import partial
 from collections import abc
@@ -92,16 +93,44 @@ class ActionChoiceWidget(mtk.ContainingWidget):
         super().__init__(master, *widgets, **kw)
 
 
-class OptionsFromSearch(mtk.OptionChoiceWidget):
+class OptionsFromSearch(ttk.Combobox):
     """an option widget that gets its options from search results"""
 
     def __init__(self, master, *, action_ns: T.Type[core.ActionNamespace],
                  allow_none=False, **kwargs):
-        values = [(o.id, str(o)) for o in
-                  common.NSWithLogin(action_ns).search(())]
+        value_map = {str(o): o.id for o in common.NSWithLogin(action_ns).search(())}
         if allow_none:
-            values.insert(0, (None, ''))
-        super().__init__(master, values=values, **kwargs)
+            value_map[''] = None
+        self.all_values = value_map
+        super().__init__(
+            master,
+            values=tuple(value_map),
+            validate='all',
+            validatecommand=(master.register(self.update_values), '%P'),
+            **kwargs,
+        )
+
+    def set(self, value):
+        """handle DataNS"""
+        if isinstance(value, core.DataNamespace):
+            value = value.id
+        super().set(value)
+
+    def update_values(self, new_value):
+        """update displayed values based on entered text
+
+        Only display options of which the entered text is a substring.
+        Auto-fill the ID if there is only one match.
+        """
+        possibilities = [v for v in self.all_values if new_value in v]
+        if len(possibilities) == 0:
+            return False  # don't allow edit
+        elif len(possibilities) == 1:
+            self.set(self.all_values[possibilities[0]])
+            self['values'] = possibilities
+        else:
+            self['values'] = possibilities
+        return True
 
 
 class Text(tk.Text):
