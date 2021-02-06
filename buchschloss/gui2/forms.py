@@ -12,8 +12,7 @@ from .. import utils
 from ..utils import get_name
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry,
-                      IntEntry, NullREntry, Text,
-                      IntListEntry, NonEmptyPasswordEntry, Entry,
+                      IntEntry, NullREntry, Text, NonEmptyPasswordEntry, Entry,
                       OptionalCheckbuttonWithVar, CheckbuttonWithVar,
                       SeriesEntry, OptionsFromSearch, SearchMultiChoice,
                       FlagEnumMultiChoice, ScriptNameEntry, MultiChoicePopup)
@@ -207,7 +206,7 @@ class LoginForm(BaseForm):
 class LibraryGroupCommon(SearchForm, template=True):
     _position_over_ = True
     name: mtkf.Element = NonEmptyEntry
-    books: GroupElement.NO_SEARCH = IntListEntry
+    books: GroupElement.NO_SEARCH = (SearchMultiChoice, {'action_ns': core.Book})
     # not as element to allow Library to have a nice order
     action = (mtk.RadioChoiceWidget, {
         '*args': [(a, get_name('form::LibraryGroupCommon::' + a))
@@ -222,7 +221,7 @@ class LibraryForm(LibraryGroupCommon):
     class FormWidget:
         default_content = {'pay_required': True}
 
-    people: GroupElement.NO_SEARCH = IntListEntry
+    people: GroupElement.NO_SEARCH = (SearchMultiChoice, {'action_ns': core.Person})
     pay_required: GroupElement.ONLY_NEW = CheckbuttonWithVar
     action: GroupElement.ONLY_EDIT = LibraryGroupCommon.action
 
@@ -241,8 +240,8 @@ class BorrowRestCommonForm(BaseForm, template=True):
             self.submit_action()
 
     _position_over_ = True
-    person: mtkf.Element = IntEntry
-    book: mtkf.Element = IntEntry
+    person: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Person})
+    book: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Book})
 
 
 class BorrowForm(BorrowRestCommonForm):
@@ -255,14 +254,14 @@ class RestituteForm(BorrowRestCommonForm):
 
 
 class BorrowSearchForm(SearchForm):
-    book__id: mtkf.Element = IntEntry
+    book__id: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Book})
     book__title: mtkf.Element = Entry
     book__author: mtkf.Element = Entry
     book__library: mtkf.Element = (OptionsFromSearch,
                                    {'action_ns': core.Library, 'allow_none': True})
     book__groups: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Group})
 
-    person__id: mtkf.Element = IntEntry
+    person__id: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Person})
     person__first_name: mtkf.Element = Entry
     person__last_name: mtkf.Element = Entry
     person__class_: mtkf.Element = ClassEntry
