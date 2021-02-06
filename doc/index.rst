@@ -10,6 +10,7 @@ Welcome to BuchSchloss's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   setup
    api
    scripts
    core-ref
