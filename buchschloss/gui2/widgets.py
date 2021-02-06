@@ -102,6 +102,7 @@ class OptionsFromSearch(ttk.Combobox):
         if allow_none:
             value_map[''] = None
         self.all_values = value_map
+        self.id_map = {str(v): v for v in value_map.values()}
         super().__init__(
             master,
             values=tuple(value_map),
@@ -116,6 +117,17 @@ class OptionsFromSearch(ttk.Combobox):
             value = value.id
         super().set(value)
 
+    def get(self):
+        """Return ID with correct type. May raise KeyError."""
+        return self.id_map[super().get()]
+
+    def validate(self):
+        """Override to supply the signature expected in forms: (valid, value)"""
+        try:
+            return True, self.get()
+        except KeyError:
+            return False, utils.get_name('invalid_object_selected')
+
     def update_values(self, new_value):
         """update displayed values based on entered text
 
@@ -127,9 +139,7 @@ class OptionsFromSearch(ttk.Combobox):
             return False  # don't allow edit
         elif len(possibilities) == 1:
             self.set(self.all_values[possibilities[0]])
-            self['values'] = possibilities
-        else:
-            self['values'] = possibilities
+        self['values'] = possibilities
         return True
 
 
