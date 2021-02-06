@@ -9,16 +9,16 @@ from peewee import (SqliteDatabase, CharField, IntegerField, DateField, BooleanF
                     BlobField, ForeignKeyField, ManyToManyField, AutoField)
 from playhouse.fields import PickleField
 
-try:
-    from . import config
-except ImportError:
-    try:
-        from buchschloss import config
-    except ImportError:
-        config = None
 if __name__ != '__main__':
+    from . import config
     from . import utils
     from . import core
+else:
+    try:
+        import config
+    except ImportError:
+        print('Unable to load configuration. Will ask for essential information')
+        config = None
 
 __all__ = [
     'db',
@@ -38,7 +38,7 @@ T = typing
 if config is not None:
     db = SqliteDatabase(config.core.database_name)
 else:
-    db = SqliteDatabase(input('Unable to locate config module. Please insert DB name -> '))
+    db = SqliteDatabase(input('Please insert DB name -> '))
 
 
 class JSONField(peewee.TextField):
@@ -268,6 +268,11 @@ if __name__ == '__main__':
           'and initialize them with basic data. Proceed? (y/n)')
     if not input().lower().startswith('y'):
         sys.exit()
+    if config is None:
+        max_level = int(input('Super admin level (number) -> '))
+    else:
+        conf_levels = config.core.required_levels.mapping.values()
+        max_level = max(lvl for cat in conf_levels for lvl in cat.values())
     db.create_tables(models)
     print('created tables...')
     Misc.create(pk='last_script_invocations', data={})
@@ -278,7 +283,7 @@ if __name__ == '__main__':
                   salt=b'{\x7f\xa5\xe7\x07\x1e>\xdf$\xc6\x8cX\xe6\x15J\x8ds\x88'
                        b'\x9d2}9\x98\x9b)x]\x8cc\x8a\xcb\xc8\x8aO\xb3y%g\x9d'
                        b'\x94\xd8\x03m\xec$V\xfa\xcdW3',
-                  level=4)
+                  level=max_level)
     Library.create(name='main')
     print('Finished. Press return to exit')
     input()
