@@ -48,7 +48,8 @@
     "no_password_match": "The passwords don't match.",
     "gui2": {
       "series_number_must_be_int": "The series number must be an integer",
-      "number_without_series": "If giving a series number, you must also specify a series name"
+      "number_without_series": "If giving a series number, you must also specify a series name",
+      "invalid_object_selected": "Choose a valid object."
     },
     "Borrow": {
       "*this*": "borrowing error",

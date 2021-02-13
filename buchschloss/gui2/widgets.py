@@ -98,14 +98,14 @@ class OptionsFromSearch(ttk.Combobox):
 
     def __init__(self, master, *, action_ns: T.Type[core.ActionNamespace],
                  allow_none=False, **kwargs):
-        value_map = {str(o): o.id for o in common.NSWithLogin(action_ns).search(())}
-        if allow_none:
-            value_map[''] = None
-        self.all_values = value_map
-        self.id_map = {str(v): v for v in value_map.values()}
+        self.all_values: T.Dict[str, T.Optional[str]] = {'': None} if allow_none else {}
+        self.id_map: T.Dict[str, T.Any] = {'': None} if allow_none else {}
+        for obj in common.NSWithLogin(action_ns).search(()):
+            self.all_values[str(obj)] = str(obj.id)
+            self.id_map[str(obj.id)] = obj.id
         super().__init__(
             master,
-            values=tuple(value_map),
+            values=tuple(self.all_values.keys()),
             validate='all',
             validatecommand=(master.register(self.update_values), '%P'),
             **kwargs,
@@ -126,7 +126,7 @@ class OptionsFromSearch(ttk.Combobox):
         try:
             return True, self.get()
         except KeyError:
-            return False, utils.get_name('invalid_object_selected')
+            return False, utils.get_name('error::gui2::invalid_object_selected')
 
     def update_values(self, new_value):
         """update displayed values based on entered text

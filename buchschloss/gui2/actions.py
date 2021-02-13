@@ -10,7 +10,6 @@ import typing as T
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import dialogs as mtkd
 from ..misc.tkstuff import forms as mtkf
-from ..misc import validation as mval
 from . import main
 from . import forms
 from . import widgets
@@ -203,8 +202,11 @@ class ShowInfo:
             try:
                 id_ = mtkd.WidgetDialog.ask(
                     main.app.root,
-                    widgets.OptionsFromSearch, {'action_ns': self.action_ns.ans},
-                    title=id_get_text, text=id_get_text)
+                    widgets.OptionsFromSearch,
+                    {'action_ns': self.action_ns.ans},
+                    title=id_get_text,
+                    text=id_get_text,
+                )
             except mtkd.UserExitedDialog:
                 main.app.reset()
                 return
