@@ -50,7 +50,11 @@ class ActionTree(dict):
             else:
                 def action(_f=v):
                     app.clear_center()
-                    _f()
+                    try:
+                        _f()
+                    except core.BuchSchlossBaseError as e:
+                        tk_msg.showerror(e.title, e.message)
+                        app.reset()
             r[k] = action
         return ActionTree(r)
 
