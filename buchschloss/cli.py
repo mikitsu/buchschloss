@@ -319,7 +319,6 @@ EXTERNAL_COMMANDS = {
     'view_member': core.Member.view_str,
     'search_member': core.Member.search,
     'borrow': core.Borrow.new,
-    'restitute': core.Borrow.restitute,
     'view_borrow': core.Borrow.view_str,
     'search_borrow': core.Borrow.search,
 }
