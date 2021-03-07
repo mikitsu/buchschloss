@@ -473,6 +473,11 @@ class ActionNamespace:
 
     @staticmethod
     @abc.abstractmethod
+    def edit(id_, *, login_context, **kwargs):
+        """Edit an existing record"""
+
+    @staticmethod
+    @abc.abstractmethod
     def view_str(id_: T.Union[int, str], *, login_context) -> dict:
         """Return information in a dict"""
         raise NotImplementedError
@@ -1066,6 +1071,32 @@ class Borrow(ActionNamespace):
             latest = latest[:config.core.save_latest_borrowers - 1]
         latest.insert(0, person.id)
         misc_data.latest_borrowers = latest
+
+    @staticmethod
+    @from_db(models.Borrow)
+    def edit(borrow, *,
+             login_context,
+             is_back: bool = None,
+             return_date: date = None,
+             weeks: int = None,
+             ):
+        """Edit a Borrow
+
+        :param is_back: whether the book was returned
+        :param return_date: the date on which the book has to be returned
+        :param weeks: the number of weeks to extend borrowing time
+
+        ``weeks`` and ``return_date`` may not be given together
+        """
+        if return_date is not None and weeks is not None:
+            raise TypeError('``return_date`` and ``weeks`` may not both be given')
+        if weeks is not None:
+            return_date = date.today() + timedelta(weeks=weeks)
+        if return_date is not None:
+            borrow.return_date = return_date
+        if is_back is not None:
+            borrow.is_back = is_back
+        borrow.save()
 
     @staticmethod
     @from_db(models.Book)

@@ -688,6 +688,22 @@ def test_borrow_new(db):
     borrow_new(2, 123, weeks, override=True)
 
 
+def test_borrow_edit(db):
+    """test Borrow.edit"""
+    today = datetime.date.today()
+    models.Library.create(name='main')
+    create_person(123)
+    create_book()
+    models.Borrow.create(person=123, book=1, return_date=today)
+    ctxt = for_levels(partial(core.Borrow.edit, 1, weeks=1), 1)
+    assert (models.Borrow.get_by_id(1).return_date - today).days == 7
+    with pytest.raises(TypeError):
+        core.Borrow.edit(1, return_date=today, weeks=1, login_context=ctxt)
+    core.Borrow.edit(1, return_date=today, is_back=True, login_context=ctxt)
+    assert models.Borrow.get_by_id(1).return_date == today
+    assert models.Borrow.get_by_id(1).is_back
+
+
 def test_borrow_restitute(db):
     """test Borrow.restitute"""
     models.Library.create(name='main')

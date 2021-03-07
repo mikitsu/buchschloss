@@ -104,9 +104,10 @@ The data type independent interface for all ``ActionNamespace`` s is:
 - ``search(condition)`` for searching. Refer to the docstring for
   information on the condition format.
 
-All namespaces also include a ``new`` function and all apart from ``Borrow`` also have
-an ``edit`` function. Special functions are ``Group.activate``, ``Borrow.restitute``,
-``Member.change_password`` and ``Script.execute``.
+All namespaces also include a ``new`` and an ``edit`` function
+which take namespace-specific arguments.
+Special functions are ``Group.activate``, ``Member.change_password``
+and ``Script.execute``.
 
 Next to the action namespaces, the ``core`` module exposes the ``login`` function
 for Members (not in the ``Member`` namespace) and ``BuchSchlossBaseError`` for
