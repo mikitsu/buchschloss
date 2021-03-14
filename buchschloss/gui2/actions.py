@@ -301,13 +301,6 @@ def login():
         main.app.header.set_login_text(utils.get_name('action::login'))
 
 
-def new_book(**kwargs):
-    tk_msg.showinfo(utils.get_name('Book'),
-                    utils.get_name('Book::new_id_{}')
-                    .format(core.Book.new(login_context=main.app.current_login,
-                                          **kwargs)))
-
-
 def display_lua_data(data):
     """provide a callback for lua's display"""
     popup = tk.Toplevel(main.app.root)
@@ -370,3 +363,33 @@ def get_script_action(script_spec):
         main.app.reset()
 
     return action
+
+# NOTE: the following functions aren't used anywhere
+# the decorator registers them in common.NSWithLogin
+
+
+@common.NSWithLogin.override('Book', 'new')  # actually used because it's shorter
+def new_book(**kwargs):
+    tk_msg.showinfo(
+        utils.get_name('Book'),
+        utils.get_name('Book::new_id_{}').format(
+            core.Book.new(login_context=main.app.current_login, **kwargs))
+    )
+
+
+@common.NSWithLogin.override('Borrow', 'restitute')
+def borrow_restitute(book):
+    b = common.NSWithLogin(core.Book).view_ns(book)
+    if b.borrow is None:
+        raise core.BuchSchlossError(
+            'Borrow::not_borrowed', 'Borrow::{}_not_borrowed', b.id)
+    core.Borrow.edit(b.borrow.id, is_back=True, login_context=main.app.current_login)
+
+
+@common.NSWithLogin.override('Borrow', 'extend')
+def borrow_extend(book, weeks):
+    b = common.NSWithLogin(core.Book).view_ns(book)
+    if b.borrow is None:
+        raise core.BuchSchlossError(
+            'Borrow::not_borrowed', 'Borrow::{}_not_borrowed', b.id)
+    core.Borrow.edit(b.borrow.id, weeks=weeks, login_context=main.app.current_login)

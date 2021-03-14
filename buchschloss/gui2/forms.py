@@ -188,7 +188,7 @@ class MemberForm(SearchForm):
     password2: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
 
 
-class ChangePasswordForm(BaseForm):
+class MemberChangePasswordForm(BaseForm):
     class FormWidget(PasswordFormWidget):
         password_name = 'new_password'
 
@@ -226,7 +226,7 @@ class LibraryForm(LibraryGroupCommon):
     action: GroupElement.ONLY_EDIT = LibraryGroupCommon.action
 
 
-class GroupActivationForm(BaseForm):
+class GroupActivateForm(BaseForm):
     group: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Group})
     src: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
     dest: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
@@ -239,12 +239,13 @@ class BorrowForm(BaseForm):
     override: mtkf.Element = CheckbuttonWithVar
 
 
-class RestituteForm(BaseForm):
+class BorrowRestituteForm(BaseForm):  # TODO: add a condition to OFS (wait for #69)
     book: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Book})
 
 
-class ExtendBorrowForm(BaseForm):
+class BorrowExtendForm(BaseForm):
     book: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Book})
+    weeks: mtkf.Element = IntEntry
 
 
 class BorrowSearchForm(SearchForm):
