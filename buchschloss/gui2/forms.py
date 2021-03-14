@@ -233,25 +233,19 @@ class GroupActivationForm(BaseForm):
     dest: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
 
 
-class BorrowRestCommonForm(BaseForm, template=True):
-    class FormWidget(mtkf.FormWidget):
-        def inject_submit(self, **data):
-            for k, v in data.items():
-                mtk.get_setter(self.widget_dict[k])(v)
-            self.submit_action()
-
-    _position_over_ = True
-    person: mtkf.Element = IntEntry
-    book: mtkf.Element = IntEntry
-
-
-class BorrowForm(BorrowRestCommonForm):
+class BorrowForm(BaseForm):
+    person: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Person})
+    book: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Book})
     weeks: mtkf.Element = IntEntry
     override: mtkf.Element = CheckbuttonWithVar
 
 
-class RestituteForm(BorrowRestCommonForm):
-    pass
+class RestituteForm(BaseForm):
+    book: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Book})
+
+
+class ExtendBorrowForm(BaseForm):
+    book: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Book})
 
 
 class BorrowSearchForm(SearchForm):

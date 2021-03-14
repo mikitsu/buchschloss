@@ -1061,16 +1061,6 @@ class Borrow(ActionNamespace):
         models.Borrow.create(person=person, book=book, return_date=rdate)
         logging.info('{} borrowed {} to {} until {}{}'.format(
             login_context, book, person, rdate, override * ' with override=True'))
-        latest = misc_data.latest_borrowers
-        # since the values are written to the DB on explicit assignment only
-        # [[and values aren't cached (yet, but I still don't want to rely on it)
-        # but read on each lookup]], the temporary variable is important
-        if person.id in latest:
-            latest.remove(person.id)
-        else:
-            latest = latest[:config.core.save_latest_borrowers - 1]
-        latest.insert(0, person.id)
-        misc_data.latest_borrowers = latest
 
     @staticmethod
     @from_db(models.Borrow)
