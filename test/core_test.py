@@ -704,24 +704,6 @@ def test_borrow_edit(db):
     assert models.Borrow.get_by_id(1).is_back
 
 
-def test_borrow_restitute(db):
-    """test Borrow.restitute"""
-    models.Library.create(name='main')
-    create_person(123)
-    create_person(124)
-    create_book()
-    create_book()
-    create_book()
-    models.Borrow.create(person=123, book=1, return_date=datetime.date.today())
-    models.Borrow.create(person=123, book=2, return_date=datetime.date.today())
-    ctxt = for_levels(partial(core.Borrow.restitute, 1, 123), 1)
-    with pytest.raises(core.BuchSchlossBaseError):
-        core.Borrow.restitute(1, 123, login_context=ctxt)
-    with pytest.raises(core.BuchSchlossBaseError):
-        core.Borrow.restitute(2, 124, login_context=ctxt)
-    core.Borrow.restitute(2, 123, login_context=ctxt)
-
-
 def test_search(db):
     """test searches"""
     models.Library.create(name='main')

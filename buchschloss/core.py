@@ -1089,32 +1089,6 @@ class Borrow(ActionNamespace):
         borrow.save()
 
     @staticmethod
-    @from_db(models.Book)
-    def restitute(book, person, *, login_context):
-        """return a book
-
-        :param book: is the ID of the Book to be returned
-        :param person: may be the ID of the returning Person or None
-
-        :raise BuchSchlossBaseError: if the Book hasn't been borrowed
-        :raise BuchSchlossBaseError: if the Book ahs been borrowed by someone
-          else and ``person`` is not None
-
-        :return: the returned Book's shelf
-        """
-        borrow = book.borrow
-        if borrow is None:
-            raise BuchSchlossError('Borrow::not_borrowed', 'Borrow::{}_not_borrowed', book.id)
-        if person is not None and borrow.person.id != person:
-            raise BuchSchlossError('Borrow::not_borrowed',
-                                   'Borrow::{book}_not_borrowed_by_{person}',
-                                   book=book, person=person)
-        borrow.is_back = True
-        borrow.save()
-        logging.info('{} confirmed {} was returned'.format(login_context, borrow))
-        return book.shelf
-
-    @staticmethod
     @from_db(models.Borrow)
     def view_str(borrow, *, login_context):
         """Return information about a Borrow
