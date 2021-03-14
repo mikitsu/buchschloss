@@ -659,7 +659,6 @@ def test_borrow_new(db):
     borrow_new(1, 123, weeks)
     # correct data
     assert len(models.Borrow.select()) == 1
-    assert models.Misc.get_by_id('latest_borrowers').data == [123]
     b = models.Borrow.get_by_id(1)
     assert b.person.id == 123
     assert b.book.id == 1
