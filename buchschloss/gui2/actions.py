@@ -10,7 +10,6 @@ import typing as T
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import dialogs as mtkd
 from ..misc.tkstuff import forms as mtkf
-from ..misc import validation as mval
 from . import main
 from . import forms
 from . import widgets
@@ -191,7 +190,7 @@ class ShowInfo:
             to widgets.InfoWidget.
         :param id_type: the type of the ID
         """
-        self.view_func = common.NSWithLogin(namespace).view_str
+        self.action_ns = common.NSWithLogin(namespace)
         self.special_keys = special_keys
         self.id_type = id_type
         self.get_name_prefix = namespace.__name__ + '::'
@@ -201,12 +200,13 @@ class ShowInfo:
         if id_ is None:
             id_get_text = utils.get_name(self.get_name_prefix + 'id')
             try:
-                validator = mval.Validator((
-                    self.id_type, {ValueError: utils.get_name(
-                        'error::must_be_{}'.format(self.id_type.__name__))}))
                 id_ = mtkd.WidgetDialog.ask(
-                    main.app.root, mtk.ValidatedWidget.new_cls(tk.Entry, validator),
-                    title=id_get_text, text=id_get_text)
+                    main.app.root,
+                    widgets.OptionsFromSearch,
+                    {'action_ns': self.action_ns.ans},
+                    title=id_get_text,
+                    text=id_get_text,
+                )
             except mtkd.UserExitedDialog:
                 main.app.reset()
                 return
@@ -217,7 +217,7 @@ class ShowInfo:
         if ShowInfo.to_destroy is not None:
             ShowInfo.to_destroy.container.destroy()
         try:
-            data = self.view_func(id_)
+            data = self.action_ns.view_str(id_)
         except core.BuchSchlossBaseError as e:
             tk_msg.showerror(e.title, e.message)
             main.app.reset()
