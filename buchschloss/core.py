@@ -1090,7 +1090,6 @@ class Borrow(ActionNamespace):
             try:
                 borrow = borrow._data  # noqa
             except AttributeError:
-                import pdb; pdb.set_trace()
                 raise err
             if isinstance(borrow, models.Book):  # noqa
                 # here, ``borrow`` is, in fact, a Book DataNS
