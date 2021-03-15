@@ -379,17 +379,17 @@ def new_book(**kwargs):
 
 @common.NSWithLogin.override('Borrow', 'restitute')
 def borrow_restitute(book):
-    b = common.NSWithLogin(core.Book).view_ns(book)
-    if b.borrow is None:
-        raise core.BuchSchlossError(
-            'Borrow::not_borrowed', 'Borrow::{}_not_borrowed', b.id)
-    core.Borrow.edit(b.borrow.id, is_back=True, login_context=main.app.current_login)
+    core.Borrow.edit(
+        common.NSWithLogin(core.Book).view_ns(book),
+        is_back=True,
+        login_context=main.app.current_login,
+    )
 
 
 @common.NSWithLogin.override('Borrow', 'extend')
 def borrow_extend(book, weeks):
-    b = common.NSWithLogin(core.Book).view_ns(book)
-    if b.borrow is None:
-        raise core.BuchSchlossError(
-            'Borrow::not_borrowed', 'Borrow::{}_not_borrowed', b.id)
-    core.Borrow.edit(b.borrow.id, weeks=weeks, login_context=main.app.current_login)
+    core.Borrow.edit(
+        common.NSWithLogin(core.Book).view_ns(book),
+        weeks=weeks,
+        login_context=main.app.current_login,
+    )
