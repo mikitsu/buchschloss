@@ -1086,10 +1086,12 @@ class Borrow(ActionNamespace):
                 borrow = models.Borrow.get_by_id(borrow)
             except models.Borrow.DoesNotExist:
                 raise BuchSchlossNotFoundError('Borrow', borrow)
-        elif not isinstance(borrow, DataNamespace):
-            raise err
-        else:
-            borrow = borrow._data  # noqa
+        else:  # is DataNamespace
+            try:
+                borrow = borrow._data  # noqa
+            except AttributeError:
+                import pdb; pdb.set_trace()
+                raise err
             if isinstance(borrow, models.Book):  # noqa
                 # here, ``borrow`` is, in fact, a Book DataNS
                 if borrow.borrow is None:
