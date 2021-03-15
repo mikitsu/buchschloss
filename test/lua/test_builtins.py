@@ -37,8 +37,12 @@ def test_new(monkeypatch):
 def test_view(monkeypatch):
     """test <Model>[<pk>]"""
     person_dummy = DummyActionNS({'view_ns': [
-        types.SimpleNamespace(first_name='first', pay_date=datetime.datetime(1965, 1, 31)),
-        types.SimpleNamespace(first_name='first', pay_date=None),
+        types.SimpleNamespace(
+            first_name='first',
+            pay_date=datetime.datetime(1965, 1, 31),
+            _data=None,
+        ),
+        types.SimpleNamespace(first_name='first', pay_date=None, _data=None),
     ]})
     monkeypatch.setattr(core, 'Person', person_dummy)
     rt = lua.prepare_runtime(core.guest_lc)
