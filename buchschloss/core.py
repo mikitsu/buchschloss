@@ -1410,7 +1410,7 @@ class DataNamespace:
             'allow': ('name', 'level'),
         },
         Script: {
-            'allow': ('code', 'setlevel', 'name', 'storage'),
+            'allow': ('name', 'code', 'setlevel', 'permissions', 'storage'),
         },
     }
 
