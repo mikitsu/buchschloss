@@ -1110,6 +1110,7 @@ class Borrow(ActionNamespace):
             borrow.return_date = return_date
         if is_back is not None:
             borrow.is_back = is_back
+        logging.info('{} edited {}'.format(login_context, borrow))
         borrow.save()
 
     @staticmethod
