@@ -5,6 +5,7 @@ contents (for use):
     - send_email() -- send an email
     - check_isbn() -- check an ISBN and convert it to ISBN-13
     - get_name() -- get a pretty name
+    - format_date() -- format a date
     - level_names -- get a pretty level representation
     - get_book_data() -- attempt to get data about a book based on the ISBN
 """
@@ -16,31 +17,12 @@ import operator
 import email
 import smtplib
 import ssl
-from datetime import datetime, date
+import datetime
 import time
 import logging
 import sched
 
 from buchschloss import core, config, py_scripts
-
-
-class FormattedDate(date):
-    """print a datetime.date as specified in config.core.date_format"""
-
-    def __str__(self):
-        return self.strftime(config.core.date_format)
-
-    @classmethod
-    def fromdate(cls, date_: date):
-        """Create a FormattedDate from a datetime.date"""
-        if date_ is None:
-            return None
-        else:
-            return cls(date_.year, date_.month, date_.day)
-
-    def todate(self):
-        """transform self to a datetime.date"""
-        return date(self.year, self.month, self.day)
 
 
 class LevelNameDict(dict):
@@ -152,6 +134,14 @@ def get_name(internal: str):
     return name
 
 
+def format_date(date: datetime.date):
+    """format a date object as specified in config"""
+    if date is None:
+        return '-----'
+    else:
+        return date.strftime(config.utils.names.date)
+
+
 def get_book_data(isbn: int):
     """Attempt to get book data via the ISBN from the DB and configured scripts"""
     def get_data_from_script(script_spec):
@@ -230,17 +220,17 @@ def get_runner():
         scheduler.enter(0, 0, target)
 
     last_invocations = collections.defaultdict(
-        lambda: datetime.fromtimestamp(0), core.misc_data.last_script_invocations)
+        lambda: datetime.datetime.fromtimestamp(0), core.misc_data.last_script_invocations)
     for spec in config.scripts.repeating:
         target = get_script_target(spec, login_context=core.internal_unpriv_lc)
         script_id = '{0[name]}!{0[type]}'.format(spec)
         delay = spec['invocation'].total_seconds()
-        invoke_time: datetime = last_invocations[script_id] + spec['invocation']
+        invoke_time: datetime.datetime = last_invocations[script_id] + spec['invocation']
 
         def target_wrapper(_f, _t=target, _id=script_id, _delay=delay):
             _t()
             last_invs = core.misc_data.last_script_invocations
-            last_invs[_id] = datetime.now()
+            last_invs[_id] = datetime.datetime.now()
             core.misc_data.last_script_invocations = last_invs
             scheduler.enter(_delay, 0, functools.partial(_f, _f))
 

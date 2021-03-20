@@ -65,16 +65,6 @@ class Model(peewee.Model):
         return cls.select(*cls.str_fields)
 
 
-class FormattedDateField(DateField):
-    def python_value(self, value):
-        return utils.FormattedDate.fromdate(super().python_value(value))
-
-    def db_value(self, value):
-        if isinstance(value, utils.FormattedDate):
-            return value.todate()
-        return value
-
-
 class ScriptPermissionField(IntegerField):
     def python_value(self, value):
         # noinspection PyArgumentList
@@ -104,7 +94,7 @@ class Person(Model):
     last_name: T.Union[str, CharField] = CharField()
     class_: T.Union[str, CharField] = CharField()
     max_borrow: T.Union[int, IntegerField] = IntegerField()
-    borrow_permission: T.Union[datetime.date, DateField] = FormattedDateField(null=True)
+    borrow_permission: T.Union[datetime.date, DateField] = DateField(null=True)
     borrows: peewee.BackrefAccessor
     libraries: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # libraries as backref
 
@@ -204,7 +194,7 @@ class Borrow(Model):
     person: Person = ForeignKeyField(Person, backref='borrows')
     book: Book = ForeignKeyField(Book, backref='borrow')
     is_back: T.Union[bool, BooleanField] = BooleanField(default=False)
-    return_date: T.Union[datetime.date, DateField] = FormattedDateField()
+    return_date: T.Union[datetime.date, DateField] = DateField()
 
     # keep ID in, needed for further info
     str_fields = (id, person, book, return_date, is_back)

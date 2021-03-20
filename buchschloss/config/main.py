@@ -130,7 +130,7 @@ def load_file(path: ActuallyPathLike,
 
 def load_names(name_file: ActuallyPathLike,
                name_format: str
-               ) -> T.Mapping:
+               ) -> dict:
     """Load the name file with inclusions ignoring errors"""
     def convert_name_data(data):
         if isinstance(data, str):
@@ -244,6 +244,7 @@ def insert_name_data(config):
     """load name data into [utils][names]"""
     name_data = load_names(
         config['utils']['names']['file'], config['utils']['names']['format'])
+    name_data['date'] = config['utils']['names']['date format']
     # without unrepr=True, this gets converted to a Section
     # which fails with numeric keys (level representations)
     config['utils'].__setitem__('names', name_data, unrepr=True)
