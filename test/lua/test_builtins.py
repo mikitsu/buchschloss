@@ -37,8 +37,12 @@ def test_new(monkeypatch):
 def test_view(monkeypatch):
     """test <Model>[<pk>]"""
     person_dummy = DummyActionNS({'view_ns': [
-        types.SimpleNamespace(first_name='first', pay_date=datetime.datetime(1965, 1, 31)),
-        types.SimpleNamespace(first_name='first', pay_date=None),
+        types.SimpleNamespace(
+            first_name='first',
+            pay_date=datetime.datetime(1965, 1, 31),
+            _data=None,
+        ),
+        types.SimpleNamespace(first_name='first', pay_date=None, _data=None),
     ]})
     monkeypatch.setattr(core, 'Person', person_dummy)
     rt = lua.prepare_runtime(core.guest_lc)
@@ -54,13 +58,9 @@ def test_view(monkeypatch):
 
 def test_specials(monkeypatch):
     """test Borrow:restitute and Group[<id>]:activate"""
-    borrow_dummy = DummyActionNS({'restitute': ['A4']})
     group_dummy = DummyActionNS({'activate': [None], 'view_ns': [object()]})
-    monkeypatch.setattr(core, 'Borrow', borrow_dummy)
     monkeypatch.setattr(core, 'Group', group_dummy)
     rt = lua.prepare_runtime(core.guest_lc)
-    assert rt.eval('Borrow:restitute{123, 456}') == 'A4'
-    assert borrow_dummy.calls['restitute'][0] == ((123, 456), {'login_context': core.guest_lc})
     assert rt.eval('Group.g_name:activate{{"1", "2", "3"}, "dest"}') is None
     assert (group_dummy.calls['activate'][0]
             == (('g_name', ['1', '2', '3'], 'dest'), {'login_context': core.guest_lc}))

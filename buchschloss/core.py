@@ -473,6 +473,11 @@ class ActionNamespace:
 
     @staticmethod
     @abc.abstractmethod
+    def edit(id_, *, login_context, **kwargs):
+        """Edit an existing record"""
+
+    @staticmethod
+    @abc.abstractmethod
     def view_str(id_: T.Union[int, str], *, login_context) -> dict:
         """Return information in a dict"""
         raise NotImplementedError
@@ -1056,42 +1061,57 @@ class Borrow(ActionNamespace):
         models.Borrow.create(person=person, book=book, return_date=rdate)
         logging.info('{} borrowed {} to {} until {}{}'.format(
             login_context, book, person, rdate, override * ' with override=True'))
-        latest = misc_data.latest_borrowers
-        # since the values are written to the DB on explicit assignment only
-        # [[and values aren't cached (yet, but I still don't want to rely on it)
-        # but read on each lookup]], the temporary variable is important
-        if person.id in latest:
-            latest.remove(person.id)
-        else:
-            latest = latest[:config.core.save_latest_borrowers - 1]
-        latest.insert(0, person.id)
-        misc_data.latest_borrowers = latest
 
     @staticmethod
-    @from_db(models.Book)
-    def restitute(book, person, *, login_context):
-        """return a book
+    def edit(borrow, *,
+             login_context,
+             is_back: bool = None,
+             return_date: date = None,
+             weeks: int = None,
+             ):
+        """Edit a Borrow
 
-        :param book: is the ID of the Book to be returned
-        :param person: may be the ID of the returning Person or None
+        :param borrow: is either a Borrow DataNS, a Borrow ID or a Book DataNS
+        :param is_back: whether the book was returned
+        :param return_date: the date on which the book has to be returned
+        :param weeks: the number of weeks to extend borrowing time
 
-        :raise BuchSchlossBaseError: if the Book hasn't been borrowed
-        :raise BuchSchlossBaseError: if the Book ahs been borrowed by someone
-          else and ``person`` is not None
+        :raise BuchSchlossBaseError: if ``borrow`` is a Book DataNS whose .borrow is None
 
-        :return: the returned Book's shelf
+        ``weeks`` and ``return_date`` may not be given together
         """
-        borrow = book.borrow
-        if borrow is None:
-            raise BuchSchlossError('Borrow::not_borrowed', 'Borrow::{}_not_borrowed', book.id)
-        if person is not None and borrow.person.id != person:
-            raise BuchSchlossError('Borrow::not_borrowed',
-                                   'Borrow::{book}_not_borrowed_by_{person}',
-                                   book=book, person=person)
-        borrow.is_back = True
+        err = TypeError('``borrow`` must be a borrow ID or a Book or Borrow DataNS')
+        if isinstance(borrow, int):
+            try:
+                borrow = models.Borrow.get_by_id(borrow)
+            except models.Borrow.DoesNotExist:
+                raise BuchSchlossNotFoundError('Borrow', borrow)
+        else:  # is DataNamespace
+            try:
+                borrow = borrow._data  # noqa
+            except AttributeError:
+                raise err
+            if isinstance(borrow, models.Book):  # noqa
+                # here, ``borrow`` is, in fact, a Book DataNS
+                if borrow.borrow is None:
+                    raise BuchSchlossError(
+                        'Borrow::not_borrowed', 'Borrow::{}_not_borrowed', borrow.id)
+                borrow = borrow.borrow
+            elif isinstance(borrow, models.Borrow):
+                borrow = borrow
+            else:
+                raise err
+
+        if return_date is not None and weeks is not None:
+            raise TypeError('``return_date`` and ``weeks`` may not both be given')
+        if weeks is not None:
+            return_date = date.today() + timedelta(weeks=weeks)
+        if return_date is not None:
+            borrow.return_date = return_date
+        if is_back is not None:
+            borrow.is_back = is_back
+        logging.info('{} edited {}'.format(login_context, borrow))
         borrow.save()
-        logging.info('{} confirmed {} was returned'.format(login_context, borrow))
-        return book.shelf
 
     @staticmethod
     @from_db(models.Borrow)
@@ -1415,7 +1435,7 @@ class DataNamespace:
             'allow': ('name', 'level'),
         },
         Script: {
-            'allow': ('code', 'setlevel', 'name', 'storage'),
+            'allow': ('name', 'code', 'setlevel', 'permissions', 'storage'),
         },
     }
 

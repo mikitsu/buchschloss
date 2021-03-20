@@ -114,7 +114,6 @@ def prepare_runtime(login_context: 'core.LoginContext', *,
     """
     ans_extended_funcs = {
         'Group': ('activate',),
-        'Borrow': ('restitute',),
         'Member': ('change_password',),
         'Script': ('execute',),
     }

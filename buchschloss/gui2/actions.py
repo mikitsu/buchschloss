@@ -301,28 +301,6 @@ def login():
         main.app.header.set_login_text(utils.get_name('action::login'))
 
 
-def borrow_restitute(form_cls, callback):
-    """function for borrow and restitute actions"""
-    def add_btn(form):
-        try:
-            pw = [(widgets.Button, {
-                'text': core.Person.view_repr(p, login_context=main.app.current_login),
-                'command': partial(form.inject_submit, person=p)
-            }) for p in core.misc_data.latest_borrowers]
-            widgets.mtk.ContainingWidget(main.app.center, *pw, horizontal=2).pack()
-        except core.BuchSchlossBaseError as e:
-            tk_msg.showerror(e.title, e.message)
-
-    return generic_formbased_action(None, form_cls, callback, post_init=add_btn)
-
-
-def new_book(**kwargs):
-    tk_msg.showinfo(utils.get_name('Book'),
-                    utils.get_name('Book::new_id_{}')
-                    .format(core.Book.new(login_context=main.app.current_login,
-                                          **kwargs)))
-
-
 def display_lua_data(data):
     """provide a callback for lua's display"""
     popup = tk.Toplevel(main.app.root)
@@ -385,3 +363,33 @@ def get_script_action(script_spec):
         main.app.reset()
 
     return action
+
+# NOTE: the following functions aren't used anywhere
+# the decorator registers them in common.NSWithLogin
+
+
+@common.NSWithLogin.override('Book', 'new')  # actually used because it's shorter
+def new_book(**kwargs):
+    tk_msg.showinfo(
+        utils.get_name('Book'),
+        utils.get_name('Book::new_id_{}').format(
+            core.Book.new(login_context=main.app.current_login, **kwargs))
+    )
+
+
+@common.NSWithLogin.override('Borrow', 'restitute')
+def borrow_restitute(book):
+    core.Borrow.edit(
+        common.NSWithLogin(core.Book).view_ns(book),
+        is_back=True,
+        login_context=main.app.current_login,
+    )
+
+
+@common.NSWithLogin.override('Borrow', 'extend')
+def borrow_extend(book, weeks):
+    core.Borrow.edit(
+        common.NSWithLogin(core.Book).view_ns(book),
+        weeks=weeks,
+        login_context=main.app.current_login,
+    )

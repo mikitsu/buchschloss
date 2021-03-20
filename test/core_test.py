@@ -659,7 +659,6 @@ def test_borrow_new(db):
     borrow_new(1, 123, weeks)
     # correct data
     assert len(models.Borrow.select()) == 1
-    assert models.Misc.get_by_id('latest_borrowers').data == [123]
     b = models.Borrow.get_by_id(1)
     assert b.person.id == 123
     assert b.book.id == 1
@@ -688,22 +687,20 @@ def test_borrow_new(db):
     borrow_new(2, 123, weeks, override=True)
 
 
-def test_borrow_restitute(db):
-    """test Borrow.restitute"""
+def test_borrow_edit(db):
+    """test Borrow.edit"""
+    today = datetime.date.today()
     models.Library.create(name='main')
     create_person(123)
-    create_person(124)
     create_book()
-    create_book()
-    create_book()
-    models.Borrow.create(person=123, book=1, return_date=datetime.date.today())
-    models.Borrow.create(person=123, book=2, return_date=datetime.date.today())
-    ctxt = for_levels(partial(core.Borrow.restitute, 1, 123), 1)
-    with pytest.raises(core.BuchSchlossBaseError):
-        core.Borrow.restitute(1, 123, login_context=ctxt)
-    with pytest.raises(core.BuchSchlossBaseError):
-        core.Borrow.restitute(2, 124, login_context=ctxt)
-    core.Borrow.restitute(2, 123, login_context=ctxt)
+    models.Borrow.create(person=123, book=1, return_date=today)
+    ctxt = for_levels(partial(core.Borrow.edit, 1, weeks=1), 1)
+    assert (models.Borrow.get_by_id(1).return_date - today).days == 7
+    with pytest.raises(TypeError):
+        core.Borrow.edit(1, return_date=today, weeks=1, login_context=ctxt)
+    core.Borrow.edit(1, return_date=today, is_back=True, login_context=ctxt)
+    assert models.Borrow.get_by_id(1).return_date == today
+    assert models.Borrow.get_by_id(1).is_back
 
 
 def test_search(db):

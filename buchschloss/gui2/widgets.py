@@ -119,12 +119,12 @@ class OptionsFromSearch(ttk.Combobox):
 
     def get(self):
         """Return ID with correct type. May raise KeyError."""
-        return self.id_map[super().get()]
+        return self.id_map.get(super().get())
 
     def validate(self):
         """Override to supply the signature expected in forms: (valid, value)"""
         try:
-            return True, self.get()
+            return True, self.id_map[super().get()]
         except KeyError:
             return False, utils.get_name('error::gui2::invalid_object_selected')
 

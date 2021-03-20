@@ -116,6 +116,7 @@ class LuaDataNS(LuaObject):
     def __init__(self, data_ns, **kwargs):
         super().__init__(**kwargs)
         self.data_ns = data_ns
+        self._data = data_ns._data  # noqa: be core.DataNS for core.Borrow.edit
 
     def __repr__(self):
         return str(self.data_ns)

@@ -188,7 +188,7 @@ class MemberForm(SearchForm):
     password2: GroupElement.ONLY_NEW = NonEmptyPasswordEntry
 
 
-class ChangePasswordForm(BaseForm):
+class MemberChangePasswordForm(BaseForm):
     class FormWidget(PasswordFormWidget):
         password_name = 'new_password'
 
@@ -226,31 +226,26 @@ class LibraryForm(LibraryGroupCommon):
     action: GroupElement.ONLY_EDIT = LibraryGroupCommon.action
 
 
-class GroupActivationForm(BaseForm):
+class GroupActivateForm(BaseForm):
     group: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Group})
     src: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
     dest: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
 
 
-class BorrowRestCommonForm(BaseForm, template=True):
-    class FormWidget(mtkf.FormWidget):
-        def inject_submit(self, **data):
-            for k, v in data.items():
-                mtk.get_setter(self.widget_dict[k])(v)
-            self.submit_action()
-
-    _position_over_ = True
+class BorrowForm(BaseForm):
     person: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Person})
     book: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Book})
-
-
-class BorrowForm(BorrowRestCommonForm):
     weeks: mtkf.Element = IntEntry
     override: mtkf.Element = CheckbuttonWithVar
 
 
-class RestituteForm(BorrowRestCommonForm):
-    pass
+class BorrowRestituteForm(BaseForm):  # TODO: add a condition to OFS (wait for #69)
+    book: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Book})
+
+
+class BorrowExtendForm(BaseForm):
+    book: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Book})
+    weeks: mtkf.Element = IntEntry
 
 
 class BorrowSearchForm(SearchForm):

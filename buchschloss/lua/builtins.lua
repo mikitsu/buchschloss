@@ -40,13 +40,6 @@ function new_data_ns(backend, delegate, id)
     return setmetatable({}, {__index=index})
 end
 
-local Borrow = setmetatable({backend=buchschloss.Borrow}, ActionNS_meta)
-
-function Borrow:restitute(options)
-    return self.backend.restitute(options)
-end
-
-
 function check_level(required, do_alert)
     local r = buchschloss.login_context.invoker.level < required
     if r and (do_alert or do_alert == nil) then
@@ -57,7 +50,7 @@ end
 
 return {
     Book=setmetatable({backend=buchschloss.Book}, ActionNS_meta),
-    Borrow=Borrow,
+    Borrow=setmetatable({backend=buchschloss.Borrow}, ActionNS_meta),
     Person=setmetatable({backend=buchschloss.Person}, ActionNS_meta),
     Library=setmetatable({backend=buchschloss.Library}, ActionNS_meta),
     Group=setmetatable({backend=buchschloss.Group, delegate={activate=true}}, ActionNS_meta),

@@ -48,11 +48,10 @@ end
 
 local function restitute()
     if check_leseclub_active(true) then return end
-    local data = ui.get_data{book='int', person='int', points='int'}
+    local data = ui.get_data{book='int', points='int'}
     if not data then return end
     if check_book_in_lc_library(data.book) then return end
-    local person = data.person
-    local ret = Borrow:restitute{book=data.book, person=person}
+    local ret = buchschloss.Borrow.edit{buchschloss.Book.view_ns(data.book), is_back=true}
     local new_points = (storage.read_books[tostring(person)] or 0) + data.points
     storage.read_books[tostring(person)] = new_points
     buchschloss.set_storage(storage)

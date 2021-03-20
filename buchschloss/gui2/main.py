@@ -173,30 +173,25 @@ def new_book_autofill(form):
 
 def get_actions(spec):
     """return a dict of actions suitable for ActionTree.from_map"""
+    gfa = generic_formbased_action
     wrapped_action_ns = {
         k: common.NSWithLogin(getattr(core, k))
         for k in ('Book', 'Person', 'Group', 'Library', 'Borrow', 'Member', 'Script')
     }
     default_action_adapters = {
-        'new': lambda name, ns: generic_formbased_action('new', get_form(name), ns.new),
-        'edit': lambda name, ns: generic_formbased_action(
+        'new': lambda name, ns: gfa('new', get_form(name), ns.new),
+        'edit': lambda name, ns: gfa(
             'edit', get_form(name), ns.edit, fill_data=ns.view_ns),
         'view': lambda name, __: ShowInfo.instances.get(name),
         'search': lambda name, ns: actions.search(
             get_form(name + 'Search', get_form(name)), ns.search, ShowInfo.instances[name]),
     }
     special_action_funcs = {
-        ('Group', 'edit'): generic_formbased_action(
+        ('Group', 'edit'): gfa(
             'edit', forms.GroupForm, wrapped_action_ns['Group'].edit),
-        ('Library', 'edit'): generic_formbased_action(
+        ('Library', 'edit'): gfa(
             'edit', forms.LibraryForm, wrapped_action_ns['Library'].edit),
-        ('Group', 'activate'): generic_formbased_action(
-            None, forms.GroupActivationForm, wrapped_action_ns['Group'].activate),
-        ('Member', 'change_password'): generic_formbased_action(
-            None, forms.ChangePasswordForm, wrapped_action_ns['Member'].change_password),
-        ('Borrow', 'restitute'): generic_formbased_action(
-            None, forms.RestituteForm, wrapped_action_ns['Borrow'].restitute),
-        ('Book', 'new'): generic_formbased_action(
+        ('Book', 'new'): gfa(  # not through override because of post_init
             'new', forms.BookForm, actions.new_book, post_init=new_book_autofill),
         ('Book', 'search'): actions.search(
             forms.BookForm,
@@ -208,17 +203,23 @@ def get_actions(spec):
     def get_form(name, *default):
         return getattr(forms, name + 'Form', *default)
 
-    def set_gui2_action(namespace, func, insert_key):
+    def get_gui2_action(namespace, func):
         if (namespace, func) in special_action_funcs:
-            action = special_action_funcs[(namespace, func)]
+            return special_action_funcs[(namespace, func)]
+        action_ns = wrapped_action_ns[namespace]
+        action_adapter = default_action_adapters.get(func)
+        if action_adapter is not None:
+            return action_adapter(namespace, action_ns)
+        special_func = getattr(action_ns, func, None)
+        if special_func is None:
+            logging.warning('unknown action "{}"'.format(':'.join((namespace, func))))
+            return None
         else:
-            action_ns = wrapped_action_ns[namespace]
-            action_adapter = default_action_adapters.get(func)
-            if action_adapter is None:
-                logging.warning('unknown action "{}"'.format(':'.join((namespace, func))))
-                action = None
-            else:
-                action = action_adapter(namespace, action_ns)
+            form_name = namespace.capitalize() + func.title().replace('_', '')
+            return gfa(None, get_form(form_name), special_func)
+
+    def set_gui2_action(namespace, func, insert_key):
+        action = get_gui2_action(namespace, func)
         if action is not None:
             cur_r[insert_key] = action
 
@@ -231,7 +232,7 @@ def get_actions(spec):
                 logging.warning('unknown action namespace "{}"'.format(v['name']))
                 continue
             if v['function'] is None:
-                core_ans = getattr(core, v['name'])
+                core_ans = wrapped_action_ns[v['name']]
                 cur_r = cur_r[k]
                 action_type = (types.FunctionType, types.MethodType)
                 for func_name in dir(core_ans):
