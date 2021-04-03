@@ -124,7 +124,7 @@ def prepare_runtime(login_context: 'core.LoginContext', *,
     g['buchschloss'] = runtime.table_from({
         k: objects.LuaActionNS(
             getattr(core, k), login_context=login_context, runtime=runtime)
-        for k in 'Book Person Group Library Borrow Member Script'.split()
+        for k in core.ActionNamespace.namespaces
     })
     wrapped_lc = objects.LuaLoginContext(login_context, runtime=runtime)
     g['buchschloss']['login_context'] = wrapped_lc

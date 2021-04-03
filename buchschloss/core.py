@@ -6,9 +6,9 @@ __all__ exports:
         Instances come with a nice description of what exactly failed.
     - misc_data: provide easy access to data stored in Misc by attribute lookup
     - login: to get a LoginContext for a user
-    - Book, Person, Borrow, Member, Library, Group: namespaces for functions
+    - Book, Person, Borrow, Member, Library, Group, Script: namespaces for functions
         dealing with the respective objects
-    - ComplexSearch: for very complex search queries
+    - ScriptPermissions: flag enum of script permissions
 """
 
 import inspect
@@ -436,10 +436,13 @@ class ActionNamespace:
     model: T.ClassVar[models.Model]
     required_levels: T.Any
     actions: 'set[str]'
+    namespaces: 'T.ClassVar[list[str]]' = []
     _model_fields: T.ClassVar[set]
 
     def __init_subclass__(cls):
         """add the _model_fields and required_levels attributes"""
+        cls.namespaces.append(cls.__name__)
+        cls.model = getattr(models, cls.__name__)
         cls._model_fields = {k for k in dir(cls.model)
                              if isinstance(getattr(cls.model, k), peewee.Field)}
 

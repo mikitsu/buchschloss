@@ -176,7 +176,7 @@ def get_actions(spec):
     gfa = generic_formbased_action
     wrapped_action_ns = {
         k: common.NSWithLogin(getattr(core, k))
-        for k in ('Book', 'Person', 'Group', 'Library', 'Borrow', 'Member', 'Script')
+        for k in core.ActionNamespace.namespaces
     }
     default_action_adapters = {
         'new': lambda name, ns: gfa('new', get_form(name), ns.new),
