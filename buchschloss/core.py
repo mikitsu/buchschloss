@@ -435,6 +435,7 @@ class ActionNamespace:
     Library, Group, Borrow and Script namespaces"""
     model: T.ClassVar[models.Model]
     required_levels: T.Any
+    actions: 'set[str]'
     _model_fields: T.ClassVar[set]
 
     def __init_subclass__(cls):
@@ -452,13 +453,16 @@ class ActionNamespace:
             checker = partial(check_level, level=level, resource=f.__qualname__)
             return type(func)(wrapper)  # func is the static/classmethod from outside
 
+        cls.actions = {'view_ns', 'view_repr', 'search'}  # implemented here
         cls.required_levels = getattr(config.core.required_levels, cls.__name__)
         for name, func in vars(cls).items():
             # the exception
             if (cls.__name__, name) == ('Member', 'change_password'):
+                cls.actions.add(name)
                 continue
             # since these are only namespaces, no normal methods
             if isinstance(func, (staticmethod, classmethod)):
+                cls.actions.add(name)
                 if name.startswith('view'):
                     req_level = cls.required_levels['view']
                 elif cls.__name__ == 'Book' and name.startswith('get_all'):

@@ -122,10 +122,8 @@ def prepare_runtime(login_context: 'core.LoginContext', *,
     restrict_runtime(runtime, config.lua.whitelist.mapping)
     g = runtime.globals()
     g['buchschloss'] = runtime.table_from({
-        k: objects.LuaActionNS(getattr(core, k),
-                               login_context=login_context,
-                               extra_get_allowed=ans_extended_funcs.get(k, ()),
-                               runtime=runtime)
+        k: objects.LuaActionNS(
+            getattr(core, k), login_context=login_context, runtime=runtime)
         for k in 'Book Person Group Library Borrow Member Script'.split()
     })
     wrapped_lc = objects.LuaLoginContext(login_context, runtime=runtime)

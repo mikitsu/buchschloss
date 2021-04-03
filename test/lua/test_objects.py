@@ -75,11 +75,12 @@ def test_action_ns():
 
     # noinspection PyArgumentList
     rt = lupa.LuaRuntime(attribute_handlers=(lua.lua_get, lua.lua_set))
-    dummy = Dummy(view_ns=view_ns, new=new, _call=lambda s, dns, runtime=None: dns)
+    dummy = Dummy(view_ns=view_ns, new=new, _call=lambda s, dns, runtime=None: dns,
+                  actions={'new', 'view_ns'})
     ns_book = objects.LuaActionNS(dummy, login_context=FLAG, runtime=rt)
     rt.globals()['book'] = ns_book
     with pytest.raises(AttributeError):
-        rt.eval('book.view_str')
+        rt.eval('book.model')
     assert rt.eval('book.view_ns') is not None
     assert rt.eval('book.new')
     assert rt.eval('book.view_ns(1).a') is FLAG

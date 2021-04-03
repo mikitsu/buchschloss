@@ -9,6 +9,7 @@ from buchschloss import lua
 
 class DummyActionNS:
     """Save all calls and return fabricated results"""
+    actions = {'new', 'view_ns', 'search', 'restitute', 'activate'}
 
     def __init__(self, results):
         self.results = {k: iter(v) for k, v in results.items()}

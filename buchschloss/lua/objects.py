@@ -68,14 +68,11 @@ class LuaObject(abc.ABC):
 
 class LuaActionNS(LuaObject):
     """wrap an ActionNamespace for use with Lua"""
-    get_allowed = ('new', 'view_ns', 'edit', 'search')
-
     def __init__(self, action_ns: 'T.Type[core.ActionNamespace]',
                  login_context: 'core.LoginContext',
-                 extra_get_allowed: T.Tuple[str, ...] = (),
                  **kwargs):
         super().__init__(**kwargs)
-        self.get_allowed += extra_get_allowed
+        self.get_allowed = action_ns.actions
         self.login_context = login_context
         self.action_ns = action_ns
 
