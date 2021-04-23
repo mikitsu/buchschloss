@@ -476,12 +476,6 @@ class ActionNamespace:
     def edit(id_, *, login_context, **kwargs):
         """Edit an existing record"""
 
-    @staticmethod
-    @abc.abstractmethod
-    def view_str(id_: T.Union[int, str], *, login_context) -> dict:
-        """Return information in a dict"""
-        raise NotImplementedError
-
     @classmethod
     def view_ns(cls, id_: T.Union[int, str], *, login_context):
         """Return a namespace of information"""
@@ -489,16 +483,6 @@ class ActionNamespace:
         try:
             return DataNamespace(cls, cls.model.get_by_id(id_), login_context)
         except cls.model.DoesNotExist:
-            raise BuchSchlossNotFoundError(cls.model.__name__, id_)
-
-    @classmethod
-    def view_repr(cls, id_: T.Union[str, int], *, login_context) -> str:
-        """Return a string representation"""
-        check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_repr')
-        try:
-            return str(next(iter(cls.model.select_str_fields().where(
-                getattr(cls.model, cls.model.pk_name) == id_).limit(1))))
-        except StopIteration:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
 
     @classmethod
@@ -651,43 +635,6 @@ class Book(ActionNamespace):
         logging.info('{} edited {}'.format(login_context, book))
         return errors
 
-    @staticmethod
-    @from_db(models.Book)
-    def view_str(book: T.Union[int, models.Book], *, login_context):
-        """Return data about a Book.
-
-        Return a dictionary consisting of the following items as strings:
-
-            - author, isbn, title, series, series_number, language, publisher,
-              concerned_people, year, medium, genres, shelf, id
-            - the name of the Library the Book is in
-            - groups as a string consisting of group names separated by ';'
-            - the book's status (available, borrowed or inactive)
-            - ``return_date``: either ``'-----'`` or the date the book will be returned
-            - ``borrowed_by``: ``'-----'`` or a representation of the borrowing Person
-            - ``__str__``: the string representation of the Book
-
-        and ``'borrowed_by_id'``, the ID of the Person that borrowed the Book (int)
-        or None if not borrowed
-        """
-        r = {k: str(getattr(book, k) or '') for k in
-             ('author', 'isbn', 'title', 'series', 'series_number', 'language',
-              'publisher', 'concerned_people', 'year', 'medium', 'genres', 'shelf', 'id',
-              )}
-        r['library'] = book.library.name
-        r['groups'] = ';'.join(g.name for g in book.groups)
-        borrow = book.borrow or Dummy(id=None, _bool=False)
-        r['status'] = utils.get_name('Book::' +  # noqa
-                                     ('borrowed' if borrow else
-                                      ('available' if book.is_active
-                                       else 'inactive')))
-        r['return_date'] = str(borrow.return_date.strftime(config.core.date_format))
-        r['borrowed_by'] = str(borrow.person)
-        r['borrowed_by_id'] = borrow.person.id
-        r['__str__'] = str(book)
-        logging.info('{} viewed {}'.format(login_context, book))
-        return r
-
 
 class Person(ActionNamespace):
     """Namespace for Person-related functions"""
@@ -759,31 +706,6 @@ class Person(ActionNamespace):
                         .format(kwargs['borrow_permission'])
                         if 'borrow_permission' in kwargs else ''))
         return errors
-
-    @staticmethod
-    @from_db(models.Person)
-    def view_str(person: T.Union[models.Person, int], *, login_context):
-        """Return data about a Person.
-
-        Return a dict consisting of the following items as strings:
-
-            - id, first_name, last_name, `class_` max_borrow, borrow_permission attributes
-            - libraries as a string, individual libraries separated by ';'
-            - borrows as a tuple of strings representing the borrows
-            - ``__str__``: the string representation
-
-        and ``'borrow_book_ids'``, a sequence of the IDs of the borrowed books
-        in the same order their representations appear in 'borrows'
-        """
-        r = {k: str(getattr(person, k) or '') for k in
-             'id first_name last_name class_ max_borrow borrow_permission'.split()}
-        borrows = person.borrows
-        r['borrows'] = tuple(map(str, borrows))
-        r['borrow_book_ids'] = [b.book.id for b in borrows]
-        r['libraries'] = ';'.join(L.name for L in person.libraries)
-        r['__str__'] = str(person)
-        logging.info('{} viewed {}'.format(login_context, person))
-        return r
 
 
 class Library(ActionNamespace):
@@ -872,25 +794,6 @@ class Library(ActionNamespace):
             if pay_required is not None:
                 lib.pay_required = pay_required
                 lib.save()
-
-    @staticmethod
-    @from_db(models.Library)
-    def view_str(lib, *, login_context):
-        """Return information on the Library
-
-        Return a dict with the following items as strings:
-
-        - ``__str__``: a string representation of the Library
-        - ``name``: the name of the Library
-        - ``people``: the IDs of the people in the Library, separated by ';'
-        - ``books``: the IDs of the books in the Library, separated by ';'
-        """
-        return {
-            '__str__': str(lib),
-            'name': lib.name,
-            'people': ';'.join(map(str, (p.id for p in lib.people))),
-            'books': ';'.join(map(str, (b.id for b in lib.books))),
-        }
 
 
 class Group(ActionNamespace):
@@ -989,23 +892,6 @@ class Group(ActionNamespace):
         (models.Book.update(library=dest)
          .where(models.Book.id << [b.id for b in books_to_update])
          .execute())
-
-    @staticmethod
-    @from_db(models.Group)
-    def view_str(group, *, login_context):
-        """Return data on a Group
-
-        Return a dict with the following items as strings:
-
-        - ``__str__``: a string representation of the Group
-        - ``name``: the name of the Group
-        - ``books``: the IDs of the books in the Group separated by ';'
-        """
-        return {
-            '__str__': str(group),
-            'name': group.name,
-            'books': ';'.join(str(b.id) for b in group.books),
-        }
 
 
 class Borrow(ActionNamespace):
@@ -1113,32 +999,6 @@ class Borrow(ActionNamespace):
         logging.info('{} edited {}'.format(login_context, borrow))
         borrow.save()
 
-    @staticmethod
-    @from_db(models.Borrow)
-    def view_str(borrow, *, login_context):
-        """Return information about a Borrow
-
-        Return a dictionary containing the following items:
-
-        - ``__str__``: a string representation of the Borrow
-        - ``person``: a string representation of the borrowing Person
-        - ``person_id``: the ID of the borrowing Person
-        - ``book``: a string representation of the borrowed Book
-        - ``book_id``: the ID of the borrowed Book
-        - ``return_date``: a string representation of the date
-          by which the book has to be returned
-        - ``is_back``: a string indicating whether the Book has been returned
-        """
-        return {
-            '__str__': str(borrow),
-            'person': str(borrow.person),
-            'person_id': borrow.person.id,
-            'book': str(borrow.book),
-            'book_id': borrow.book.id,
-            'return_date': str(borrow.return_date),
-            'is_back': utils.get_name(str(borrow.is_back)),
-        }
-
 
 class Member(ActionNamespace):
     """namespace for Member-related functions"""
@@ -1211,23 +1071,6 @@ class Member(ActionNamespace):
         member.save()
         logging.info("{} changed {}'s password".format(login_context, member))
 
-    @staticmethod
-    @from_db(models.Member)
-    def view_str(member, *, login_context):
-        """Return information about a Member
-
-        Return a dictionary with the following string items:
-
-        - ``__str__``: a representation of the Member
-        - ``name``: the Member's name
-        - ``level``: the Member's level
-        """
-        return {
-            '__str__': str(member),
-            'name': member.name,
-            'level': utils.level_names[member.level],
-        }
-
 
 class Script(ActionNamespace):
     """namespace for Script-related functions"""
@@ -1278,26 +1121,6 @@ class Script(ActionNamespace):
             setattr(script, k, v)
         script.save()
         logging.info('{} edited {}'.format(login_context, script))
-
-    @staticmethod
-    @from_db(models.Script)
-    def view_str(script: T.Union[models.Script, str], *, login_context) -> dict:
-        """return a dict with the following items:
-
-        - ``__str__``: a string representation of the script
-        - ``name``: the script name
-        - ``setlevel``: the script's setlevel status (``'-----'`` if not set)
-        - ``permissions``: the scripts permissions, separated by ``';'``
-        """
-        return {
-            '__str__': str(script),
-            'name': script.name,
-            'setlevel': ('-----' if script.setlevel is None
-                         else utils.level_names[script.setlevel]),
-            'permissions': ';'.join(utils.get_name('Script::permissions::' + p.name)
-                                    for p in ScriptPermissions
-                                    if p in script.permissions)
-        }
 
     @classmethod
     @from_db(script=models.Script)
