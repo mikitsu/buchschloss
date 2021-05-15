@@ -97,10 +97,6 @@ and authentication/authorization for more information on it.
 The data type independent interface for all ``ActionNamespace`` s is:
 
 - ``view_ns(id, /)`` for getting a namespace with all data saved about a specific instance.
-- ``view_str(id, /)`` for getting a dictionary with string keys and string values
-  (with few exceptions). This is useful for displaying data to an end-user
-- ``view_repr(id, /)`` for getting a string representation. This is fully equivalent to
-  ``str(view_ns(<id>))``, but gets just the required fields from the database
 - ``search(condition)`` for searching. Refer to the docstring for
   information on the condition format.
 
