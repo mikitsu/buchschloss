@@ -1,10 +1,11 @@
 """widgets"""
+import re
 import enum
 import functools
 import operator
 import tkinter as tk
 import tkinter.ttk as ttk
-from tkinter import Entry, Label, Button
+from tkinter import Label, Button
 from functools import partial
 from collections import abc
 import typing as T
@@ -18,71 +19,168 @@ from . import common
 from .. import utils
 from .. import config
 from .. import core
+from . import formlib
 
 
-class ListEntryMixin(Entry):
-    def __init__(self, master, cnf={}, sep=';', **kw):
-        self.sep = sep
-        super().__init__(master, cnf, **kw)
+class Entry(formlib.FormWidget):
+    """Wrap tk.Entry with options
+
+    - cycling through previous values
+    - options for handling of empty inputs
+    - validation via regex
+    """
+    widget: tk.Entry
+    _history_dict = {}
+
+    def __init__(self, form, master, name,
+                 on_empty,
+                 regex=None,
+                 transform=None,
+                 max_history=1_000,
+                 extra_kwargs=None,
+                 ):
+        """Wrapped tk.Entry with history, options for empty input and regex validation
+
+        :param form: is the form this widget is used in (passed up)
+        :param name: is the name of this widget in the form (passed up)
+        :param on_empty: is a string specifying what to do when a value is empty:
+          ``'error'`` will treat it as an error, ``'none'`` will transform it
+          into ``None`` and ``'keep'`` will leave it unchanged, i.e. ``''``
+        :param regex: is an optional regular expression to apply to input
+        :param transform: is an optional function that will be applied to values.
+          A ValueError from this function will be treated as validation failure.
+        :param max_history: specifies how many previous inputs to store.
+          Set to 0 to disable history.
+        :param extra_kwargs: arguments to pass to the tk Entry widget
+        """
+        super().__init__(form, master, name)
+        if on_empty not in ('error', 'none', 'keep'):
+            raise ValueError("on_empty must be 'error', 'none' or 'keep'")
+        self.on_empty = on_empty
+        self.regex = re.compile(regex) if isinstance(regex, str) else regex
+        self.transform = lambda v: v if transform is None else transform
+        self.widget = tk.Entry(self.master, **(extra_kwargs or {}))
+        if max_history:
+            self.history = self._history_dict.setdefault((type(self.form), self.name), [])
+            self.max_history = max_history
+            self.history_index = -1
+            self.widget.bind('<FocusOut>', self._update_history)
+            self.widget.bind('<Next>', lambda e: self._history_move(1))
+            self.widget.bind('<Prior>', lambda e: self._history_move(-1))
+
+    def get_simple(self):
+        """delegate to self.widget.get() and handle on_empty=='none'"""
+        v = self.widget.get()
+        return None if not v and self.on_empty == 'none' else self.transform(v)
+
+    def set_simple(self, data):
+        """delete current and insert new"""
+        self.widget.delete(0, tk.END)
+        self.widget.insert(0, data)
+
+    def validate_simple(self):
+        """handle on_empty='error' and validate_re"""
+        v = self.get_simple()
+        if self.on_empty == 'error' and not v:
+            return self.form.get_name(f'{self.name}::error::empty')
+        if self.regex is not None and self.regex.search(v) is None:
+            return self.form.get_name(f'{self.name}::error::regex')
+        try:
+            self.get_simple()
+        except ValueError:
+            return self.form.get_name(f'{self.name}::error::transform')
+        return None
+
+    def _update_history(self, event=None):
+        """Add content to history and reset index"""
+        self.history_index = -1
+        v = self.widget.get()
+        if self.history and v == self.history[0]:
+            return
+        else:
+            self.history.insert(0, v)
+            if len(self.history) > self.max_history:
+                self.history = self.history[:-1]
+
+    def _history_move(self, direction):
+        """move one item up (direction == 1) or down (direction == -1)"""
+        if 0 <= self.history_index + direction < len(self.history):
+            self.history_index += direction
+            self.set_simple(self.history[self.history_index])
+
+
+class SeriesInput(formlib.FormWidget):
+    """Provide Entry widgets for a series name and number"""
+    def __init__(self, form, master, name):
+        super().__init__(form, master, name)
+        self.widget = tk.Frame(self.form.frame)
+        self.subwidgets = {
+            'series': Entry(self.form, self.widget, 'series', 'none'),
+            'series_number': Entry(self.form, self.widget, 'series_number', 'none',
+                                   transform=int, extra_kwargs={'width': 2}),
+        }
+        for w in self.subwidgets.values():
+            w.widget.pack(side=tk.LEFT)
 
     def get(self):
-        v = super().get()
-        if v:
-            return v.split(self.sep)
-        else:
-            return []
+        """Return series name and number, under 'series' and 'series_number'"""
+        return {k: v for w in self.subwidgets.values() for k, v in w.get()}
 
-
-ListEntry = type('ListEntry', (ListEntryMixin, Entry), {})
-ListREntry = type('ListREntry', (ListEntryMixin, mtk.RememberingEntry), {})
-ISBNEntry = mtk.ValidatedWidget.new_cls(Entry, validation.ISBN_validator)
-NonEmptyEntry = mtk.ValidatedWidget.new_cls(Entry, validation.nonempty)
-NonEmptyREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.nonempty)
-ClassEntry = mtk.ValidatedWidget.new_cls(Entry, validation.class_validator)
-IntListEntry = mtk.ValidatedWidget.new_cls(ListEntry, validation.int_list)
-IntEntry = mtk.ValidatedWidget.new_cls(Entry, validation.type_int)
-NullIntEntry = mtk.ValidatedWidget.new_cls(Entry, validation.int_or_none)
-NullEntry = mtk.ValidatedWidget.new_cls(Entry, validation.none_on_empty)
-NullREntry = mtk.ValidatedWidget.new_cls(mtk.RememberingEntry, validation.none_on_empty)
-ScriptNameEntry = mtk.ValidatedWidget.new_cls(Entry, validation.script_name)
-
-
-class SeriesEntry(mtk.ContainingWidget):
-    """Entry combining a name for the series and an integer input for the number"""
-
-    def __init__(self, master, **kw):
-        self.number_dummy = core.Dummy(set=self.set_number,
-                                       get=lambda: 1,
-                                       validate=lambda: (1, 0))
-        widgets = [
-            (NullREntry, {'rem_key': 'book-series'}),
-            (NullIntEntry, {'width': 2}),
-        ]
-        super().__init__(master, *widgets, **kw)
+    def set(self, data):
+        """Set series name and number"""
+        for w in self.subwidgets.values():
+            w.set(data)
 
     def validate(self):
-        """check whether the series number is valid
+        """Validate name and number individually and together"""
+        r = {k: v for w in self.subwidgets.values() for k, v in w.validate()}
+        if all((not r,
+                self.subwidgets['series_number'].get_simple() is not None,
+                self.subwidgets['series'].get_simple() is None)):
+            r['series'] = self.form.get_name('error::series_number_without_series')
+        return r
 
-            - if it is a number
-            - if it is only given in combination with a series
-        """
-        # Validation always succeeds
-        _, series = self.widgets[0].validate()
-        number_valid, series_number = self.widgets[1].validate()
-        if not number_valid:
-            return False, utils.get_name('error::gui2::series_number_must_be_int')
-        if series is None and series_number is not None:
-            return False, utils.get_name('error::gui2::number_without_series')
-        return True, (series, series_number)
 
-    def set_number(self, number):
-        mtk.get_setter(self.widgets[1])(number)
+class ConfirmedPasswordInput(formlib.FormWidget):
+    """Provide two password fields and check the entered password are the same"""
+    def __init__(self, form, master, name):
+        super().__init__(form, master, name)
+        self.widget = tk.Frame(self.master)
+        self.password_1 = tk.Entry(self.widget, show='*')
+        self.password_2 = tk.Entry(self.widget, show='*')
+        self.password_1.pack()
+        self.password_2.pack()
 
-    def set(self, value):
-        mtk.get_setter(self.widgets[0])(value)
+    def get_simple(self):
+        """raise ValueError if the password don't match"""
+        p1, p2 = self.password_1.get(), self.password_2.get()
+        if p1 != p2:
+            raise ValueError("the passwords don't match")
+        return p1
 
-    def get(self):
-        return mtk.get_getter(self.widgets[0])()
+    def set_simple(self, data):
+        """set both fields to the given value"""
+        for w in (self.password_1, self.password_2):
+            w.delete(0, tk.END)
+            w.insert(0, data)
+
+    def validate_simple(self):
+        """check whether the passwords match"""
+        p1, p2 = self.password_1.get(), self.password_2.get()
+        if p1 != p2:
+            return self.form.get_name('error::password_mismatch')
+        return None
+
+
+ISBNEntry = (Entry, 'error', {'transform': validation.ISBN_validator})
+NonEmptyEntry = (Entry, 'error', {'max_history': 0})
+NonEmptyREntry = (Entry, 'error', {})
+ClassEntry = (Entry, 'error', {'regex': config.gui2.class_regex})
+IntEntry = (Entry, 'error', {'transform': int})
+NullIntEntry = (Entry, 'none', {'transform': int})
+NullEntry = (Entry, 'none', {'max_history': 0})
+NullREntry = (Entry, 'none', {})
+ScriptNameEntry = (Entry, 'error', {'regex': r'^[a-zA-Z0-9 _-]*$'})
 
 
 class ActionChoiceWidget(mtk.ContainingWidget):
