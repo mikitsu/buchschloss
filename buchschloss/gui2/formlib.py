@@ -26,8 +26,8 @@ class Form:
     Where ``field`` is a field name (passed to widgets and used as default result key),
     ``tag`` is a form tag (see below) with ``None`` indicating the default
     and a ``widget_spec`` specifies a ``FormWidget`` either as a class, in which
-    case the instance will be created without arguments or as a ``(class, kwargs)`` tuple,
-    in which case the instance will be created with ``**kwargs``.
+    case the instance will be created without arguments or as a ``(class, *args, kwargs)``
+    tuple, in which case the instance will be created with ``*args`` and  ``**kwargs``.
     It may also be ``None``, in which case no widget is created.
 
     .. note::
@@ -68,7 +68,7 @@ class Form:
         self.tag = tag
         self.submit_callback = submit_callback
         self.widget_dict = {
-            name: widget[0](self, name, **widget[1])
+            name: widget[0](self, self.frame, name, *widget[1:-1], **widget[-1])
             for name, tag_alternatives in self.all_widgets.items()
             for widget in [tag_alternatives.get(tag, tag_alternatives[None])]
             if widget is not None
@@ -119,10 +119,8 @@ class Form:
     def validate(self):
         """Check for and return errors. Default: rely on widget validation"""
         errors = {}
-        for name, widget in self.widget_dict.items():
-            err = widget.validate()
-            if err is not None:
-                errors[name] = err
+        for widget in self.widget_dict.values():
+            errors.update(widget.validate())
         return errors
 
     @staticmethod
@@ -145,10 +143,14 @@ class FormWidget:
     A FormWidget wraps a tk input widget and provides a uniform interface to Form.
     This is the base class. Use the specific subclasses.
     """
+    form: Form
+    master: tk.Widget
+    name: str
     widget: tk.Widget
 
-    def __init__(self, form, name):
+    def __init__(self, form, master, name):
         self.form = form
+        self.master = master
         self.name = name
 
     def get(self):
@@ -166,15 +168,27 @@ class FormWidget:
         """Set this widgets value to those provided (ignore unknown keys)
         
         This default implementation calls ``self.set_simple(data[self.name])``
+        if ``self.name in data``
         """
-        self.set_simple(data[self.name])
+        if self.name in data:
+            self.set_simple(data[self.name])
     
     def set_simple(self, data):
         """Set a single value this widget provides"""
-        raise NotImplementedError("implement .set_simple() if you don't override .set()")
+        raise NotImplementedError(
+            "implement .set_simple() if you don't override .set()")
     
     def validate(self):
-        """Validate this widget's data and return None or an error message for humans
+        """Validate this widget's data and return None or a dict of error messages
         
-        This default implementation always returns None (i.e. valid)"""
-        return None
+        This default implementation returns ``{self.name: self.validate_simple()}``
+        if ``self.validate_simple() is not None`` and ``{}`` otherwise
+        calling ``.validate_simple()`` only once.
+        """
+        v = self.validate_simple()
+        return {} if v is None else {self.name: v}
+
+    def validate_simple(self):
+        """Validate this widgets data and return None or an error message"""
+        raise NotImplementedError(
+            "implement .validate_simple() if you don't override .validate()")
