@@ -10,9 +10,13 @@ from buchschloss import config, core, models, utils
 
 def create_book(library='main', **options):
     """create a Book with falsey values. The Library can be specified"""
+    genres = options.pop('genres', ())
     kwargs = dict(isbn=0, author='', title='', language='', publisher='',
                   year=0, medium='', shelf='', library=library)
-    return models.Book.create(**{**kwargs, **options})
+    b = models.Book.create(**{**kwargs, **options})
+    for g in genres:
+        models.Genre.get_or_create(name=g, book=b)
+    return b
 
 
 def create_person(id_, **options):
@@ -203,7 +207,7 @@ def test_book_new(db):
     ctxt = for_levels(partial(
         core.Book.new,
         isbn=123, year=456, author='author', title='title', language='lang',
-        publisher='publisher', medium='medium', shelf='A1'),
+        publisher='publisher', medium='medium', shelf='A1', genres=('one', 'two')),
         2,
         lambda r: r == 1
     )
@@ -219,6 +223,7 @@ def test_book_new(db):
     assert b.shelf == 'A1'
     assert b.library.name == 'main'
     assert tuple(b.groups) == ()
+    assert set(b.genres) == {'one', 'two'}
     with pytest.raises(core.BuchSchlossBaseError):
         book_new(isbn=123, year=456, author='author', title='title', language='lang',
                  publisher='publisher', medium='medium', shelf='A1',
@@ -276,6 +281,8 @@ def test_book_edit(db):
     assert models.Book.get_by_id(1).year == 123
     assert models.Book.get_by_id(2).medium == ''
     assert models.Book.get_by_id(2).year == 0
+    book_edit(1, genres=('one', 'two'))
+    assert set(models.Book.get_by_id(1).genres) == {'one', 'two'}
 
 
 def test_library_new(db):
@@ -535,7 +542,7 @@ def test_borrow_edit(db):
 def test_search(db):
     """test searches"""
     models.Library.create(name='main')
-    book_1 = core.DataNamespace(core.Book, create_book(author='author name'), None)
+    book_1 = core.DataNamespace(core.Book, create_book(author='author name', genres=('one', 'two')), None)
     book_2 = core.DataNamespace(core.Book, create_book(author='author 2', year=2000), None)
     person = core.DataNamespace(core.Person, create_person(123, class_='cls', libraries=['main']), None)
     ctxt_person = for_levels(partial(core.Person.search, ()), 1)
@@ -561,6 +568,7 @@ def test_search(db):
     assert tuple(book_search(('year', 'ge', 2000))) == (book_2,)
     assert tuple(book_search(('id', 'in', (1, 200, 300)))) == (book_1,)
     assert tuple(book_search(('author', 'in', ('neither', 'matches')))) == ()
+    assert tuple(book_search(('genres', 'eq', 'one'))) == (book_1,)
 
 
 def test_script_new(db):

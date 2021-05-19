@@ -536,6 +536,11 @@ class ActionNamespace:
                 mod = fv.rel_model
                 q = handle_many_to_many()
                 fv = getattr(mod, mod.pk_name)
+            elif isinstance(fv, peewee.BackrefAccessor):
+                mod = fv.rel_model.alias()
+                q = q.join(mod, on=(getattr(cur, cur.pk_name)
+                                    == getattr(mod, fv.field.name)))
+                fv = getattr(mod, mod.pk_name)
             return fv, q
 
         def handle_condition(cond, q):
@@ -551,6 +556,12 @@ class ActionNamespace:
                     return getattr(operator, op + '_')(handle_condition(a, q),
                                                        handle_condition(b, q))
             else:
+                if a == 'genres':
+                    # If something like this becomes more prevalent,
+                    # consider adding a transform= to DataNS
+                    # which allows removing the properties in models.
+                    # This will also move logic out of models.
+                    a = '_genres'
                 a, q = follow_path(a, q)
                 if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
                     return q.where(getattr(operator, op)(a, b))
@@ -576,7 +587,7 @@ class Book(ActionNamespace):
             year: int, medium: str, shelf: str, series: T.Optional[str] = None,
             series_number: T.Optional[int] = None,
             concerned_people: T.Optional[str] = None,
-            genres: T.Optional[str] = None, groups: T.Iterable[str] = (),
+            genres: T.Iterable[str] = (), groups: T.Iterable[str] = (),
             library: str = 'main', login_context: LoginContext) -> int:
         """Attempt to create a new Book with the given arguments and return the ID
 
@@ -591,15 +602,19 @@ class Book(ActionNamespace):
                     isbn=isbn, author=author, title=title, language=language,
                     publisher=publisher, year=year, medium=medium,
                     shelf=shelf, series=series, series_number=series_number,
-                    concerned_people=concerned_people, genres=genres,
+                    concerned_people=concerned_people,
                     library=models.Library.get_by_id(library),
                 )
-                for g in groups:
-                    b.groups.add(models.Group.get_or_create(name=g)[0])
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', library)
-            else:
-                logging.info('{} created {}'.format(login_context, b))
+            for g in groups:
+                b.groups.add(models.Group.get_or_create(name=g)[0])
+            for g in genres:
+                try:
+                    models.Genre.create(book=b, name=g)
+                except peewee.IntegrityError as e:
+                    assert str(e).startswith('UNIQUE')
+            logging.info('{} created {}'.format(login_context, b))
         return b.id
 
     @classmethod
@@ -614,7 +629,7 @@ class Book(ActionNamespace):
 
         Return a set of error messages for errors during group changes.
         """
-        if ((not set(kwargs.keys()) <= cls._model_fields)
+        if ((not set(kwargs.keys()) - {'genres'} <= cls._model_fields)
                 or 'id' in kwargs):
             raise TypeError('unexpected kwarg')
         groups = set(kwargs.pop('groups', ()))
@@ -625,6 +640,12 @@ class Book(ActionNamespace):
                 book.library = models.Library.get_by_id(lib)
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', lib)
+        genres = kwargs.pop('genres', ())
+        for g in genres:
+            try:
+                models.Genre.create(book=book, name=g)
+            except peewee.IntegrityError as e:
+                assert str(e).startswith('UNIQUE')
         for k, v in kwargs.items():
             if (isinstance(v, str)
                     and not isinstance(getattr(models.Book, k), peewee.CharField)):
