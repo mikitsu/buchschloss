@@ -158,7 +158,7 @@ class Book(Model):
     concerned_people: T.Union[str, CharField] = CharField(null=True)
     year: T.Union[int, IntegerField] = IntegerField()
     medium: T.Union[str, CharField] = CharField()
-    genres: T.Union[str, CharField] = CharField(null=True)
+    genres: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # genres as backref
 
     groups: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # groups as backref
     id: T.Union[int, IntegerField] = AutoField(primary_key=True)
@@ -174,6 +174,16 @@ class Book(Model):
 
     def __str__(self):
         return utils.get_name('Book[{}]"{}"').format(self.id, self.title)
+
+
+class Genre(Model):
+    """A single genre-book pair"""
+    book: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]\
+        = ForeignKeyField(Book, backref='genres')
+    name: T.Union[str, CharField] = CharField()
+
+    class Meta:
+        primary_key = peewee.CompositeKey('book', 'name')
 
 
 class Group(Model):
