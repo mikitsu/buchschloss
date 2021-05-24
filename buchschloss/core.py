@@ -556,12 +556,6 @@ class ActionNamespace:
                     return getattr(operator, op + '_')(handle_condition(a, q),
                                                        handle_condition(b, q))
             else:
-                if a == 'genres':
-                    # If something like this becomes more prevalent,
-                    # consider adding a transform= to DataNS
-                    # which allows removing the properties in models.
-                    # This will also move logic out of models.
-                    a = '_genres'
                 a, q = follow_path(a, q)
                 if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
                     return q.where(getattr(operator, op)(a, b))
@@ -1246,6 +1240,8 @@ class DataNamespace:
                     obj,
                     login_context=self._login_context,
                 )
+        elif item in self._handlers.get('transform', {}):
+            return self._handlers['transform'][item](getattr(self._data, item))
         elif item == 'id':
             # Not making the same mistake twice
             return getattr(self._data, type(self._data).pk_name)
@@ -1255,8 +1251,12 @@ class DataNamespace:
     data_handling: T.Mapping[T.Type[ActionNamespace], T.Mapping] = {
         Book: {
             'allow': ('id isbn author title series series_number language publisher '
-                      'concerned_people year medium genres shelf is_active').split(),
-            'wrap_iter': {'groups': Group},
+                      'concerned_people year medium shelf is_active').split(),
+            # 'wrap_iter': {'groups': Group},
+            'transform': {
+                'genres': lambda gs: [g.name for g in gs],
+                'groups': lambda gs: [g.name for g in gs],
+            },
             'wrap_dns': {'library': Library, 'borrow': Borrow},
         },
         Person: {

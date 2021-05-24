@@ -115,17 +115,20 @@ def test_data_ns():
         'allow': 'ab',
         'wrap_iter': {'i': DataB},
         'wrap_dns': {'d': DataB, 'n': DataB},
+        'transform': {'g': lambda gs: [g.x for g in gs]},
     }
     core.DataNamespace.data_handling[DataB] = {'allow': 'ad'}
     data = core.DataNamespace(
         DataA,
-        DataA(a=1, b=[1, 2, 3], d=DataB(x=0), i=[DataB(x=1), DataB(x=2)], n=None),
+        DataA(a=1, b=[1, 2, 3], d=DataB(x=0), i=[DataB(x=1), DataB(x=2)], n=None,
+              g=[DataB(x=5), DataB(x=7)]),
         login_context=FLAG,
     )
     assert data.a == 1
     assert data.b == [1, 2, 3]
     validate_datab(data.d, 0)
     validate_datab(data.i[0], 1)
+    assert data.g == [5, 7]
     assert data == 1
     assert {data: 'xyz'}[1] == 'xyz' == {1: 'xyz'}[data]
 
@@ -223,7 +226,7 @@ def test_book_new(db):
     assert b.shelf == 'A1'
     assert b.library.name == 'main'
     assert tuple(b.groups) == ()
-    assert set(b.genres) == {'one', 'two'}
+    assert set(b.genres) == {models.Genre.get_by_id((b, k)) for k in ('one', 'two')}
     with pytest.raises(core.BuchSchlossBaseError):
         book_new(isbn=123, year=456, author='author', title='title', language='lang',
                  publisher='publisher', medium='medium', shelf='A1',
@@ -282,7 +285,8 @@ def test_book_edit(db):
     assert models.Book.get_by_id(2).medium == ''
     assert models.Book.get_by_id(2).year == 0
     book_edit(1, genres=('one', 'two'))
-    assert set(models.Book.get_by_id(1).genres) == {'one', 'two'}
+    b = models.Book.get_by_id(1)
+    assert set(b.genres) == {models.Genre.get_by_id((b, k)) for k in ('one', 'two')}
 
 
 def test_library_new(db):

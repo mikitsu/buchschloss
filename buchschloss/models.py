@@ -159,15 +159,12 @@ class Book(Model):
     year: T.Union[int, IntegerField] = IntegerField()
     medium: T.Union[str, CharField] = CharField()
 
+    genres: peewee.BackrefAccessor
     groups: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # groups as backref
     id: T.Union[int, IntegerField] = AutoField(primary_key=True)
     library: T.Union[Library, ForeignKeyField] = ForeignKeyField(Library, backref='books')
     shelf: T.Union[str, CharField] = CharField()
     is_active: T.Union[bool, BooleanField] = BooleanField(default=True)
-
-    @property
-    def genres(self):
-        return [g.name for g in self._genres]
 
     @property
     def borrow(self):
@@ -181,8 +178,7 @@ class Book(Model):
 
 class Genre(Model):
     """A single genre-book pair"""
-    book: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]\
-        = ForeignKeyField(Book, backref='_genres')
+    book = ForeignKeyField(Book, backref='genres')
     name: T.Union[str, CharField] = CharField()
 
     pk_name = 'name'  # for search
