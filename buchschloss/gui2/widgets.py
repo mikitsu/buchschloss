@@ -1,5 +1,4 @@
-"""widgets"""
-import re
+"""specific widgets and FormWidget classes"""
 import enum
 import functools
 import operator
@@ -21,117 +20,14 @@ from .. import core
 from . import formlib
 
 
-class Entry(formlib.FormWidget):
-    """Wrap tk.Entry with options
-
-    - cycling through previous values
-    - options for handling of empty inputs
-    - validation via regex
-    """
-    widget: tk.Entry
-    _history_dict = {}
-
-    def __init__(self, form, master, name,
-                 on_empty,
-                 regex=None,
-                 transform=None,
-                 max_history=1_000,
-                 autocomplete=None,
-                 extra_kwargs=None,
-                 ):
-        """Wrapped tk.Entry with history, autocomplete and regex validation
-
-        :param form: is the form this widget is used in (passed up)
-        :param name: is the name of this widget in the form (passed up)
-        :param on_empty: is a string specifying what to do when a value is empty:
-          ``'error'`` will treat it as an error, ``'none'`` will transform it
-          into ``None`` and ``'keep'`` will leave it unchanged, i.e. ``''``
-        :param regex: is an optional regular expression to apply to input
-        :param transform: is an optional function that will be applied to values.
-          A ValueError from this function will be treated as validation failure.
-        :param autocomplete: may map characters to completion text,
-          e.g. {'so': 'me text'}
-        :param max_history: specifies how many previous inputs to store.
-          Set to 0 to disable history.
-        :param extra_kwargs: arguments to pass to the tk Entry widget
-        """
-        super().__init__(form, master, name)
-        if on_empty not in ('error', 'none', 'keep'):
-            raise ValueError("on_empty must be 'error', 'none' or 'keep'")
-        self.on_empty = on_empty
-        self.regex = re.compile(regex) if isinstance(regex, str) else regex
-        self.transform = lambda v: v if transform is None else transform
-        self.autocomplete = autocomplete or {}
-        self.widget = tk.Entry(self.master, **(extra_kwargs or {}))
-        if max_history:
-            self.history = self._history_dict.setdefault((type(self.form), self.name), [])
-            self.max_history = max_history
-            self.history_index = -1
-            self.widget.bind('<FocusOut>', self._update_history)
-            self.widget.bind('<Next>', lambda e: self._history_move(1))
-            self.widget.bind('<Prior>', lambda e: self._history_move(-1))
-        if autocomplete:
-            self.widget.bind('<Control-space>', self._do_autocomplete)
-
-    def get_simple(self):
-        """delegate to self.widget.get() and handle on_empty=='none'"""
-        v = self.widget.get()
-        return None if not v and self.on_empty == 'none' else self.transform(v)
-
-    def set_simple(self, data):
-        """delete current and insert new"""
-        self.widget.delete(0, tk.END)
-        self.widget.insert(0, data)
-
-    def validate_simple(self):
-        """handle on_empty='error' and validate_re"""
-        v = self.get_simple()
-        if self.on_empty == 'error' and not v:
-            return self.form.get_name(f'{self.name}::error::empty')
-        if self.regex is not None and self.regex.search(v) is None:
-            return self.form.get_name(f'{self.name}::error::regex')
-        try:
-            self.get_simple()
-        except ValueError:
-            return self.form.get_name(f'{self.name}::error::transform')
-        return None
-
-    def _do_autocomplete(self, event=None):  # noqa -- tkinter callback
-        """Perform auto-completion based on self.autocomplete"""
-        position = self.widget.index(tk.INSERT)
-        current = self.widget.get()[:position]
-        for k, v in self.autocomplete.items():
-            if current.endswith(k):
-                self.widget.insert(position, v)
-                self.widget.icursor(position + len(v))
-                break
-
-    def _update_history(self, event=None):  # noqa -- tkinter callback
-        """Add content to history and reset index"""
-        self.history_index = -1
-        v = self.widget.get()
-        if self.history and v == self.history[0]:
-            return
-        else:
-            self.history.insert(0, v)
-            if len(self.history) > self.max_history:
-                self.history = self.history[:-1]
-
-    def _history_move(self, direction):
-        """move one item up (direction == 1) or down (direction == -1)"""
-        if 0 <= self.history_index + direction < len(self.history):
-            self.history_index += direction
-            self.set_simple(self.history[self.history_index])
-
-
 class SeriesInput(formlib.FormWidget):
     """Provide Entry widgets for a series name and number"""
     def __init__(self, form, master, name):
         super().__init__(form, master, name)
         self.widget = tk.Frame(self.form.frame)
         self.subwidgets = {
-            'series': Entry(self.form, self.widget, 'series', 'none'),
-            'series_number': Entry(self.form, self.widget, 'series_number', 'none',
+            'series': formlib.Entry(self.form, self.widget, 'series', 'none'),
+            'series_number': formlib.Entry(self.form, self.widget, 'series_number', 'none',
                                    transform=int, extra_kwargs={'width': 2}),
         }
         for w in self.subwidgets.values():
@@ -187,16 +83,16 @@ class ConfirmedPasswordInput(formlib.FormWidget):
         return None
 
 
-ISBNEntry = (Entry, 'error', {'transform': validation.ISBN_validator})
-NonEmptyEntry = (Entry, 'error', {'max_history': 0})
-NonEmptyREntry = (Entry, 'error', {})
-ClassEntry = (Entry, 'error', {'regex': config.gui2.class_regex})
-IntEntry = (Entry, 'error', {'transform': int})
-NullIntEntry = (Entry, 'none', {'transform': int})
-NullEntry = (Entry, 'none', {'max_history': 0})
-NullREntry = (Entry, 'none', {})
-ScriptNameEntry = (Entry, 'error', {'regex': r'^[a-zA-Z0-9 _-]*$'})
-PasswordEntry = (Entry, 'ignore', {'extra_kwargs': {'show': '*'}})
+ISBNEntry = (formlib.Entry, 'error', {'transform': validation.ISBN_validator})
+NonEmptyEntry = (formlib.Entry, 'error', {'max_history': 0})
+NonEmptyREntry = (formlib.Entry, 'error', {})
+ClassEntry = (formlib.Entry, 'error', {'regex': config.gui2.class_regex})
+IntEntry = (formlib.Entry, 'error', {'transform': int})
+NullIntEntry = (formlib.Entry, 'none', {'transform': int})
+NullEntry = (formlib.Entry, 'none', {'max_history': 0})
+NullREntry = (formlib.Entry, 'none', {})
+ScriptNameEntry = (formlib.Entry, 'error', {'regex': r'^[a-zA-Z0-9 _-]*$'})
+PasswordEntry = (formlib.Entry, 'ignore', {'extra_kwargs': {'show': '*'}})
 
 
 class ActionChoiceWidget(mtk.ContainingWidget):

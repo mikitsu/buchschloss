@@ -30,7 +30,7 @@ class BaseForm(formlib.Form):
 
         for k, v in config.gui2.get('autocomplete').get(cls.form_name).mapping.items():
             if k in cls.all_widgets:
-                for _, w_kwargs in cls.all_widgets[k]:
+                for *_, w_kwargs in cls.all_widgets[k].values():
                     w_kwargs.setdefault('autocomplete', v)
 
         @functools.wraps(cls.__init__)

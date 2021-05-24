@@ -1,6 +1,14 @@
-"""Form and FormWidget classes"""
+"""Generic form classes
+
+:class:`~.Form` and :class:`~.FormWidget` provide the basics
+while the other classes implement form widgets in a generic, but useful, way
+"""
+import re
 import tkinter as tk
+from tkinter import ttk
 import tkinter.messagebox as tk_msg
+
+__all__ = ['Form', 'FormWidget', 'Entry', 'RadioChoices', 'DropdownChoices']
 
 
 class Form:
@@ -192,3 +200,225 @@ class FormWidget:
         """Validate this widgets data and return None or an error message"""
         raise NotImplementedError(
             "implement .validate_simple() if you don't override .validate()")
+
+
+class Entry(FormWidget):
+    """Wrap tk.Entry with options
+
+    - cycling through previous values
+    - options for handling of empty inputs
+    - validation via regex
+    """
+    widget: tk.Entry
+    _history_dict = {}
+
+    def __init__(self, form, master, name,
+                 on_empty,
+                 regex=None,
+                 transform=None,
+                 max_history=1_000,
+                 autocomplete=None,
+                 extra_kwargs=None,
+                 ):
+        """Wrapped tk.Entry with history, autocomplete and regex validation
+
+        :param form: is the form this widget is used in (passed up)
+        :param name: is the name of this widget in the form (passed up)
+        :param on_empty: is a string specifying what to do when a value is empty:
+          ``'error'`` will treat it as an error, ``'none'`` will transform it
+          into ``None`` and ``'keep'`` will leave it unchanged, i.e. ``''``
+        :param regex: is an optional regular expression to apply to input
+        :param transform: is an optional function that will be applied to values.
+          A ValueError from this function will be treated as validation failure.
+        :param autocomplete: may map characters to completion text,
+          e.g. {'so': 'me text'}
+        :param max_history: specifies how many previous inputs to store.
+          Set to 0 to disable history.
+        :param extra_kwargs: arguments to pass to the tk Entry widget
+        """
+        super().__init__(form, master, name)
+        if on_empty not in ('error', 'none', 'keep'):
+            raise ValueError("on_empty must be 'error', 'none' or 'keep'")
+        self.on_empty = on_empty
+        self.regex = re.compile(regex) if isinstance(regex, str) else regex
+        self.transform = lambda v: v if transform is None else transform
+        self.autocomplete = autocomplete or {}
+        self.widget = tk.Entry(self.master, **(extra_kwargs or {}))
+        if max_history:
+            self.history = self._history_dict.setdefault((type(self.form), self.name), [])
+            self.max_history = max_history
+            self.history_index = -1
+            self.widget.bind('<FocusOut>', self._update_history)
+            self.widget.bind('<Next>', lambda e: self._history_move(1))
+            self.widget.bind('<Prior>', lambda e: self._history_move(-1))
+        if autocomplete:
+            self.widget.bind('<Control-space>', self._do_autocomplete)
+
+    def get_simple(self):
+        """delegate to self.widget.get() and handle on_empty=='none'"""
+        v = self.widget.get()
+        return None if not v and self.on_empty == 'none' else self.transform(v)
+
+    def set_simple(self, data):
+        """delete current and insert new"""
+        self.widget.delete(0, tk.END)
+        self.widget.insert(0, data)
+
+    def validate_simple(self):
+        """handle on_empty='error' and validate_re"""
+        v = self.get_simple()
+        if self.on_empty == 'error' and not v:
+            return self.form.get_name(f'{self.name}::error::empty')
+        if self.regex is not None and self.regex.search(v) is None:
+            return self.form.get_name(f'{self.name}::error::regex')
+        try:
+            self.get_simple()
+        except ValueError:
+            return self.form.get_name(f'{self.name}::error::transform')
+        return None
+
+    def _do_autocomplete(self, event=None):  # noqa -- tkinter callback
+        """Perform auto-completion based on self.autocomplete"""
+        position = self.widget.index(tk.INSERT)
+        current = self.widget.get()[:position]
+        for k, v in self.autocomplete.items():
+            if current.endswith(k):
+                self.widget.insert(position, v)
+                self.widget.icursor(position + len(v))
+                break
+
+    def _update_history(self, event=None):  # noqa -- tkinter callback
+        """Add content to history and reset index"""
+        self.history_index = -1
+        v = self.widget.get()
+        if self.history and v == self.history[0]:
+            return
+        else:
+            self.history.insert(0, v)
+            if len(self.history) > self.max_history:
+                self.history = self.history[:-1]
+
+    def _history_move(self, direction):
+        """move one item up (direction == 1) or down (direction == -1)"""
+        if 0 <= self.history_index + direction < len(self.history):
+            self.history_index += direction
+            self.set_simple(self.history[self.history_index])
+
+
+class RadioChoices(FormWidget):
+    """Select one radio button"""
+    def __init__(self, form, master, name, choices, default=0, pack_side=tk.LEFT):
+        """Create the widget
+
+        :param choices: is an iterable of ``code, display`` pairs. ``code`` is
+          the value returned by ``.get()`` and ``display`` is shown to the user.
+        :param default: is the index of the choice to pre-select or None to not
+          select any choice
+        :param pack_side: is used as argument when ``.pack()``ing the radio buttons
+        """
+        super().__init__(form, master, name)
+        self.widget = tk.Frame(self.master)
+        self.var = tk.Variable()
+        self.radios = [
+            tk.Radiobutton(self.widget, value=code, text=text, variable=self.var)
+            for code, text in choices
+        ]
+        for i, radio in enumerate(self.radios):  # this elegantly avoids IndexError
+            if i == default:
+                radio.select()
+            radio.pack(side=pack_side)
+
+    def get_simple(self):
+        """return the code for the currently selected value"""
+        return self.var.get()
+
+    def set_simple(self, data):
+        """select the radio button with the given code"""
+        self.var.set(data)
+
+    def validate_simple(self):
+        """always valid"""
+        return None
+
+
+class DropdownChoices(FormWidget):
+    """Select an element from a drop-down menu (Combobox)"""
+    widget: ttk.Combobox
+    error_message = 'selection ambiguous'
+
+    def __init__(self, form, master, name, choices, default=0, search=False, new=False):
+        """Create the widget
+
+        :param choices: is a sequence of ``code, display`` pairs or single strings.
+          In the latter case, each element will be used for both. ``code`` is the
+          value returned by ``.get()`` and ``display`` is shown to the user.
+          For dynamic uses, ``choices`` may also be a zero-argument callable providing
+          a sequence as described above.
+        :param default: is the index of the choice to pre-select or None to not
+          select any choice
+        :param search: specifies whether to allow searching the values by typing into
+          the Combobox. This will allow typing text with strict validation.
+          Until a value can be uniquely identified, None is returned in ``.get()``
+          and validation fails with the message in ``self.error_message``, unless
+          ``new`` is true
+        :param new: specifies whether to allow user-created inputs that are not
+          in the given choices. If true, allow typing any text and return the typed text
+          if it doesn't match a value entry.
+        """
+        self.allow_new = new
+        super().__init__(form, master, name)
+        if callable(choices):
+            choices = choices()
+        if choices and not isinstance(choices[0], str):  # avoid zip(*())
+            self.codes, self.all_values = zip(*choices)
+        else:
+            self.codes = self.all_values = tuple(choices)
+        kwargs = {}
+        if search:
+            kwargs['validate'] = 'all'
+            kwargs['validatecommand'] = (self.master.register(self._update_values), '%P')
+        elif not new:
+            kwargs['state'] = 'readonly'
+        self.widget = ttk.Combobox(self.master, values=self.all_values, **kwargs)
+        if default is not None:
+            self.widget.current(default)
+
+    def get_simple(self):
+        """return the code for the currently selected value"""
+        value = self.widget.get()
+        try:
+            return self.codes[self.all_values.index(value)]
+        except ValueError:
+            if self.allow_new:
+                return value
+            else:
+                return None
+
+    def set_simple(self, data):
+        """select the value with the given code"""
+        self.widget['values'] = self.all_values
+        self.widget.current(self.codes.index(data))
+        if '_update_values' in self.widget['validatecommand']:
+            self._update_values(self.get())
+
+    def validate_simple(self):
+        """check if the choice is unambiguous if not self.allow_new"""
+        if self.allow_new or self.widget.current() != -1:
+            return None
+        else:
+            return self.error_message
+
+    def _update_values(self, new_value):
+        """update displayed values based on entered text
+
+        If not self.allow_new, block text that doesn't match anything
+        and auto-fill completely when the choice is unambiguous
+        """
+        possibilities = [v for v in self.all_values if new_value in v]
+        if not self.allow_new:
+            if not possibilities:
+                return False
+            elif len(possibilities) == 1:
+                self.widget.set(possibilities[0])
+        self.widget['values'] = possibilities
+        return True
