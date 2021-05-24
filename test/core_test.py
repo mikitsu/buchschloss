@@ -488,15 +488,9 @@ def test_borrow_new(db):
                       borrow_permission=(datetime.date.today()
                                          + datetime.timedelta(days=1)),
                       libraries=['main', 'no-pay'])
-    ctxt = core.internal_unpriv_lc
+    weeks = 10
+    ctxt = for_levels(partial(core.Borrow.new, 1, 123, weeks), 1)
     borrow_new = partial(core.Borrow.new, login_context=ctxt)
-    # follows config settings
-    for i in range(5):
-        ctxt.level = i
-        with pytest.raises(core.BuchSchlossBaseError):
-            borrow_new(1, 123, config.core.borrow_time_limit[i] + 1)
-    weeks = config.core.borrow_time_limit[i]
-    borrow_new(1, 123, weeks)
     # correct data
     assert len(models.Borrow.select()) == 1
     b = models.Borrow.get_by_id(1)

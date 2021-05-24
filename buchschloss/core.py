@@ -454,8 +454,8 @@ class ActionNamespace:
 
         cls.required_levels = getattr(config.core.required_levels, cls.__name__)
         for name, func in vars(cls).items():
-            # the two exceptions
-            if (cls.__name__, name) in (('Borrow', 'new'), ('Member', 'change_password')):
+            # the exception
+            if (cls.__name__, name) == ('Member', 'change_password'):
                 continue
             # since these are only namespaces, no normal methods
             if isinstance(func, (staticmethod, classmethod)):
@@ -929,20 +929,11 @@ class Borrow(ActionNamespace):
             b) the Person has reached their limit set in max_borrow
             c) the Person is not allowed to access the library the book is in
             d) the Book is not available
-            e) the Person 's
-               borrow_permission has expired
-            f) ``weeks`` exceeds the one allowed to the executing member
-            g) ``weeks`` is <= 0
+            e) the Person's borrow_permission has expired
 
         The maximum amount of time a book may be borrowed for is defined
         in the configuration settings.
         """
-        req_level = next(i for i, allowed_weeks in
-                         enumerate([*config.core.borrow_time_limit, float('inf')])
-                         if weeks <= allowed_weeks)
-        check_level(login_context, req_level, 'Borrow.new')
-        if weeks <= 0:
-            raise BuchSchlossError('Borrow', 'Borrow::borrow_length_not_positive')
         if not book.is_active or book.borrow:
             raise BuchSchlossError('Borrow', 'Borrow::Book_{}_not_available', book.id)
         if override:

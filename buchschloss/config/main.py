@@ -295,17 +295,6 @@ def apply_permission_level_defaults(config):
     return config
 
 
-def create_borrow_time_list(config):
-    """create a list of borrow time limits"""
-    limit_list = []
-    current = 0
-    for i in range(MAX_LEVEL + 1):
-        current = max(current, config['core']['borrow time limit'].get(str(i), 0))
-        limit_list.append(current)
-    config['core']['borrow time limit'] = limit_list
-    return config
-
-
 pre_validation = (
     merge_ui,
     flatten_gui2_actions,
@@ -314,7 +303,6 @@ post_validation = (
     insert_name_data,
     apply_ui_intro_text_default,
     apply_permission_level_defaults,
-    create_borrow_time_list,
     check_smtp_auth_data,
     redirect_stderr,
 )
