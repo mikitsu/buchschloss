@@ -12,7 +12,6 @@ import typing as T
 
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import dialogs as mtkd
-from ..misc.tkstuff.blocks import PasswordEntry, CheckbuttonWithVar
 
 from . import validation
 from . import common
@@ -37,9 +36,10 @@ class Entry(formlib.FormWidget):
                  regex=None,
                  transform=None,
                  max_history=1_000,
+                 autocomplete=None,
                  extra_kwargs=None,
                  ):
-        """Wrapped tk.Entry with history, options for empty input and regex validation
+        """Wrapped tk.Entry with history, autocomplete and regex validation
 
         :param form: is the form this widget is used in (passed up)
         :param name: is the name of this widget in the form (passed up)
@@ -49,6 +49,8 @@ class Entry(formlib.FormWidget):
         :param regex: is an optional regular expression to apply to input
         :param transform: is an optional function that will be applied to values.
           A ValueError from this function will be treated as validation failure.
+        :param autocomplete: may map characters to completion text,
+          e.g. {'so': 'me text'}
         :param max_history: specifies how many previous inputs to store.
           Set to 0 to disable history.
         :param extra_kwargs: arguments to pass to the tk Entry widget
@@ -59,6 +61,7 @@ class Entry(formlib.FormWidget):
         self.on_empty = on_empty
         self.regex = re.compile(regex) if isinstance(regex, str) else regex
         self.transform = lambda v: v if transform is None else transform
+        self.autocomplete = autocomplete or {}
         self.widget = tk.Entry(self.master, **(extra_kwargs or {}))
         if max_history:
             self.history = self._history_dict.setdefault((type(self.form), self.name), [])
@@ -67,6 +70,8 @@ class Entry(formlib.FormWidget):
             self.widget.bind('<FocusOut>', self._update_history)
             self.widget.bind('<Next>', lambda e: self._history_move(1))
             self.widget.bind('<Prior>', lambda e: self._history_move(-1))
+        if autocomplete:
+            self.widget.bind('<Control-space>', self._do_autocomplete)
 
     def get_simple(self):
         """delegate to self.widget.get() and handle on_empty=='none'"""
@@ -91,7 +96,17 @@ class Entry(formlib.FormWidget):
             return self.form.get_name(f'{self.name}::error::transform')
         return None
 
-    def _update_history(self, event=None):
+    def _do_autocomplete(self, event=None):  # noqa -- tkinter callback
+        """Perform auto-completion based on self.autocomplete"""
+        position = self.widget.index(tk.INSERT)
+        current = self.widget.get()[:position]
+        for k, v in self.autocomplete.items():
+            if current.endswith(k):
+                self.widget.insert(position, v)
+                self.widget.icursor(position + len(v))
+                break
+
+    def _update_history(self, event=None):  # noqa -- tkinter callback
         """Add content to history and reset index"""
         self.history_index = -1
         v = self.widget.get()
@@ -181,6 +196,7 @@ NullIntEntry = (Entry, 'none', {'transform': int})
 NullEntry = (Entry, 'none', {'max_history': 0})
 NullREntry = (Entry, 'none', {})
 ScriptNameEntry = (Entry, 'error', {'regex': r'^[a-zA-Z0-9 _-]*$'})
+PasswordEntry = (Entry, 'ignore', {'extra_kwargs': {'show': '*'}})
 
 
 class ActionChoiceWidget(mtk.ContainingWidget):
@@ -191,40 +207,42 @@ class ActionChoiceWidget(mtk.ContainingWidget):
         super().__init__(master, *widgets, **kw)
 
 
-class OptionsFromSearch(ttk.Combobox):
-    """an option widget that gets its options from search results"""
+class OptionsFromSearch(formlib.FormWidget):
+    """Choose from the result of a search"""
+    widget: ttk.Combobox
 
-    def __init__(self, master, *, action_ns: T.Type[core.ActionNamespace],
-                 allow_none=False, **kwargs):
+    def __init__(self, form, master, name, action_ns, allow_none=False, condition=()):
+        super().__init__(form, master, name)
         self.all_values: T.Dict[str, T.Optional[str]] = {'': None} if allow_none else {}
         self.id_map: T.Dict[str, T.Any] = {'': None} if allow_none else {}
-        for obj in common.NSWithLogin(action_ns).search(()):
+        for obj in common.NSWithLogin(action_ns).search(condition):
             self.all_values[str(obj)] = str(obj.id)
             self.id_map[str(obj.id)] = obj.id
-        super().__init__(
+        self.widget = ttk.Combobox(
             master,
             values=tuple(self.all_values.keys()),
             validate='all',
-            validatecommand=(master.register(self.update_values), '%P'),
-            **kwargs,
+            validatecommand=(self.master.register(self.update_values), '%P'),
         )
 
-    def set(self, value):
+    def set_simple(self, value):
         """handle DataNS"""
         if isinstance(value, core.DataNamespace):
             value = value.id
-        super().set(value)
+        self.widget.set(value)
 
-    def get(self):
+    def get_simple(self):
         """Return ID with correct type. May raise KeyError."""
-        return self.id_map.get(super().get())
+        return self.id_map[self.widget.get()]  # TODO: this was .get() -- still important?
 
-    def validate(self):
+    def validate_simple(self):
         """Override to supply the signature expected in forms: (valid, value)"""
         try:
-            return True, self.id_map[super().get()]
+            self.get_simple()
         except KeyError:
-            return False, utils.get_name('error::gui2::invalid_object_selected')
+            return self.form.get_name(f'{self.name}::error::invalid_object_selected')
+        else:
+            return None
 
     def update_values(self, new_value):
         """update displayed values based on entered text
@@ -236,19 +254,27 @@ class OptionsFromSearch(ttk.Combobox):
         if len(possibilities) == 0:
             return False  # don't allow edit
         elif len(possibilities) == 1:
-            self.set(self.all_values[possibilities[0]])
-        self['values'] = possibilities
+            self.set_simple(self.all_values[possibilities[0]])
+        self.widget['values'] = possibilities
         return True
 
 
-class Text(tk.Text):
-    """get/set operate on all the text"""
-    def get(self):  # noqa
-        return super().get('0.0', 'end')
+class Text(formlib.FormWidget):
+    """Provide a tk.Text input widget"""
+    widget: tk.Text
 
-    def set(self, text):
-        super().delete('0.0', 'end')
-        super().insert('0.0', text)
+    def __init__(self, form, master, name):
+        super().__init__(form, master, name)
+        self.widget = tk.Text(self.master)
+
+    def get_simple(self):
+        """return text in the widget"""
+        return self.widget.get('0.0', tk.END)
+
+    def set_simple(self, data):
+        """set the text to the given value"""
+        self.widget.delete('0.0', tk.END)
+        self.widget.insert('0.0', data)
 
 
 @mtk.ScrollableWidget(height=config.gui2.widget_size.main.height,
@@ -277,25 +303,29 @@ class InfoWidget(mtk.ContainingWidget):
         super().__init__(master, *widgets, horizontal=2)
 
 
-class OptionalCheckbuttonWithVar(CheckbuttonWithVar):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.state(['alternate'])
-        self.is_alternate = True
-        self.variable.trace('w', lambda *a, s=self: setattr(s, 'is_alternate', False))
+class Checkbox(formlib.FormWidget):
+    """A checkbox entry. Optionally with third state."""
+    widget: ttk.Checkbutton
 
-    def get(self):
-        if self.is_alternate:
+    def __init__(self, form, master, name, allow_none=False):
+        super().__init__(form, master, name)
+        self.var = tk.BooleanVar()
+        self.widget = ttk.Checkbutton(self.master, variable=self.var)
+        if allow_none:
+            self.widget.state(['alternate'])
+
+    def get_simple(self):
+        """Return checkbutton state"""
+        if self.widget.state() == ('!alternate',):
             return None
-        else:
-            return super().get()
+        assert self.widget.state() == ()
+        return self.var.get()
 
-    def set(self, value):
-        if value is None:
-            self.state(['alternate'])
-            self.is_alternate = True
-        else:
-            super().set(value)
+    def set_simple(self, data):
+        """Set the widget to the given value. ``allow_none`` is not enforced"""
+        self.var.set(data)
+        if data is None:
+            self.widget.state(['alternate'])
 
 
 class ActivatingListbox(tk.Listbox):
@@ -456,7 +486,3 @@ class SearchResultWidget(mtk.ContainingWidget):
                 'wraplength': config.gui2.widget_size.main.width,
                 'command': partial(view_func, r.id)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))
-
-
-class NonEmptyPasswordEntry(PasswordEntry, NonEmptyEntry):
-    pass

@@ -38,9 +38,9 @@ def generic_formbased_action(form_type, form_cls, callback,
             do_reset: boolean indicating whether to call app.reset after form submission"""
     form_options_ = {
         k: {'groups': v} for k, v in {
-            'new': [forms.ElementGroup.NEW],
-            'edit': [forms.ElementGroup.EDIT],
-            'search': [forms.ElementGroup.SEARCH],
+            'new': [forms.FormTag.NEW],
+            'edit': [forms.FormTag.EDIT],
+            'search': [forms.FormTag.SEARCH],
             None: [],
         }.items()
     }
