@@ -604,10 +604,7 @@ class Book(ActionNamespace):
             for g in groups:
                 b.groups.add(models.Group.get_or_create(name=g)[0])
             for g in genres:
-                try:
-                    models.Genre.create(book=b, name=g)
-                except peewee.IntegrityError as e:
-                    assert str(e).startswith('UNIQUE')
+                models.Genre.create(book=b, name=g)
             logging.info('{} created {}'.format(login_context, b))
         return b.id
 
@@ -635,6 +632,8 @@ class Book(ActionNamespace):
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', lib)
         genres = kwargs.pop('genres', ())
+        models.Genre.delete().where(
+            models.Genre.book == book, models.Genre.name.not_in(genres)).execute()
         for g in genres:
             try:
                 models.Genre.create(book=book, name=g)

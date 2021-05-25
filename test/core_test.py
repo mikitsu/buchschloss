@@ -284,9 +284,13 @@ def test_book_edit(db):
     assert models.Book.get_by_id(1).year == 123
     assert models.Book.get_by_id(2).medium == ''
     assert models.Book.get_by_id(2).year == 0
-    book_edit(1, genres=('one', 'two'))
-    b = models.Book.get_by_id(1)
-    assert set(b.genres) == {models.Genre.get_by_id((b, k)) for k in ('one', 'two')}
+
+    book_edit(2, genres=('two',))
+    for new in (('one', 'two'), ('one',), ('three',)):
+        book_edit(1, genres=new)
+        b = models.Book.get_by_id(1)
+        assert set(b.genres) == {models.Genre.get_by_id((b, k)) for k in new}
+    assert models.Book.get_by_id(2).genres[0].name == 'two'
 
 
 def test_library_new(db):
