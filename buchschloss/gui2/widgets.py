@@ -27,8 +27,10 @@ class SeriesInput(formlib.FormWidget):
         self.widget = tk.Frame(self.form.frame)
         self.subwidgets = {
             'series': formlib.Entry(self.form, self.widget, 'series', 'none'),
-            'series_number': formlib.Entry(self.form, self.widget, 'series_number', 'none',
-                                   transform=int, extra_kwargs={'width': 2}),
+            'series_number': formlib.Entry(
+                self.form, self.widget, 'series_number', 'none',
+                transform=int, extra_kwargs={'width': 2},
+            ),
         }
         for w in self.subwidgets.values():
             w.widget.pack(side=tk.LEFT)
@@ -83,6 +85,21 @@ class ConfirmedPasswordInput(formlib.FormWidget):
         return None
 
 
+def options_from_search(action_ns, allow_none=False, condition=()):
+    """Return a formlib.DropdownChoices tuple that gets choices for a search
+
+    :param action_ns: is the ActionNamespace to search in
+    :param allow_none: specifies whether an empty input is considered valid
+    :param condition: specifies the condition with which to search
+    """
+    return (
+        formlib.DropdownChoices,
+        lambda: (*[(None, '')]*allow_none,
+                 *((o.id, str(o)) for o in action_ns.search(condition))),
+        {},
+    )
+
+
 ISBNEntry = (formlib.Entry, 'error', {'transform': validation.ISBN_validator})
 NonEmptyEntry = (formlib.Entry, 'error', {'max_history': 0})
 NonEmptyREntry = (formlib.Entry, 'error', {})
@@ -101,58 +118,6 @@ class ActionChoiceWidget(mtk.ContainingWidget):
                              'padx': 50})
                    for txt, cmd in actions]
         super().__init__(master, *widgets, **kw)
-
-
-class OptionsFromSearch(formlib.FormWidget):
-    """Choose from the result of a search"""
-    widget: ttk.Combobox
-
-    def __init__(self, form, master, name, action_ns, allow_none=False, condition=()):
-        super().__init__(form, master, name)
-        self.all_values: T.Dict[str, T.Optional[str]] = {'': None} if allow_none else {}
-        self.id_map: T.Dict[str, T.Any] = {'': None} if allow_none else {}
-        for obj in common.NSWithLogin(action_ns).search(condition):
-            self.all_values[str(obj)] = str(obj.id)
-            self.id_map[str(obj.id)] = obj.id
-        self.widget = ttk.Combobox(
-            master,
-            values=tuple(self.all_values.keys()),
-            validate='all',
-            validatecommand=(self.master.register(self.update_values), '%P'),
-        )
-
-    def set_simple(self, value):
-        """handle DataNS"""
-        if isinstance(value, core.DataNamespace):
-            value = value.id
-        self.widget.set(value)
-
-    def get_simple(self):
-        """Return ID with correct type. May raise KeyError."""
-        return self.id_map[self.widget.get()]  # TODO: this was .get() -- still important?
-
-    def validate_simple(self):
-        """Override to supply the signature expected in forms: (valid, value)"""
-        try:
-            self.get_simple()
-        except KeyError:
-            return self.form.get_name(f'{self.name}::error::invalid_object_selected')
-        else:
-            return None
-
-    def update_values(self, new_value):
-        """update displayed values based on entered text
-
-        Only display options of which the entered text is a substring.
-        Auto-fill the ID if there is only one match.
-        """
-        possibilities = [v for v in self.all_values if new_value in v]
-        if len(possibilities) == 0:
-            return False  # don't allow edit
-        elif len(possibilities) == 1:
-            self.set_simple(self.all_values[possibilities[0]])
-        self.widget['values'] = possibilities
-        return True
 
 
 class Text(formlib.FormWidget):

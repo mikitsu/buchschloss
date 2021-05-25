@@ -9,8 +9,8 @@ from .. import core
 from .. import utils
 
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry, PasswordEntry,
-                      IntEntry, NullREntry, Text, ConfirmedPasswordInput, Entry,
-                      Checkbox, SeriesInput, OptionsFromSearch, SearchMultiChoice,
+                      IntEntry, NullREntry, Text, ConfirmedPasswordInput,
+                      Checkbox, SeriesInput, options_from_search, SearchMultiChoice,
                       FlagEnumMultiChoice, ScriptNameEntry, MultiChoicePopup)
 
 
@@ -97,11 +97,11 @@ class BookForm(SearchForm):
         # TODO: widget
         # 'genres': (OptionsFromSearch, core.Book, {})
         'library': {
-            None: (OptionsFromSearch, core.Library, {}),
-            FormTag.SEARCH: (OptionsFromSearch, core.Library, {'allow_none': True}),
+            None: options_from_search(core.Library),
+            FormTag.SEARCH: options_from_search(core.Library, True),
         },
         # TODO: widget
-        'groups': (OptionsFromSearch, core.Group, {}),
+        # 'groups':
         'shelf': NonEmptyREntry,
     }
 
@@ -138,13 +138,9 @@ class PersonForm(SearchForm):
 class MemberForm(AuthedForm, SearchForm):
     all_widgets = {
         'name': NonEmptyREntry,
-        # TODO: OptionChoiceWidget
-        # 'level':
+        'level': (formlib.DropdownChoices, tuple(utils.level_names.items()), 1, {}),
         'password': {FormTag.NEW: ConfirmedPasswordInput},
     }
-    # level: mtkf.Element = (mtk.OptionChoiceWidget,
-    #                        {'values': list(utils.level_names.items()),
-    #                         'default': 1})
 
 
 class MemberChangePasswordForm(AuthedForm):
@@ -192,22 +188,23 @@ class LoginForm(BaseForm):
 
 class BorrowForm(BaseForm):
     all_widgets = {
-        'person': (OptionsFromSearch, core.Person, {}),
-        'book': (OptionsFromSearch, core.Book, {}),
+        'person': options_from_search(core.Person),
+        'book': options_from_search(core.Book),
         'weeks': IntEntry,
         'override': Checkbox,
     }
 
 
-class BorrowRestituteForm(BaseForm):  # TODO: add a condition to OFS (wait for #69)
+class BorrowRestituteForm(BaseForm):
     all_widgets = {
-        'book': (OptionsFromSearch, core.Book, {}),
+        'book': options_from_search(
+            core.Book,  condition=('borrow.is_back', 'eq', False)),
     }
 
 
 class BorrowExtendForm(BaseForm):
     all_widgets = {
-        'book': (OptionsFromSearch, core.Book, {}),
+        'book': options_from_search(core.Book),
         'weeks': IntEntry,
     }
 
@@ -216,7 +213,7 @@ class BorrowSearchForm(SearchForm):
     all_widgets = {
         'book__title': NullREntry,
         'book__author': NullREntry,
-        'book__library': (OptionsFromSearch, core.Library, {'allow_none': True}),
+        'book__library': options_from_search(core.Library, True),
         # TODO: widget
         # 'book__groups':
         # this has on_empty='error', but empty values are removed when searching
@@ -235,7 +232,8 @@ class ScriptForm(AuthedForm, SearchForm):
         'name': ScriptNameEntry,
         # TODO: widget
         # 'permissions':
-        # 'setlevel':
+        'setlevel': (formlib.DropdownChoices,
+                     ((None, '-----'), *utils.level_names.items()), {}),
         'code': {
             None: Text,
             FormTag.SEARCH: None,
@@ -245,6 +243,3 @@ class ScriptForm(AuthedForm, SearchForm):
     #     FlagEnumMultiChoice,
     #     {'flag_enum': core.ScriptPermissions, 'get_name_prefix': 'Script::permissions::'}
     # )
-    # setlevel: mtkf.Element = (
-    #     mtk.OptionChoiceWidget,
-    #     {'values': ((None, '-----'), *utils.level_names.items())})

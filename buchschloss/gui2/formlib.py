@@ -346,7 +346,7 @@ class DropdownChoices(FormWidget):
     widget: ttk.Combobox
     error_message = 'selection ambiguous'
 
-    def __init__(self, form, master, name, choices, default=0, search=False, new=False):
+    def __init__(self, form, master, name, choices, default=0, search=True, new=False):
         """Create the widget
 
         :param choices: is a sequence of ``code, display`` pairs or single strings.
