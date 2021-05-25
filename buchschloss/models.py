@@ -105,12 +105,8 @@ class Person(Model):
     class_: T.Union[str, CharField] = CharField()
     max_borrow: T.Union[int, IntegerField] = IntegerField()
     borrow_permission: T.Union[datetime.date, DateField] = FormattedDateField(null=True)
+    borrows: peewee.BackrefAccessor
     libraries: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # libraries as backref
-
-    @property
-    def borrows(self):
-        return Borrow.select().where(Borrow.person == self,
-                                     Borrow.is_back == False)  # noqa
 
     str_fields = (id, last_name, first_name)
 
@@ -160,15 +156,12 @@ class Book(Model):
     medium: T.Union[str, CharField] = CharField()
 
     genres: peewee.BackrefAccessor
+    borrow: peewee.BackrefAccessor
     groups: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # groups as backref
     id: T.Union[int, IntegerField] = AutoField(primary_key=True)
     library: T.Union[Library, ForeignKeyField] = ForeignKeyField(Library, backref='books')
     shelf: T.Union[str, CharField] = CharField()
     is_active: T.Union[bool, BooleanField] = BooleanField(default=True)
-
-    @property
-    def borrow(self):
-        return Borrow.get_or_none(Borrow.book == self, is_back=False)
 
     str_fields = (id, title)
 
@@ -210,8 +203,8 @@ class Borrow(Model):
         - return_date: date by which the Book must de returned
     """
     id: T.Union[int, IntegerField] = AutoField(primary_key=True)
-    person: Person = ForeignKeyField(Person)
-    book: Book = ForeignKeyField(Book)
+    person: Person = ForeignKeyField(Person, backref='borrows')
+    book: Book = ForeignKeyField(Book, backref='borrow')
     is_back: T.Union[bool, BooleanField] = BooleanField(default=False)
     return_date: T.Union[datetime.date, DateField] = FormattedDateField()
 

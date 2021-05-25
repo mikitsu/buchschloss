@@ -567,7 +567,7 @@ class ActionNamespace:
                     raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
                                      '"ge", "le" or "contains"')
 
-        query = cls.model.select_str_fields()
+        query = cls.model.select_str_fields().distinct()
         result = handle_condition(condition, query)
         return (DataNamespace(cls, value, login_context) for value in result)
 
@@ -947,7 +947,8 @@ class Borrow(ActionNamespace):
                     and (person.borrow_permission or date.min) < date.today()):
                 raise BuchSchlossError(
                     'Borrow', 'Borrow::Library_{}_needs_payment', book.library)
-            if len(person.borrows) >= person.max_borrow:
+            n_borrowed = person.borrows.where(models.Borrow.is_back == False).count()  # noqa
+            if n_borrowed >= person.max_borrow:
                 raise BuchSchlossError('Borrow', 'Borrow::{}_reached_max_borrow', person)
         rdate = date.today() + timedelta(weeks=weeks)
         models.Borrow.create(person=person, book=book, return_date=rdate)
@@ -1190,6 +1191,7 @@ class DataNamespace:
         """initialize this namespace with data from the database"""
         self._data = raw_data
         self._handlers = self.data_handling[ans]
+        self._attributes = frozenset.union(*map(frozenset, self._handlers.values()))
         self._login_context = login_context
 
     def __eq__(self, other):
@@ -1214,15 +1216,21 @@ class DataNamespace:
         return str(self._data)
 
     def __getattr__(self, item):
-        if item in self._handlers['allow']:
-            return getattr(self._data, item)
-        elif item in self._handlers.get('wrap_iter', {}):
+        if item == 'id':
+            # Not making the same mistake twice
+            return getattr(self._data, type(self._data).pk_name)
+        elif item in self._attributes:
+            obj = getattr(self._data, item)
+        else:
+            raise AttributeError("DataNamespace object has no attribute '%s'" % item)
+        if item in self._handlers.get('transform', {}):
+            obj = self._handlers['transform'][item](obj)
+        if item in self._handlers.get('wrap_iter', {}):
             new_dns = partial(type(self),
                               self._handlers['wrap_iter'][item],
                               login_context=self._login_context)
-            return tuple(map(new_dns, getattr(self._data, item)))
+            return tuple(map(new_dns, obj))
         elif item in self._handlers.get('wrap_dns', {}):
-            obj = getattr(self._data, item)
             if obj is None:
                 return None
             else:
@@ -1231,27 +1239,24 @@ class DataNamespace:
                     obj,
                     login_context=self._login_context,
                 )
-        elif item in self._handlers.get('transform', {}):
-            return self._handlers['transform'][item](getattr(self._data, item))
-        elif item == 'id':
-            # Not making the same mistake twice
-            return getattr(self._data, type(self._data).pk_name)
-        else:
-            raise AttributeError("DataNamespace object has no attribute '%s'" % item)
+        else:  # allow + transform without wrapping
+            return obj
 
     data_handling: T.Mapping[T.Type[ActionNamespace], T.Mapping] = {
         Book: {
-            'allow': ('id isbn author title series series_number language publisher '
+            'allow': ('isbn author title series series_number language publisher '
                       'concerned_people year medium shelf is_active').split(),
-            # 'wrap_iter': {'groups': Group},
             'transform': {
                 'genres': lambda gs: [g.name for g in gs],
                 'groups': lambda gs: [g.name for g in gs],
+                'borrow': lambda bs:
+                    next(iter(bs.where(models.Borrow.is_back == False).limit(1)), None),
             },
             'wrap_dns': {'library': Library, 'borrow': Borrow},
         },
         Person: {
-            'allow': 'id first_name last_name class_ max_borrow pay_date'.split(),
+            'allow': 'first_name last_name class_ max_borrow pay_date'.split(),
+            'transform': {'borrows': lambda bs: bs.where(models.Borrow.is_back == False)},  # noqa
             'wrap_iter': {'libraries': Library, 'borrows': Borrow},
         },
         Library: {
