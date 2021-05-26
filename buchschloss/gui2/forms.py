@@ -8,9 +8,10 @@ from .. import config
 from .. import core
 from .. import utils
 
+from .formlib import RadioChoices
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry, PasswordEntry,
                       IntEntry, NullREntry, Text, ConfirmedPasswordInput,
-                      Checkbox, SeriesInput, options_from_search, SearchMultiChoice,
+                      Checkbox, SeriesInput, options_from_search, search_multi_choice,
                       FlagEnumMultiChoice, ScriptNameEntry, MultiChoicePopup)
 
 
@@ -48,8 +49,8 @@ class BaseForm(formlib.Form):
 class SearchForm(BaseForm):
     """Add search options (and/or) + exact matching"""
     all_widgets = {
-        # TODO: appropriate widget
-        # 'search_mode':
+        'search_mode': {FormTag.SEARCH: (
+            RadioChoices, [(c, utils.get_name(c)) for c in ('and', 'or')], {})},
         'exact_match': {FormTag.SEARCH: Checkbox},
     }
 
@@ -94,26 +95,14 @@ class BookForm(SearchForm):
         'concerned_people': NullREntry,
         'year': IntEntry,
         'medium': NonEmptyREntry,
-        # TODO: widget
-        # 'genres': (OptionsFromSearch, core.Book, {})
+        'genres': (MultiChoicePopup, lambda: core.Book.get_all_genres(), {}),
         'library': {
             None: options_from_search(core.Library),
             FormTag.SEARCH: options_from_search(core.Library, True),
         },
-        # TODO: widget
-        # 'groups':
+        'groups': (MultiChoicePopup, lambda: core.Book.get_all_groups(), {}),
         'shelf': NonEmptyREntry,
     }
-
-    # if config.gui2.genres.options is None:
-    #     genres: mtkf.Element = (NullREntry, {'rem_key': 'book-genres'})
-    # else:
-    #     genres: mtkf.Element = (
-    #         type('StrMultiChoicePopup', (MultiChoicePopup,),
-    #              {'get': lambda s: s.sep.join(MultiChoicePopup.get(s))}),
-    #         {'options': config.gui2.genres.options,
-    #          'sep': config.gui2.genres.sep}
-    #     )
 
 
 class PersonForm(SearchForm):
@@ -126,8 +115,7 @@ class PersonForm(SearchForm):
         'last_name': NonEmptyREntry,
         'class_': ClassEntry,
         'max_borrow': IntEntry,
-        # TODO: widget
-        # 'libraries': (SearchMultiChoice, core.Library, {}),
+        'libraries': search_multi_choice(core.Library),
         'pay': {
             FormTag.SEARCH: None,
             None: Checkbox,
@@ -214,24 +202,19 @@ class BorrowSearchForm(SearchForm):
         'book__title': NullREntry,
         'book__author': NullREntry,
         'book__library': options_from_search(core.Library, True),
-        # TODO: widget
-        # 'book__groups':
+        'book__groups': (MultiChoicePopup, lambda: core.Book.get_all_groups(), {}),
         # this has on_empty='error', but empty values are removed when searching
         # the Null*Entries above are not really needed
         'person__class_': ClassEntry,
-        # TODO: widget
-        # 'person__libraries':
+        'person__libraries': search_multi_choice(core.Library),
         'is_back': (Checkbox, {'allow_none': True}),
     }
-    # book__groups: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Group})
-    # person__libraries: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
 
 
 class ScriptForm(AuthedForm, SearchForm):
     all_widgets = {
         'name': ScriptNameEntry,
-        # TODO: widget
-        # 'permissions':
+        'permissions': (FlagEnumMultiChoice, core.ScriptPermissions, {}),
         'setlevel': (formlib.DropdownChoices,
                      ((None, '-----'), *utils.level_names.items()), {}),
         'code': {
@@ -239,7 +222,3 @@ class ScriptForm(AuthedForm, SearchForm):
             FormTag.SEARCH: None,
         }
     }
-    # permissions: mtkf.Element = (
-    #     FlagEnumMultiChoice,
-    #     {'flag_enum': core.ScriptPermissions, 'get_name_prefix': 'Script::permissions::'}
-    # )

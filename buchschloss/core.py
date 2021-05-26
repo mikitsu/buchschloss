@@ -461,6 +461,8 @@ class ActionNamespace:
             if isinstance(func, (staticmethod, classmethod)):
                 if name.startswith('view'):
                     req_level = cls.required_levels['view']
+                elif cls.__name__ == 'Book' and name.startswith('get_all'):
+                    req_level = cls.required_levels['view']
                 else:
                     req_level = cls.required_levels[name]
                 setattr(cls, name, level_required(req_level, func.__func__))  # noqa
@@ -648,6 +650,17 @@ class Book(ActionNamespace):
         book.save()
         logging.info('{} edited {}'.format(login_context, book))
         return errors
+
+    @staticmethod
+    def get_all_genres():
+        """return all known genres in the database"""
+        return tuple(g.name for g in models.Genre.select(models.Genre.name).distinct())
+
+    @staticmethod
+    def get_all_groups():
+        """return all known groups in the database"""
+        # the "distinct" is still useless, but I'd like to make Groups like Genres
+        return tuple(g.name for g in models.Group.select(models.Group.name).distinct())
 
 
 class Person(ActionNamespace):
@@ -1212,7 +1225,7 @@ class DataNamespace:
         return hash(self.id)
 
     def __str__(self):
-        return str(self._data)
+        return str(self._data)  # TODO: replace with something that calls utils.get_name
 
     def __getattr__(self, item):
         if item == 'id':
