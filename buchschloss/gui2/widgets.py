@@ -1,5 +1,4 @@
 """specific widgets and FormWidget classes"""
-import enum
 import functools
 import operator
 import tkinter as tk
@@ -7,16 +6,12 @@ import tkinter.ttk as ttk
 from tkinter import Label, Button
 from functools import partial
 from collections import abc
-import typing as T
 
 from ..misc import tkstuff as mtk
-from ..misc.tkstuff import dialogs as mtkd
 
 from . import validation
-from . import common
 from .. import utils
 from .. import config
-from .. import core
 from . import formlib
 
 
@@ -86,7 +81,7 @@ class ConfirmedPasswordInput(formlib.FormWidget):
 
 
 def options_from_search(action_ns, allow_none=False, condition=()):
-    """Return a formlib.DropdownChoices tuple that gets choices for a search
+    """Return a formlib.DropdownChoices tuple that gets choices from a search
 
     :param action_ns: is the ActionNamespace to search in
     :param allow_none: specifies whether an empty input is considered valid
@@ -189,131 +184,47 @@ class Checkbox(formlib.FormWidget):
             self.widget.state(['alternate'])
 
 
-class ActivatingListbox(tk.Listbox):
-    """a Listbox that allows initial items, possibly already activated
-        additional options: exportselection=False, selectmode=tk.MULTIPLE"""
+class MultiChoicePopup(formlib.MultiChoicePopup):
+    """provide thw ``wraplength`` argument and set ``max_height`` and ``sep``"""
+    max_height = config.gui2.popup_height
+    sep = config.gui2.option_sep
 
-    def __init__(self, master, cfg={}, values=(), activate=(), **kwargs):
-        super().__init__(master, cfg, exportselection=False,
-                         selectmode=tk.MULTIPLE, **kwargs)
-        self.insert(0, *values)
-        for i in activate:
-            self.select_set(i)
-
-
-def get_scrolled_listbox(master, listbox=tk.Listbox, **listbox_kwargs):
-    """a Listbox that includes its Scrollbar"""
-    inst: T.Union[listbox, mtk.WrappedWidget] = \
-        mtk.WrappedWidget(master, (listbox, listbox_kwargs), (tk.Scrollbar, {}))
-    inst.scrollbar = inst.container.widgets[1]
-    inst['yscrollcommand'] = inst.scrollbar.set
-    inst.scrollbar['command'] = inst.yview
-    return inst
+    def __init__(self, *args, button_options=None, **kwargs):
+        kwargs['button_options'] = {
+            **(button_options or {}),
+            'wraplength': config.gui2.widget_size.main.width // 2,
+        }
+        super().__init__(*args, **kwargs)
 
 
-class ScrolledListbox(tk.Listbox):
-    """wrapper around get_scrolled_listbox for functions needing a class"""
-    def __new__(cls, *args, **kwargs):
-        return get_scrolled_listbox(*args, **kwargs)
+def search_multi_choice(action_ns, condition=()):
+    """Return a MultiChoicePopup tuple that gets choices from a search
 
-
-class MultiChoicePopup(tk.Button):
-    """Button that displays a multi-choice listbox popup dialog on click"""
-    def __init__(self, master, cnf={}, options=(), sep=';', **kwargs):
-        """create a new MultiChoicePopup
-
-            ``root`` is the master of the generated popup
-            ``options`` is a sequence of (<code>, <display>) tuples
-                <display> will be shown to the user, while <code>
-                will be used when .get is called
-            ``sep`` is the separator used to join results for display
-        """
-        kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
-        super().__init__(master, cnf, command=self.action, **kwargs)
-        if not options or isinstance(options[0], str):
-            self.codes = self.displays = options
-        else:
-            self.codes, self.displays = zip(*options)
-        self.active = ()
-        self.sep = sep
-
-    def get(self):
-        """get the last selected items"""
-        return [self.codes[i] for i in self.active]
-
-    def set(self, values):
-        """set the items to be selected"""
-        self.active = [self.codes.index(x) for x in values]
-        self.set_text()
-
-    def action(self, event=None):
-        """display the popup window, set self.active and update button text"""
-        options = {'values': self.displays, 'activate': self.active}
-        if len(self.displays) > config.gui2.popup_height:
-            options.update(listbox=ActivatingListbox, height=config.gui2.popup_height)
-            widget = ScrolledListbox
-        else:
-            options.update(height=len(self.displays))
-            widget = ActivatingListbox
-        try:
-            self.active = mtkd.WidgetDialog.ask(
-                self.master, widget, options, getter='curselection')
-        except mtkd.UserExitedDialog:
-            pass
-        self.set_text()
-
-    def set_text(self):
-        """set the text to the displays separated by semicolons"""
-        self['text'] = self.sep.join(self.displays[i] for i in self.active)
-
-
-class SearchMultiChoice(MultiChoicePopup):
-    """MultiChoicePopup that gets values from searches"""
-
-    def __init__(self, master, cnf={}, *,
-                 action_ns: T.Type[core.ActionNamespace],
-                 **kwargs):
-        kwargs.setdefault('wraplength', config.gui2.widget_size.main.width / 2)
-        options = [(o.id, str(o)) for o in
-                   common.NSWithLogin(action_ns).search(())]
-        super().__init__(master, cnf, options=options, **kwargs)
-
-    def set(self, values):
-        """update text.
-
-            If ``values`` is a non-empty string,
-            split it on ';' before passing to super()
-        """
-        if isinstance(values, str):
-            if values:
-                values = values.split(self.sep)
-            else:
-                values = ()
-        super().set(values)
+    :param action_ns: is the ActionNamespace to search in
+    :param condition: is an optional condition to apply to the search
+    """
+    return (
+        MultiChoicePopup,
+        lambda: [(o.id, str(o)) for o in action_ns.search(condition)],
+        {},
+    )
 
 
 class FlagEnumMultiChoice(MultiChoicePopup):
-    """Display FlagEnum options"""
-    def __init__(self, master, cnf={}, *,
-                 flag_enum: T.Type[enum.Flag],
-                 get_name_prefix: str = '',
-                 **kwargs):
-        """create a new FlagEnumMultiChoice based on ``flag_enum``"""
+    """Use a FlagEnum as option source"""
+    def __init__(self, form, master, name, flag_enum):
+        """Get the options from ``flag_enum``"""
         self.enum = flag_enum
-        options = [(v.value, utils.get_name(get_name_prefix + k))
-                   for k, v in flag_enum.__members__.items()]
-        super().__init__(master, cnf, options, **kwargs)
+        options = [(v, form.get_name('' + k)) for k, v in flag_enum.__members__.items()]
+        super().__init__(form, master, name, options)
 
-    def get(self):
-        return functools.reduce(operator.or_, map(self.enum, super().get()), self.enum(0))
+    def get_simple(self):
+        """convert individual codes to a FlagEnum instance"""
+        return functools.reduce(operator.or_, super().get_simple(), self.enum(0))
 
-    def set(self, value):
-        # is there any way to properly do this?
-        to_set = []
-        for v in self.enum.__members__.values():
-            if v in value:
-                to_set.append(v.value)
-        super().set(to_set)
+    def set_simple(self, data):
+        """convert a FlagEnum instance to individual codes"""
+        super().set_simple([v for v in self.enum.__members__.values() if v in data])
 
 
 class Header:

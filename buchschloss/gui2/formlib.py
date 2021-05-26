@@ -450,7 +450,8 @@ class MultiChoicePopup(FormWidget):
         super().__init__(form, master, name)
         self.allow_new = new
         self.active = ()
-        self.widget = tk.Button(self.master, command=self.show_dropdown, **button_options)
+        button_options = {**(button_options or {}), 'command': self.show_dropdown}
+        self.widget = tk.Button(self.master, **button_options)
         if callable(choices):
             choices = choices()
         if choices and not isinstance(choices[0], str):  # avoid zip(*())
