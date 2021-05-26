@@ -187,7 +187,7 @@ class FormWidget:
             "implement .set_simple() if you don't override .set()")
     
     def validate(self):
-        """Validate this widget's data and return None or a dict of error messages
+        """Validate this widget's data and return a dict of error messages.
         
         This default implementation returns ``{self.name: self.validate_simple()}``
         if ``self.validate_simple() is not None`` and ``{}`` otherwise
@@ -197,9 +197,12 @@ class FormWidget:
         return {} if v is None else {self.name: v}
 
     def validate_simple(self):
-        """Validate this widgets data and return None or an error message"""
-        raise NotImplementedError(
-            "implement .validate_simple() if you don't override .validate()")
+        """Validate this widget's data.
+
+         Return None if valid (this default implementation) and
+         an error message otherwise.
+         """
+        return None
 
 
 class Entry(FormWidget):
@@ -336,10 +339,6 @@ class RadioChoices(FormWidget):
         """select the radio button with the given code"""
         self.var.set(data)
 
-    def validate_simple(self):
-        """always valid"""
-        return None
-
 
 class DropdownChoices(FormWidget):
     """Select an element from a drop-down menu (Combobox)"""
@@ -406,7 +405,7 @@ class DropdownChoices(FormWidget):
         if self.allow_new or self.widget.current() != -1:
             return None
         else:
-            return self.error_message
+            return self.form.get_name(self.error_message)
 
     def _update_values(self, new_value):
         """update displayed values based on entered text
@@ -422,3 +421,122 @@ class DropdownChoices(FormWidget):
                 self.widget.set(possibilities[0])
         self.widget['values'] = possibilities
         return True
+
+
+class MultiChoicePopup(FormWidget):
+    """allow selection of multiple values
+
+    :var .sep: is the separator for displaying chosen options
+    :var .max_height: is the maximum height (in entries) of the listbox popup.
+      If new values can be added or the existing values are more than this value,
+      the listbox will be made scrollable.
+    """
+    sep = '; '
+    max_height = 10
+
+    def __init__(self, form, master, name, choices, new=False, button_options=None):
+        """Create the widget
+
+        :param choices: is a sequence of ``code, display`` pairs or single strings.
+          In the latter case, each element will be used for both. ``code`` is the
+          value returned by ``.get()`` and ``display`` is shown to the user.
+          For dynamic uses, ``choices`` may also be a zero-argument callable providing
+          a sequence as described above.
+        :param new: specifies whether to allow the user to add new values.
+          In this case, an entry widget will be added
+        :param button_options: may be a dit of keyword arguments to pass to the button,
+          excluding "command"
+        """
+        super().__init__(form, master, name)
+        self.allow_new = new
+        self.active = ()
+        self.widget = tk.Button(self.master, command=self.show_dropdown, **button_options)
+        if callable(choices):
+            choices = choices()
+        if choices and not isinstance(choices[0], str):  # avoid zip(*())
+            self.codes, self.values = map(list, zip(*choices))
+        else:
+            self.codes = list(choices)
+            self.values = list(choices)
+
+    def get_simple(self):
+        """return a list of codes for the selected values"""
+        return [self.codes[i] for i in self.active]
+
+    def set_simple(self, data):
+        """activate the elements with the given codes"""
+        self.active = [self.codes.index(elem) for elem in data]
+        self.widget['text'] = self.sep.join(self.values[i] for i in self.active)
+
+    def show_dropdown(self):
+        """Show the dropdown menu"""
+        # get the absolute coordinates by going up the chain
+        x = 0
+        y = self.widget.winfo_height()
+        w = self.widget
+        while w is not None:
+            x += w.winfo_x()
+            y += w.winfo_y()
+            w = w.master
+
+        def dropup(event):  # noqa
+            """update everything and remove the dropdown"""
+            self.active = listbox.curselection()
+            self.widget['text'] = self.sep.join(self.values[i] for i in self.active)
+            dropdown.destroy()
+            for event, func_id in bound:
+                root.unbind(event, func_id)
+
+        # I've often seen .withdraw() and such, but they don't seem to
+        # change anything in practice for me.
+        # The events bound try to remove the dropdown when required,
+        # but it doesn't always work, notably when moving the parent window.
+        # <Configure> is bad because we update the button text.
+        root = self.widget.winfo_toplevel()
+        bound = [(event, root.bind(event, dropup))
+                 for event in ('<Button>', '<Key>', '<FocusOut>')]
+        dropdown = tk.Toplevel(root)
+        dropdown.overrideredirect(True)
+        dropdown.geometry(f'+{x}+{y}')
+        listbox = self.make_dropdown_content(dropdown)
+
+    def make_dropdown_content(self, top):
+        """Create and display the dropdown widgets and return the listbox
+
+        The widgets are:
+
+        - A listbox, in any case
+        - A scrollbar, if new values are allowed or the number of values
+          exceeds ``self.max_height``
+        - An entry, if new values are allowed
+        """
+        if self.allow_new:
+            def insert_new(event=None):  # noqa
+                value = entry.get()
+                entry.delete(0, tk.END)
+                try:
+                    index = self.values.index(value)
+                except ValueError:
+                    listbox.insert(tk.END, value)
+                    self.values.append(value)
+                    self.codes.append(value)
+                    index = len(self.values) - 1
+                listbox.select_set(index)
+            entry_frame = tk.Frame(top)
+            entry = tk.Entry(entry_frame)
+            entry.bind('<Return>', insert_new)
+            entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
+            tk.Button(entry_frame, text='+', command=insert_new).pack(side=tk.LEFT)
+            top = tk.Frame(top)
+            top.pack()
+            entry_frame.pack()
+        listbox = tk.Listbox(top, exportselection=False, selectmode=tk.MULTIPLE)
+        listbox.insert(0, *self.values)
+        for i in self.active:
+            listbox.select_set(i)
+        listbox.pack(side=tk.LEFT)
+        if self.allow_new or len(self.values) > self.max_height:
+            scrollbar = tk.Scrollbar(top, command=listbox.yview)
+            listbox['yscrollcommand'] = scrollbar.set
+            scrollbar.pack(expand=True, fill=tk.Y, side=tk.LEFT)
+        return listbox
