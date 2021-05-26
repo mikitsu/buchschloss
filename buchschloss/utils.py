@@ -10,6 +10,7 @@ contents (for use):
 
 import collections
 import functools
+import itertools
 import operator
 import email
 import smtplib
@@ -64,6 +65,36 @@ def send_email(subject, text):
             conn.send_message(msg)
     except smtplib.SMTPException as e:
         logging.error('error while sending email: {}: {}'.format(type(e).__name__, e))
+
+
+def check_isbn(isbn: str) -> int:
+    """Check whether the given ISBN is valid and convert it into ISBN-13 format"""
+    # To list of digits
+    if {'x', 'X'} & set(isbn[:-1]):
+        raise ValueError('"X" in not-last position')
+    digits = []
+    for digit in isbn:
+        if digit.isdigit():
+            digits.append(int(digit))
+        elif digit in 'xX':
+            digits.append(10)
+    if len(digits) == 9:
+        digits.insert(0, 0)
+    # check the checksum
+    get_weighted_digits = functools.partial(zip, itertools.cycle((1, 3)))
+    if len(digits) == 10:
+        if (sum((10 - i) * x for i, x in enumerate(isbn)) % 11
+                or sum(i * x for i, x in enumerate(isbn, 1)) % 11):
+            raise ValueError('checksum mismatch')
+        else:
+            digits = [9, 7, 8] + digits[:-1]
+            digits.append(-sum(w * d for w, d in get_weighted_digits(digits)) % 10)
+    elif len(digits) == 13:
+        if sum(w * d for w, d in get_weighted_digits(isbn)) % 10:
+            raise ValueError('checksum mismatch')
+    else:
+        raise ValueError(f'ISBN has {len(digits)} digits, not 10 or 13')
+    return int(''.join(map(str, digits)))
 
 
 def get_name(internal: str):

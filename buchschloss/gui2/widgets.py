@@ -9,7 +9,6 @@ from collections import abc
 
 from ..misc import tkstuff as mtk
 
-from . import validation
 from .. import utils
 from .. import config
 from . import formlib
@@ -95,7 +94,7 @@ def options_from_search(action_ns, allow_none=False, condition=()):
     )
 
 
-ISBNEntry = (formlib.Entry, 'error', {'transform': validation.ISBN_validator})
+ISBNEntry = (formlib.Entry, 'error', {'transform': utils.check_isbn})
 NonEmptyEntry = (formlib.Entry, 'error', {'max_history': 0})
 NonEmptyREntry = (formlib.Entry, 'error', {})
 ClassEntry = (formlib.Entry, 'error', {'regex': config.gui2.class_regex})
