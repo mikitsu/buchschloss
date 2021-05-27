@@ -94,7 +94,10 @@ class SetForEditForm(BaseForm):
 class BookForm(SearchForm, SetForEditForm):
     all_widgets = {
         'id': {},
-        'isbn': ISBNEntry,
+        'isbn': {
+            FormTag.NEW: (ISBNEntry, True, {}),
+            None: (ISBNEntry, False, {}),
+        },
         'author': NonEmptyREntry,
         'title': NonEmptyEntry,
         'series': SeriesInput,

@@ -3,15 +3,18 @@ import functools
 import operator
 import tkinter as tk
 import tkinter.ttk as ttk
+import tkinter.messagebox as tk_msg
 from tkinter import Label, Button
 from functools import partial
 from collections import abc
 
 from ..misc import tkstuff as mtk
 
+from .. import core
 from .. import utils
 from .. import config
 from . import formlib
+from . import common
 
 
 class OptionsFromSearch(formlib.DropdownChoices):
@@ -116,7 +119,36 @@ class ConfirmedPasswordInput(formlib.FormWidget):
         return None
 
 
-ISBNEntry = (formlib.Entry, 'error', {'transform': utils.check_isbn})
+class ISBNEntry(formlib.Entry):
+    """Entry adaption for ISBN, with optional data filling"""
+    def __init__(self, form, master, name, fill):
+        """If ``fill`` is True, automatically fill data"""
+        super().__init__(form, master, name, 'error', transform=utils.check_isbn)
+        if fill:
+            self.widget.bind('<FocusOut>', self.fill)
+
+    def fill(self, event=None):
+        """Fill data based on the ISBN"""
+        with common.ignore_missing_messagebox():
+            f = self.form.frame
+            if str(f) not in str(f.winfo_toplevel().focus_get()):
+                # going somewhere else
+                return
+        error = self.validate_simple()
+        if error is not None:
+            tk_msg.showerror(message=error)
+            return
+        if not tk_msg.askyesno(utils.get_name('book::isbn'),
+                               utils.get_name('interactive_question::isbn_autofill')):
+            return
+        try:
+            data = utils.get_book_data(self.get_simple())
+        except core.BuchSchlossBaseError as e:
+            tk_msg.showerror(e.title, e.message)
+        else:
+            self.form.set_data(data)
+
+
 NonEmptyEntry = (formlib.Entry, 'error', {'max_history': 0})
 NonEmptyREntry = (formlib.Entry, 'error', {})
 ClassEntry = (formlib.Entry, 'error', {'regex': config.gui2.class_regex})

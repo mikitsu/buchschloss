@@ -143,34 +143,6 @@ class App:
             sys.exit()
 
 
-def new_book_autofill(form):
-    """automatically fill some information on a book"""
-
-    def filler(event=None):
-        with common.ignore_missing_messagebox():
-            if str(form) not in str(app.root.focus_get()):
-                # going somewhere else
-                return
-        valid, isbn = isbn_field.validate()
-        if not valid:
-            tk_msg.showerror(message=isbn)
-            isbn_field.focus()
-            return
-        if not tk_msg.askyesno(utils.get_name('book::isbn'),
-                               utils.get_name('interactive_question::isbn_autofill')):
-            return
-        try:
-            data = utils.get_book_data(isbn)
-        except core.BuchSchlossBaseError as e:
-            tk_msg.showerror(e.title, e.message)
-        else:
-            for k, v in data.items():
-                mtk.get_setter(form.widget_dict[k])(v)
-
-    isbn_field = form.widget_dict['isbn']
-    isbn_field.bind('<FocusOut>', filler)
-
-
 def get_actions(spec):
     """return a dict of actions suitable for ActionTree.from_map"""
     gfa = generic_formbased_action
