@@ -3,6 +3,7 @@
 contents (for use):
     - get_runner() -- get a task running function
     - send_email() -- send an email
+    - check_isbn() -- check an ISBN and convert it to ISBN-13
     - get_name() -- get a pretty name
     - level_names -- get a pretty level representation
     - get_book_data() -- attempt to get data about a book based on the ISBN

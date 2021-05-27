@@ -8,7 +8,7 @@ from .. import config
 from .. import core
 from .. import utils
 
-from .formlib import RadioChoices
+from .formlib import RadioChoices, DropdownChoices
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry, PasswordEntry,
                       IntEntry, NullREntry, Text, ConfirmedPasswordInput,
                       Checkbox, SeriesInput, options_from_search, search_multi_choice,
@@ -145,33 +145,23 @@ class LoginForm(BaseForm):
     }
 
 
-# class LibraryGroupCommon(SearchForm, template=True):
-#     _position_over_ = True
-#     name: mtkf.Element = NonEmptyEntry
-#     books: GroupElement.NO_SEARCH = (SearchMultiChoice, {'action_ns': core.Book})
-#     # not as element to allow Library to have a nice order
-#     action = (mtk.RadioChoiceWidget, {
-#         '*args': [(a, get_name('form::LibraryGroupCommon::' + a))
-#                   for a in ['add', 'remove', 'delete']]})
-#
-#
-# class GroupForm(LibraryGroupCommon):
-#     action: GroupElement.ONLY_EDIT = LibraryGroupCommon.action
-#
-#
-# class LibraryForm(LibraryGroupCommon):
-#     class FormWidget:
-#         default_content = {'pay_required': True}
-#
-#     people: GroupElement.NO_SEARCH = (SearchMultiChoice, {'action_ns': core.Person})
-#     pay_required: GroupElement.ONLY_NEW = CheckbuttonWithVar
-#     action: GroupElement.ONLY_EDIT = LibraryGroupCommon.action
-#
-#
-# class GroupActivateForm(BaseForm):
-#     group: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Group})
-#     src: mtkf.Element = (SearchMultiChoice, {'action_ns': core.Library})
-#     dest: mtkf.Element = (OptionsFromSearch, {'action_ns': core.Library})
+class LibraryForm(SearchForm):
+    all_widgets = {
+        'name': NonEmptyREntry,
+        'books': {FormTag.SEARCH: None,
+                  None: search_multi_choice(core.Book)},
+        'people': {FormTag.SEARCH: None,
+                   None: search_multi_choice(core.Person)},
+        'pay_required': Checkbox,
+        'action': {
+            FormTag.EDIT: (
+                DropdownChoices,
+                [(e, utils.get_name('from::library::action::' + e.value))
+                 for e in core.LibraryAction],
+                {},
+            ),
+        },
+    }
 
 
 class BorrowForm(BaseForm):

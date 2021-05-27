@@ -187,8 +187,6 @@ def get_actions(spec):
             get_form(name + 'Search', get_form(name)), ns.search, ShowInfo.instances[name]),
     }
     special_action_funcs = {
-        ('Group', 'edit'): gfa(
-            'edit', forms.GroupForm, wrapped_action_ns['Group'].edit),
         ('Library', 'edit'): gfa(
             'edit', forms.LibraryForm, wrapped_action_ns['Library'].edit),
         ('Book', 'new'): gfa(  # not through override because of post_init
@@ -237,8 +235,10 @@ def get_actions(spec):
                 action_type = (types.FunctionType, types.MethodType)
                 for func_name in dir(core_ans):
                     func_v = getattr(core_ans, func_name)
-                    if (func_name.startswith(('_', 'view'))
-                            or not isinstance(func_v, action_type)):
+                    if any((func_name.startswith(('_', 'view')),
+                            not isinstance(func_v, action_type),
+                            v['name'] == 'Book' and func_name.startswith('get_all'),
+                            )):
                         continue
                     set_gui2_action(v['name'], func_name, func_name)
                 set_gui2_action(v['name'], 'view', 'view')

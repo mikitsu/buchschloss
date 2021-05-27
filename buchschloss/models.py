@@ -157,7 +157,7 @@ class Book(Model):
 
     genres: peewee.BackrefAccessor
     borrow: peewee.BackrefAccessor
-    groups: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # groups as backref
+    groups: peewee.BackrefAccessor
     id: T.Union[int, IntegerField] = AutoField(primary_key=True)
     library: T.Union[Library, ForeignKeyField] = ForeignKeyField(Library, backref='books')
     shelf: T.Union[str, CharField] = CharField()
@@ -182,15 +182,13 @@ class Genre(Model):
 
 class Group(Model):
     """Represent a Group."""
-    books: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]\
-        = ManyToManyField(Book, 'groups')
-    name: T.Union[str, CharField] = CharField(primary_key=True)
+    book = ForeignKeyField(Book, backref='groups')
+    name: T.Union[str, CharField] = CharField()
 
-    def __str__(self):
-        return utils.get_name('Group[{}]').format(self.name)
+    pk_name = 'name'  # for search
 
-    str_fields = (name,)
-    pk_name = 'name'
+    class Meta:
+        primary_key = peewee.CompositeKey('book', 'name')
 
 
 class Borrow(Model):
@@ -266,7 +264,7 @@ class Misc(Model):
     pk_name = 'pk'
 
 
-models = Model.__subclasses__() + [Library.people.through_model, Group.books.through_model]
+models = Model.__subclasses__() + [Library.people.through_model]
 if __name__ == '__main__':
     print('Running this as a script will create tables in the DB '
           'and initialize them with basic data. Proceed? (y/n)')

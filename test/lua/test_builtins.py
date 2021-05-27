@@ -55,13 +55,3 @@ def test_view(monkeypatch):
         ((123,), {'login_context': core.guest_lc}),
         ((124,), {'login_context': core.guest_lc}),
     )
-
-
-def test_specials(monkeypatch):
-    """test Borrow:restitute and Group[<id>]:activate"""
-    group_dummy = DummyActionNS({'activate': [None], 'view_ns': [object()]})
-    monkeypatch.setattr(core, 'Group', group_dummy)
-    rt = lua.prepare_runtime(core.guest_lc)
-    assert rt.eval('Group.g_name:activate{{"1", "2", "3"}, "dest"}') is None
-    assert (group_dummy.calls['activate'][0]
-            == (('g_name', ['1', '2', '3'], 'dest'), {'login_context': core.guest_lc}))

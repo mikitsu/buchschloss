@@ -34,8 +34,7 @@ BuchSchloss includes the following submodules:
   It provides more abstraction that ``cli`` and seems to be easier to use.
 - ``lua`` was meant to be a better command-line interface and has morphed
   into scriptability for BuchSchloss using Lua_.
-- ``misc`` is just a copy of my old misc_ project. I should probably include it
-  as a git submodule when I find some time.
+- ``misc`` is just a copy of my old misc_ project. I'm trying to remove most of it.
 
 .. _Lua: https://www.lua.org
 .. _misc: https://github.com/mik2k2/misc-utils
@@ -51,15 +50,13 @@ Data overview
 The following data types are present:
 
 - Book: this represents a book. It saves bibliographic data, such as ISBN, author,
-  title, a Library (see below), any number of Groups (see below) and, if applicable,
-  the Person who has currently borrowed the book [#borrow-in-book]_.
+  title, a Library (see below), any number of groups (which should have been called tags)
+  and, if applicable, the Person who has currently borrowed the book [#borrow-in-book]_.
 - Person: this represents someone who can borrow some books. Personal details,
   available Libraries and information on borrowing restrictions are stored.
 - Library: Libraries contain a group of books whose borrowing conditions are the same.
   Each Library also stores a "pay_required" (old name, should change to "restricted")
   value.
-- Group: Groups are used to simplify Library-changing of large numbers of Books.
-  A Group can be activated, automatically transferring all Books to a Library.
 - Borrow: not as evident on the UI level as the other data pieces.
   Saves a borrowing action: Book and Person, the return date and whether
   the Book has been returned
@@ -72,9 +69,10 @@ The following data types are present:
 
 .. note::
 
-    The database contains a few more tables, specifically two tables to
-    provide the many-to-many relationship between (Groups and Books) and
-    (People and Libraries) and a "misc" table for persistent storage of general stuff
+    The database contains a few more tables, specifically a table to
+    provide the many-to-many relationship between People and Libraries,
+    a table each for genres and groups
+    and a "misc" table for persistent storage of general stuff
 
 UI interface
 ------------

@@ -241,45 +241,42 @@ def test_book_new(db):
                     publisher='publisher', medium='medium', shelf='A1',
                     groups=['grp0'])
     assert b_id == 3
-    assert list(models.Book.get_by_id(b_id).groups) == [models.Group.get_by_id('grp0')]
+    b = models.Book.get_by_id(b_id)
+    assert list(b.groups) == [models.Group.get_by_id((b, 'grp0'))]
     b_id = book_new(isbn=123, year=456, author='author', title='title', language='lang',
                     publisher='publisher', medium='medium', shelf='A1',
                     groups=['grp0', 'grp1'])
     assert b_id == 4
-    assert set(models.Book.get_by_id(b_id).groups) == {
-        models.Group.get_by_id('grp0'), models.Group.get_by_id('grp1')}
+    b = models.Book.get_by_id(b_id)
+    assert set(b.groups) == {
+        models.Group.get_by_id((b, 'grp0')), models.Group.get_by_id((b, 'grp1'))}
 
 
 def test_book_edit(db):
     """test Book.edit"""
     models.Library.create(name='main')
-    models.Group.create(name='group-1')
-    models.Group.create(name='group-2')
     create_book()
     create_book()
     ctxt = for_levels(partial(core.Book.edit, 1, isbn=1), 2, lambda r: not r)
     book_edit = partial(core.Book.edit, login_context=ctxt)
     assert models.Book.get_by_id(1).isbn == 1
     assert models.Book.get_by_id(2).isbn == 0
-    assert not book_edit(1, author='author', shelf='shl')
+    book_edit(1, author='author', shelf='shl')
     assert models.Book.get_by_id(1).author == 'author'
     assert models.Book.get_by_id(1).shelf == 'shl'
     assert models.Book.get_by_id(2).author == ''
     assert models.Book.get_by_id(2).shelf == ''
     models.Library.create(name='lib')
-    assert not book_edit(1, library='lib')
+    book_edit(1, library='lib')
     assert models.Book.get_by_id(1).library.name == 'lib'
     assert models.Book.get_by_id(2).library.name == 'main'
     with pytest.raises(core.BuchSchlossBaseError):
         book_edit(1, library='does_not_exist')
     assert not book_edit(1, groups=['group-1'])
     assert set(g.name for g in models.Book.get_by_id(1).groups) == {'group-1'}
-    e = book_edit(1, groups=('group-2', 'does not exist'))
-    assert e == {utils.get_name('error::no_Group_with_id_{}').format('does not exist')}
-    assert set(g.name for g in models.Book.get_by_id(1).groups) == {'group-2'}
     assert models.Book.get_by_id(1).library.name == 'lib'
-    assert not book_edit(1, medium='med')
-    assert not book_edit(1, year=123)
+    book_edit(1, medium='med')
+    book_edit(1, year=123)
     assert models.Book.get_by_id(1).medium == 'med'
     assert models.Book.get_by_id(1).year == 123
     assert models.Book.get_by_id(2).medium == ''
@@ -330,108 +327,28 @@ def test_library_edit(db):
     create_book('test-2')
     create_person(123)
     create_person(124)
-    ctxt = for_levels(partial(core.Library.edit, core.LibraryGroupAction.NONE, 'testlib'), 3)
+    ctxt = for_levels(partial(core.Library.edit, core.LibraryAction.NONE, 'testlib'), 3)
     library_edit = partial(core.Library.edit, login_context=ctxt)
     with pytest.raises(core.BuchSchlossBaseError):
-        library_edit(core.LibraryGroupAction.NONE, 'does not exist')
-    library_edit(core.LibraryGroupAction.ADD, 'testlib', books=[1])
+        library_edit(core.LibraryAction.NONE, 'does not exist')
+    library_edit(core.LibraryAction.ADD, 'testlib', books=[1])
     assert models.Book.get_by_id(1).library.name == 'testlib'
-    library_edit(core.LibraryGroupAction.ADD, 'testlib', books=[2, 3], people=[123])
+    library_edit(core.LibraryAction.ADD, 'testlib', books=[2, 3], people=[123])
     assert all(models.Book.get_by_id(n).library.name == 'testlib' for n in range(1, 4))
     assert [p.id for p in models.Library.get_by_id('testlib').people] == [123]
-    library_edit(core.LibraryGroupAction.REMOVE, 'testlib', books=[3, 4], people=[123])
+    library_edit(core.LibraryAction.REMOVE, 'testlib', books=[3, 4], people=[123])
     assert models.Book.get_by_id(4).library.name == 'test-2'
     assert models.Book.get_by_id(3).library.name == 'main'
     assert not models.Person.get_by_id(123).libraries
-    library_edit(core.LibraryGroupAction.DELETE, 'testlib')
+    library_edit(core.LibraryAction.DELETE, 'testlib')
     assert not models.Library.get_by_id('testlib').people
     assert not models.Library.get_by_id('testlib').books
-    library_edit(core.LibraryGroupAction.NONE, 'testlib', pay_required=True)
+    library_edit(core.LibraryAction.NONE, 'testlib', pay_required=True)
     assert models.Library.get_by_id('testlib').pay_required
-    library_edit(core.LibraryGroupAction.NONE, 'testlib', pay_required=None)
+    library_edit(core.LibraryAction.NONE, 'testlib', pay_required=None)
     assert models.Library.get_by_id('testlib').pay_required
-    library_edit(core.LibraryGroupAction.NONE, 'testlib', pay_required=False)
+    library_edit(core.LibraryAction.NONE, 'testlib', pay_required=False)
     assert not models.Library.get_by_id('testlib').pay_required
-
-
-def test_group_new(db):
-    """test Group.new"""
-    models.Library.create(name='main')
-    create_book()
-    create_book()
-    ctxt = for_levels(partial(core.Group.new, 'test-grp'), 3)
-    group_new = partial(core.Group.new, login_context=ctxt)
-    assert not models.Group.get_by_id('test-grp').books
-    with pytest.raises(core.BuchSchlossBaseError):
-        group_new('test-grp')
-    group_new('test-2', [1, 2])
-    assert list(g.name for g in models.Book.get_by_id(1).groups) == ['test-2']
-    assert list(g.name for g in models.Book.get_by_id(2).groups) == ['test-2']
-    group_new('test-3', [2])
-    assert list(g.name for g in models.Book.get_by_id(1).groups) == ['test-2']
-    assert set(g.name for g in models.Book.get_by_id(2).groups) == {'test-2', 'test-3'}
-    group_new('test-4', [12345])
-
-
-def test_group_edit(db):
-    """test Group.edit"""
-    models.Library.create(name='main')
-    models.Group.create(name='group-1')
-    models.Group.create(name='group-2')
-    create_book()
-    create_book()
-    ctxt = for_levels(partial(core.Group.edit, core.LibraryGroupAction.NONE, 'group-1', ()), 3)
-    group_edit = partial(core.Group.edit, login_context=ctxt)
-    with pytest.raises(core.BuchSchlossBaseError):
-        group_edit(core.LibraryGroupAction.NONE, 'does not exist', ())
-    group_edit(core.LibraryGroupAction.ADD, 'group-1', [1])
-    assert set(g.name for g in models.Book.get_by_id(1).groups) == {'group-1'}
-    assert not models.Book.get_by_id(2).groups
-    assert 'group-2' not in models.Book.get_by_id(1).groups + models.Book.get_by_id(2).groups
-    group_edit(core.LibraryGroupAction.REMOVE, 'group-1', iter([1, 2, 3]))
-    group_edit(core.LibraryGroupAction.ADD, 'group-1', [2])
-    assert not models.Book.get_by_id(1).groups
-    assert set(g.name for g in models.Book.get_by_id(2).groups) == {'group-1'}
-    assert 'group-2' not in models.Book.get_by_id(1).groups + models.Book.get_by_id(2).groups
-    group_edit(core.LibraryGroupAction.DELETE, 'group-1', ())
-    assert not models.Book.get_by_id(1).groups
-    assert not models.Book.get_by_id(2).groups
-    assert set() == {'group-1', 'group-2'} & set(models.Book.get_by_id(1).groups
-                                                 + models.Book.get_by_id(2).groups)
-
-
-def test_group_activate(db):
-    """test Group.activate"""
-    models.Library.create(name='main')
-    models.Library.create(name='lib-1')
-    models.Library.create(name='lib-2')
-    models.Group.create(name='group-1')
-    models.Group.create(name='group-2')
-    books = [create_book(),
-             create_book(),
-             create_book(),
-             ]
-    ctxt = for_levels(partial(core.Group.activate, 'group-1'), 3, lambda r: not r)
-    group_activate = partial(core.Group.activate, login_context=ctxt)
-    with pytest.raises(core.BuchSchlossBaseError):
-        group_activate('does not exist')
-    books[0].groups.add('group-1')
-    books[1].groups.add('group-2')
-    assert not group_activate('group-1', dest='lib-1')
-    assert models.Book.get_by_id(1).library.name == 'lib-1'
-    assert models.Book.get_by_id(2).library.name == 'main'
-    b = models.Book.get_by_id(3)
-    assert b.library.name == 'main'
-    b.groups.add('group-1')
-    b.library = models.Library.get_by_id('lib-2')
-    b.save()
-    assert not group_activate('group-1', ['lib-1'])
-    assert models.Book.get_by_id(1).library.name == 'main'
-    assert models.Book.get_by_id(3).library.name == 'lib-2'
-    with pytest.raises(core.BuchSchlossBaseError):
-        group_activate('group-1', ['does not exist', 'lib-2'])
-    with pytest.raises(core.BuchSchlossBaseError):
-        group_activate('group-1', ['lib-1'], 'does not exist')
 
 
 def test_member_new(db):

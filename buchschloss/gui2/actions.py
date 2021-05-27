@@ -274,7 +274,7 @@ ShowInfo.instances = {
     ),
 }
 ShowInfo.instances.update({k: ShowInfo(getattr(core, k))
-                           for k in ('Library', 'Group', 'Member', 'Script')})
+                           for k in ('Library', 'Member', 'Script')})
 
 
 def login():

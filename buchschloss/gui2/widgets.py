@@ -214,7 +214,7 @@ class FlagEnumMultiChoice(MultiChoicePopup):
     def __init__(self, form, master, name, flag_enum):
         """Get the options from ``flag_enum``"""
         self.enum = flag_enum
-        options = [(v, form.get_name('' + k)) for k, v in flag_enum.__members__.items()]
+        options = [(e, form.get_name('' + e.name)) for e in flag_enum]
         super().__init__(form, master, name, options)
 
     def get_simple(self):
@@ -223,7 +223,7 @@ class FlagEnumMultiChoice(MultiChoicePopup):
 
     def set_simple(self, data):
         """convert a FlagEnum instance to individual codes"""
-        super().set_simple([v for v in self.enum.__members__.values() if v in data])
+        super().set_simple([v for v in self.enum if v in data])
 
 
 class Header:

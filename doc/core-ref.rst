@@ -19,9 +19,6 @@
 .. autoclass:: buchschloss.core.Person
     :members: new, edit
 
-.. autoclass:: buchschloss.core.Group
-    :members: new, edit, activate
-
 .. autoclass:: buchschloss.core.Library
     :members: new, edit
 
