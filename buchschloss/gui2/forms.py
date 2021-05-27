@@ -81,17 +81,29 @@ class AuthedForm(BaseForm):
     }
 
 
-class SetForEditForm(BaseForm):
-    """Use OptionsFromSearch with setter=True for the first widget on FormTag.EDIT"""
+class EditForm(BaseForm):
+    """Adapt forms for the EDIT action.
+
+    On FormTag.EDIT:
+    Use OptionsFromSearch with setter=True for the first widget.
+    Modify ``.get_data`` to include the value of the first widget under ``'*args'``.
+    """
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        widget_spec = next(iter(cls.all_widgets.values()))
+        cls.id_name, widget_spec = next(iter(cls.all_widgets.items()))
         if FormTag.EDIT in widget_spec:
             raise TypeError("can't use SetForEditForm if FormTag.EDIT is specified")
         widget_spec[FormTag.EDIT] = (OptionsFromSearch, getattr(core, cls.form_name), {})
 
+    def get_data(self):
+        """put the value of the ID widget under ``'*args'``"""
+        data = super().get_data()
+        if self.tag is FormTag.EDIT:
+            data['*args'] = (data.pop(self.id_name),)
+        return data
 
-class BookForm(SearchForm, SetForEditForm):
+
+class BookForm(SearchForm, EditForm):
     all_widgets = {
         'id': {},
         'isbn': {
@@ -116,7 +128,7 @@ class BookForm(SearchForm, SetForEditForm):
     }
 
 
-class PersonForm(SearchForm, SetForEditForm):
+class PersonForm(SearchForm, EditForm):
     all_widgets = {
         'id_': {
             FormTag.SEARCH: None,
@@ -134,7 +146,7 @@ class PersonForm(SearchForm, SetForEditForm):
     }
 
 
-class MemberForm(AuthedForm, SearchForm, SetForEditForm):
+class MemberForm(AuthedForm, SearchForm, EditForm):
     all_widgets = {
         'name': NonEmptyREntry,
         'level': (formlib.DropdownChoices, tuple(utils.level_names.items()), 1, {}),
@@ -156,7 +168,7 @@ class LoginForm(BaseForm):
     }
 
 
-class LibraryForm(SearchForm, SetForEditForm):
+class LibraryForm(SearchForm, EditForm):
     all_widgets = {
         'name': NonEmptyREntry,
         'books': {FormTag.SEARCH: None,
@@ -212,7 +224,7 @@ class BorrowSearchForm(SearchForm):
     }
 
 
-class ScriptForm(AuthedForm, SearchForm, SetForEditForm):
+class ScriptForm(AuthedForm, SearchForm, EditForm):
     all_widgets = {
         'name': ScriptNameEntry,
         'permissions': (FlagEnumMultiChoice, core.ScriptPermissions, {}),

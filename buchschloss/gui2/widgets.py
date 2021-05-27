@@ -40,7 +40,7 @@ class OptionsFromSearch(formlib.DropdownChoices):
             values.insert(0, (None, ''))
         super().__init__(form, master, name, values)
         if setter:
-            self.widget.bind('<<ConboboxSelected>>', self._do_set)
+            self.widget.bind('<<ComboboxSelected>>', self._do_set)
             self._update_values = self._update_values_with_set
 
     def _update_values_with_set(self, new_value):
