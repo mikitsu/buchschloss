@@ -1,5 +1,4 @@
 """forms"""
-import functools
 import enum
 
 from . import formlib
@@ -11,7 +10,7 @@ from .. import utils
 from .formlib import RadioChoices, DropdownChoices
 from .widgets import (ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry, PasswordEntry,
                       IntEntry, NullREntry, Text, ConfirmedPasswordInput,
-                      Checkbox, SeriesInput, options_from_search, search_multi_choice,
+                      Checkbox, SeriesInput, OptionsFromSearch, search_multi_choice,
                       FlagEnumMultiChoice, ScriptNameEntry, MultiChoicePopup)
 
 
@@ -23,8 +22,14 @@ class FormTag(enum.Enum):
 
 class BaseForm(formlib.Form):
     """Base class for forms, handling get_name, default content and autocompletes"""
+    form_name: str
+
+    def __init__(self, frame, tag, submit_callback):
+        super().__init__(frame, tag, submit_callback)
+        self.set_data(config.gui2.entry_defaults.get(self.form_name).mapping)
+
     def __init_subclass__(cls, **kwargs):
-        """Handle default content and autocompletes"""
+        """Handle autocompletes and set cls.form_name"""
         cls.form_name = cls.__name__.replace('Form', '')
         # This will put every widget spec into the standard form, required below
         super().__init_subclass__(**kwargs)  # noqa -- it might accept kwargs later
@@ -33,13 +38,6 @@ class BaseForm(formlib.Form):
             if k in cls.all_widgets:
                 for *_, w_kwargs in cls.all_widgets[k].values():
                     w_kwargs.setdefault('autocomplete', v)
-
-        @functools.wraps(cls.__init__)
-        def wrap__init__(self, *args, __wraps=cls.__init__, **kwargs):
-            """wrap __init__ to insert default content"""
-            __wraps(self, *args, **kwargs)
-            self.set_data(config.gui2.entry_defaults.get(cls.form_name).mapping)
-        cls.__init__ = wrap__init__
 
     def get_name(self, name):
         """redirect to utils.get_name inserting a form-specific prefix"""
@@ -83,9 +81,19 @@ class AuthedForm(BaseForm):
     }
 
 
-class BookForm(SearchForm):
+class SetForEditForm(BaseForm):
+    """Use OptionsFromSearch with setter=True for the first widget on FormTag.EDIT"""
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        widget_spec = next(iter(cls.all_widgets.values()))
+        if FormTag.EDIT in widget_spec:
+            raise TypeError("can't use SetForEditForm if FormTag.EDIT is specified")
+        widget_spec[FormTag.EDIT] = (OptionsFromSearch, getattr(core, cls.form_name), {})
+
+
+class BookForm(SearchForm, SetForEditForm):
     all_widgets = {
-        'id': {FormTag.EDIT: IntEntry},
+        'id': {},
         'isbn': ISBNEntry,
         'author': NonEmptyREntry,
         'title': NonEmptyEntry,
@@ -97,19 +105,19 @@ class BookForm(SearchForm):
         'medium': NonEmptyREntry,
         'genres': (MultiChoicePopup, lambda: core.Book.get_all_genres(), {}),
         'library': {
-            None: options_from_search(core.Library),
-            FormTag.SEARCH: options_from_search(core.Library, True),
+            None: (OptionsFromSearch, core.Library, {}),
+            FormTag.SEARCH: (OptionsFromSearch, core.Library, {'allow_none': True}),
         },
         'groups': (MultiChoicePopup, lambda: core.Book.get_all_groups(), {}),
         'shelf': NonEmptyREntry,
     }
 
 
-class PersonForm(SearchForm):
+class PersonForm(SearchForm, SetForEditForm):
     all_widgets = {
         'id_': {
             FormTag.SEARCH: None,
-            None: IntEntry,
+            FormTag.NEW: IntEntry,
         },
         'first_name': NonEmptyREntry,
         'last_name': NonEmptyREntry,
@@ -123,7 +131,7 @@ class PersonForm(SearchForm):
     }
 
 
-class MemberForm(AuthedForm, SearchForm):
+class MemberForm(AuthedForm, SearchForm, SetForEditForm):
     all_widgets = {
         'name': NonEmptyREntry,
         'level': (formlib.DropdownChoices, tuple(utils.level_names.items()), 1, {}),
@@ -145,7 +153,7 @@ class LoginForm(BaseForm):
     }
 
 
-class LibraryForm(SearchForm):
+class LibraryForm(SearchForm, SetForEditForm):
     all_widgets = {
         'name': NonEmptyREntry,
         'books': {FormTag.SEARCH: None,
@@ -166,8 +174,8 @@ class LibraryForm(SearchForm):
 
 class BorrowForm(BaseForm):
     all_widgets = {
-        'person': options_from_search(core.Person),
-        'book': options_from_search(core.Book),
+        'person': (OptionsFromSearch, core.Person, {}),
+        'book': (OptionsFromSearch, core.Book, {}),
         'weeks': IntEntry,
         'override': Checkbox,
     }
@@ -175,14 +183,14 @@ class BorrowForm(BaseForm):
 
 class BorrowRestituteForm(BaseForm):
     all_widgets = {
-        'book': options_from_search(
-            core.Book,  condition=('borrow.is_back', 'eq', False)),
+        'book': (OptionsFromSearch, core.Book,
+                 {'condition': ('borrow.is_back', 'eq', False)}),
     }
 
 
 class BorrowExtendForm(BaseForm):
     all_widgets = {
-        'book': options_from_search(core.Book),
+        'book': (OptionsFromSearch, core.Book, {}),
         'weeks': IntEntry,
     }
 
@@ -191,7 +199,7 @@ class BorrowSearchForm(SearchForm):
     all_widgets = {
         'book__title': NullREntry,
         'book__author': NullREntry,
-        'book__library': options_from_search(core.Library, True),
+        'book__library': (OptionsFromSearch, core.Library, {'allow_none': True}),
         'book__groups': (MultiChoicePopup, lambda: core.Book.get_all_groups(), {}),
         # this has on_empty='error', but empty values are removed when searching
         # the Null*Entries above are not really needed
@@ -201,7 +209,7 @@ class BorrowSearchForm(SearchForm):
     }
 
 
-class ScriptForm(AuthedForm, SearchForm):
+class ScriptForm(AuthedForm, SearchForm, SetForEditForm):
     all_widgets = {
         'name': ScriptNameEntry,
         'permissions': (FlagEnumMultiChoice, core.ScriptPermissions, {}),

@@ -14,6 +14,43 @@ from .. import config
 from . import formlib
 
 
+class OptionsFromSearch(formlib.DropdownChoices):
+    """A formlib.DropdownChoices tuple that gets choices from a search"""
+    def __init__(self, form, master, name,
+                 action_ns, allow_none=False, setter=False, condition=()):
+        """Create a new instance.
+
+        :param action_ns: is the ActionNamespace to search in
+        :param allow_none: specifies whether an empty input is considered valid
+        :param setter: makes this widget call ``.set_data`` on its form
+          with results of ``action_ns.view_ns`` when a selection is made.
+          This is especially/only useful for ID fields when editing.
+        :param condition: specifies the condition with which to search
+
+        The parameters ``allow_none`` and ``setter`` are mutually exclusive.
+        """
+        self.action_ns = action_ns
+        values = [(o.id, str(o)) for o in action_ns.search(condition)]
+        if allow_none:
+            if setter:
+                raise ValueError('``setter`` and ``allow_none`` are mutually exclusive')
+            values.insert(0, (None, ''))
+        super().__init__(form, master, name, values)
+        if setter:
+            self.widget.bind('<<ConboboxSelected>>', self._do_set)
+            self._update_values = self._update_values_with_set
+
+    def _update_values_with_set(self, new_value):
+        super()._update_values(new_value)
+        if len(self.widget['values']) == 1:
+            self._do_set()
+
+    def _do_set(self, event=None):  # noqa
+        """Call .set() on the form with a .view_ns result"""
+        result = self.action_ns.view_ns(self.get_simple())
+        self.form.set_data({k: getattr(result, k) for k in dir(result)})
+
+
 class SeriesInput(formlib.FormWidget):
     """Provide Entry widgets for a series name and number"""
     def __init__(self, form, master, name):
@@ -77,21 +114,6 @@ class ConfirmedPasswordInput(formlib.FormWidget):
         if p1 != p2:
             return self.form.get_name('error::password_mismatch')
         return None
-
-
-def options_from_search(action_ns, allow_none=False, condition=()):
-    """Return a formlib.DropdownChoices tuple that gets choices from a search
-
-    :param action_ns: is the ActionNamespace to search in
-    :param allow_none: specifies whether an empty input is considered valid
-    :param condition: specifies the condition with which to search
-    """
-    return (
-        formlib.DropdownChoices,
-        lambda: (*[(None, '')]*allow_none,
-                 *((o.id, str(o)) for o in action_ns.search(condition))),
-        {},
-    )
 
 
 ISBNEntry = (formlib.Entry, 'error', {'transform': utils.check_isbn})
