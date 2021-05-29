@@ -1,11 +1,12 @@
 """translate GUI actions to core-provided functions"""
 
-import collections
+import collections.abc
 import itertools
 import tkinter as tk
 import tkinter.messagebox as tk_msg
 from functools import partial
 import typing as T
+from typing import Type, Callable, Any, Iterable
 
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import dialogs as mtkd
@@ -26,107 +27,68 @@ from .widgets import (
 )
 
 
-# noinspection PyDefaultArgument
-def generic_formbased_action(form_type, form_cls, callback,
-                             form_options={}, fill_data=None,
-                             post_init=lambda f: None,
-                             do_reset=True):
-    # TODO: make form_type an enum
-    """perform a generic action
-        Arguments:
-            form_type: 'new', 'edit' or 'search': used for the form group
-            form_cls: the form class (subclass of misc.tkstuff.forms.Form)
-            callback: the function to call on form submit with form data as keyword arguments
-            form_options: optional dict of additional options for the form
-            fill_data: optional callable taking the input of the first form field
-                and returning a dict of data to fill into the form
-            post_init: called after creation and placement of the form
-                with the form instance as argument
-            do_reset: boolean indicating whether to call app.reset after form submission"""
-    form_options_ = {
-        k: {'groups': v} for k, v in {
-            'new': [forms.FormTag.NEW],
-            'edit': [forms.FormTag.EDIT],
-            'search': [forms.FormTag.SEARCH],
-            None: [],
-        }.items()
-    }
-    form_options_['edit']['default_content'] = {}
-    form_options_ = form_options_.get(form_type, {})
-    form_options_.update(form_options)
+def callback_adapter(callback, do_reset, kwargs):
+    """Adapter for form callbacks <-> ActionNS actions. For use with functools.partial.
 
-    def action(event=None):
-        def onsubmit(data):
-            if fill_data is not None:
-                valid, id_ = id_field.validate()
-                if valid:
-                    mod = [id_]
-                    del data[id_name]
-                else:
-                    tk_msg.showerror()
-                    return
-            else:
-                mod = ()
-            try:
-                r = callback(*mod, **data)
-            except core.BuchSchlossBaseError as e:
-                tk_msg.showerror(e.title, e.message)
-            except Exception:
-                tk_msg.showerror(None, utils.get_name('unexpected_error'))
-                raise
-            else:
-                if r and isinstance(r, set):
-                    tk_msg.showerror(None, utils.get_name('errors_{}').format('\n'.join(r)))
-                else:
-                    form.destroy()
-                    if do_reset:
-                        main.app.reset()
-
-        form = form_cls(main.app.center, onsubmit=onsubmit, **form_options_)
-        if fill_data is not None:
-            id_field = form.widgets[0]
-            id_name = {id(v): k for k, v in form.widget_dict.items()}[id(id_field)]
-
-            def fill_fields(event=None):
-                with common.ignore_missing_messagebox():
-                    if str(form) not in str(main.app.root.focus_get()):
-                        return  # going somewhere else
-                valid, id_ = id_field.validate()
-                if not valid:
-                    tk_msg.showerror(None, id_)
-                    id_field.focus()
-                    return
-                try:
-                    data = fill_data(id_)
-                except core.BuchSchlossBaseError as e:
-                    tk_msg.showerror(e.title, e.message)
-                    id_field.focus()
-                else:
-                    for k, w in form.widget_dict.items():
-                        v = getattr(data, k, None)
-                        if v is not None:
-                            mtk.get_setter(w)(v)
-            id_field.bind('<FocusOut>', fill_fields)
-        form.widgets[0].focus()
-        form.pack()
-        post_init(form)
-    return action
+    The adapter handles argument unpacking (including *args) and error displaying.
+    These first two arguments should be given beforehand:
+    :param callback: is the action to wrap
+    :param do_reset: specifies whether ``app.reset`` should be called after the callback
+    The final argument should then be provided by the form:
+    :param kwargs: form submission data to call the real callback with
+    """
+    args = kwargs.pop('*args', ())
+    try:
+        callback(*args, **kwargs)
+    except core.BuchSchlossBaseError as e:
+        tk_msg.showerror(e.title, e.message)
+    except Exception:
+        tk_msg.showerror(None, utils.get_name('unexpected_error'))
+        raise
+    else:
+        if do_reset:
+            main.app.reset()
 
 
-def show_results(results: T.Iterable, view_func: T.Callable[[T.Any], dict], master=None):
+def make_action(master: tk.Widget,
+                name: str,
+                func: str,
+                ans: Type[core.ActionNamespace] = None,
+                ) -> Callable:
+    """Make actions from a form and function name
+
+    :param master: is the master widget (passed to the form)
+    :param name: is the form name without 'Form'-suffix, e.g. 'book'
+    :param func: is the name of the function.
+      'search' is handled by :func:`.search_callback`
+    :param ans: is the ActionNamespace to use. If None, ``name`` is used to
+      select one automatically (must exist)
+    """
+    if ans is None:
+        ans = getattr(core, name.capitalize())
+    ans = common.NSWithLogin(ans)
+    form_cls = globals()[name.capitalize() + 'Form']
+    tag = FormTag.__members__.get(func.upper())
+    if func == 'search':
+        view_func = make_view_func()
+        middle_callback = partial(search_callback, master, view_func, ans.search)
+        callback = partial(callback_adapter, middle_callback, False)
+    else:
+        callback = partial(callback_adapter, getattr(ans, func), True)
+    return partial(form_cls, master, tag, callback)
+
+
+def show_results(master: tk.Widget, results: Iterable, view_func: Callable):
     """show search results as buttons taking the user to the appropriate view
 
-        Arguments:
-            - results: an iterable of objects as those returned by core.*.search
-            - view_func: the function to display information to the user
-            - master: the master widget, app.center by default
+    :param master: is the master widget in which the results are displayed
+    :param results: is an iterable of objects as those returned by ``ANS.search``
+    :param view_func: is a function that displays data given an ID or a DataNS
     """
-    if master is None:
-        master = main.app.center
 
     def search_hide():
         rw.pack_forget()
-        show_btn = widgets.Button(search_frame, text=utils.get_name('back_to_results'))
+        show_btn = tk.Button(search_frame, text=utils.get_name('back_to_results'))
         show_btn.config(command=partial(search_show, show_btn))
         show_btn.pack()
 
@@ -146,34 +108,39 @@ def show_results(results: T.Iterable, view_func: T.Callable[[T.Any], dict], mast
     rw.pack()
 
 
-def search(form_cls: T.Type[forms.BaseForm],
-           search_func: T.Callable[[T.Any], T.Iterable],
-           view_func: T.Callable[[T.Any], dict]
-           ) -> T.Callable[[T.Optional[tk.Event]], None]:
-    """wrapper for generic_formbased_action for search actions
+def search_callback(master: tk.Widget, view_func: Type[BaseForm], search_func: Callable,
+                    search_mode: str, exact_match: bool, **kwargs):
+    """Provide a search-specific callback. Intended for use with functools.partial.
 
-    Arguments:
-        - form_cls: the misc.tkstuff.forms.Form subclass
-        - search_func: the function for searching
-        - view_func: the function for viewing individual results
+    This callback displays the search results with :func:`.show_results`.
+    These arguments are meant to be given beforehand:
+    :param master: is passed to :func:`.show_results`
+    :param view_func: is passed to :func:`.show_results`
+    :param search_func: is the function to use for searching, typically ``ANS.search``
+
+    These arguments typically are provided by the form submission:
+    :param search_mode: is ``'and'`` or ``'or'`` and specifies how the different
+      values are combined into a search query
+    :param exact_match: specified whether to use ``'eq'`` or ``'contains'`` operators
+    :param kwargs: are the search queries
     """
-    def search_callback(*, search_mode, exact_match, **kwargs):
-        q = ()
-        for k, val_seq in kwargs.items():
-            k = k.replace('__', '.')
-            if (isinstance(val_seq, str)
-                    or not isinstance(val_seq, collections.abc.Sequence)):
-                val_seq = [val_seq]
-            for v in val_seq:
-                if exact_match or not isinstance(v, str):
-                    q = ((k, 'eq', v), search_mode, q)
-                else:
-                    q = ((k, 'contains', v), search_mode, q)
+    q = ()
+    for k, val_seq in kwargs.items():
+        k = k.replace('__', '.')
+        if (isinstance(val_seq, str)
+                or not isinstance(val_seq, collections.abc.Sequence)):
+            val_seq = [val_seq]
+        for v in val_seq:
+            if exact_match or not isinstance(v, str):
+                q = ((k, 'eq', v), search_mode, q)
+            else:
+                q = ((k, 'contains', v), search_mode, q)
 
-        results = search_func(q)
-        show_results(results, view_func)
+    show_results(master, search_func(q), view_func)
 
-    return generic_formbased_action('search', form_cls, search_callback, do_reset=False)
+
+def make_view_func():
+    """TODO"""
 
 
 class ShowInfo:
