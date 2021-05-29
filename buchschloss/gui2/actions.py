@@ -6,7 +6,7 @@ import tkinter as tk
 import tkinter.messagebox as tk_msg
 from functools import partial
 import typing as T
-from typing import Type, Callable, Any, Iterable
+from typing import Type, Callable, Any, Iterable, Optional
 
 from ..misc import tkstuff as mtk
 from ..misc.tkstuff import dialogs as mtkd
@@ -19,12 +19,27 @@ from .. import core
 from .. import config
 from .. import utils
 from .widgets import (
-    BaseForm, AuthedForm, EditForm, SearchForm, FormTag,
+    BaseForm, AuthedForm, EditForm, SearchForm, ViewForm, FormTag,
     ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry, PasswordEntry,
     IntEntry, NullREntry, Text, ConfirmedPasswordInput, DisplayWidget,
     Checkbox, SeriesInput, OptionsFromSearch, search_multi_choice,
-    FlagEnumMultiChoice, ScriptNameEntry, MultiChoicePopup,
+    FlagEnumMultiChoice, ScriptNameEntry, MultiChoicePopup, LinkWidget,
 )
+
+
+def form_dialog(root: tk.Widget, form_cls: Type[BaseForm]) -> Optional[dict]:
+    """Show a pop-up dialog based on a form"""
+    def callback(**kwargs):
+        nonlocal data
+        data = kwargs
+        popup.destroy()
+
+    data = None
+    popup = tk.Toplevel(root)
+    popup.transient(root)
+    form_cls(popup, None, callback)
+    popup.mainloop()
+    return data
 
 
 def callback_adapter(callback, do_reset, kwargs):
@@ -61,6 +76,7 @@ def make_action(master: tk.Widget,
     :param name: is the form name without 'Form'-suffix, e.g. 'book'
     :param func: is the name of the function.
       'search' is handled by :func:`.search_callback`
+      'view' is redirected to :func:`.view_action`
     :param ans: is the ActionNamespace to use. If None, ``name`` is used to
       select one automatically (must exist)
     """
@@ -69,8 +85,10 @@ def make_action(master: tk.Widget,
     ans = common.NSWithLogin(ans)
     form_cls = globals()[name.capitalize() + 'Form']
     tag = FormTag.__members__.get(func.upper())
+    if func == 'view':
+        return partial(view_action, master, ans)
     if func == 'search':
-        view_func = make_view_func()
+        view_func = partial(view_data, name)
         middle_callback = partial(search_callback, master, view_func, ans.search)
         callback = partial(callback_adapter, middle_callback, False)
     else:
@@ -78,12 +96,15 @@ def make_action(master: tk.Widget,
     return partial(form_cls, master, tag, callback)
 
 
-def show_results(master: tk.Widget, results: Iterable, view_func: Callable):
+def show_results(master: tk.Widget,
+                 results: Iterable,
+                 view_func: Callable[[tk.Widget, core.DataNamespace], None],
+                 ):
     """show search results as buttons taking the user to the appropriate view
 
     :param master: is the master widget in which the results are displayed
     :param results: is an iterable of objects as those returned by ``ANS.search``
-    :param view_func: is a function that displays data given an ID or a DataNS
+    :param view_func: is a function that displays data
     """
 
     def search_hide():
@@ -98,9 +119,9 @@ def show_results(master: tk.Widget, results: Iterable, view_func: Callable):
         ShowInfo.to_destroy = None
         rw.pack()
 
-    def view_wrap(*args, **kwargs):
+    def view_wrap(dns):
         search_hide()
-        return view_func(*args, **kwargs)
+        return view_func(search_frame, dns)
 
     search_frame = tk.Frame(master)
     search_frame.pack()
@@ -108,15 +129,21 @@ def show_results(master: tk.Widget, results: Iterable, view_func: Callable):
     rw.pack()
 
 
-def search_callback(master: tk.Widget, view_func: Type[BaseForm], search_func: Callable,
-                    search_mode: str, exact_match: bool, **kwargs):
-    """Provide a search-specific callback. Intended for use with functools.partial.
+def search_callback(master: tk.Widget,
+                    view_func: Callable[[tk.Widget, core.DataNamespace], None],
+                    ans: common.NSWithLogin,
+                    search_mode: str,
+                    exact_match: bool,
+                    **kwargs,
+                    ):
+    """Provide a search-specific callback. Intended for use with ``functools.partial``.
 
     This callback displays the search results with :func:`.show_results`.
     These arguments are meant to be given beforehand:
     :param master: is passed to :func:`.show_results`
     :param view_func: is passed to :func:`.show_results`
-    :param search_func: is the function to use for searching, typically ``ANS.search``
+    :param ans: is the (wrapped) ActionNamespace used for searching
+      and getting result DataNamespaces
 
     These arguments typically are provided by the form submission:
     :param search_mode: is ``'and'`` or ``'or'`` and specifies how the different
@@ -136,11 +163,39 @@ def search_callback(master: tk.Widget, view_func: Type[BaseForm], search_func: C
             else:
                 q = ((k, 'contains', v), search_mode, q)
 
-    show_results(master, search_func(q), view_func)
+    def wrapped_view(view_master, dns):
+        """wrap to get a complete DataNS"""
+        return view_func(view_master, ans.view_ns(dns.id))
+
+    show_results(master, ans.search(q), wrapped_view)
 
 
-def make_view_func():
-    """TODO"""
+def view_data(name: str, master: tk.Widget, dns: core.DataNamespace):
+    """Display data. Useful with ``functools.partial``.
+
+    :param name: is a :func:`.make_action`-compatible name
+    :param master: is the master widget to display data in
+    :param dns: is a DataNamespace of the object to display
+    """
+    for child in master.children.copy().values():
+        child.destroy()
+    form_cls: Type[BaseForm] = globals()[name.capitalize() + 'Form']
+    form = form_cls(master, FormTag.VIEW, lambda **kw: None)
+    form.set_data({k: getattr(dns, k) for k in dir(dns)})  # TODO: make DataNS a mapping
+
+
+def view_action(master: tk.Widget, ans: common.NSWithLogin):
+    """Ask for an ID and call :func:`.view_data`. Useful with ``functools.partial``"""
+    temp_form = type(
+        ans.ans.__name__ + 'Form',
+        (BaseForm,),
+        {'all_widgets': {'id': (OptionsFromSearch, ans.ans, {})}},
+    )
+    id_ = form_dialog(master.winfo_toplevel(), temp_form)  # noqa
+    if id_ is None:
+        main.app.reset()
+        return
+    view_data(ans.ans.__name__, master, ans.view_ns(id_))
 
 
 class ShowInfo:

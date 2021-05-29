@@ -276,12 +276,14 @@ class DisplayWidget(formlib.FormWidget):
 
 class LinkWidget(formlib.FormWidget):
     """Display a button that opens an info display when clicked"""
-    def __init__(self, form, master, name, view_func):
+    def __init__(self, form, master, name, view_func, attr='id', display=str):
         super().__init__(form, master, name)
-        self.data = self.id = None
+        self.attr = attr
+        self.display = display
+        self.data = self.vf_arg = None
         self.widget = tk.Button(
             self.master,
-            command=lambda: view_func(self.id),
+            command=lambda: view_func(self.master, self.vf_arg),
             wraplength=WRAPLENGTH,
         )
 
@@ -289,11 +291,11 @@ class LinkWidget(formlib.FormWidget):
         """update the displayed data"""
         self.data = data
         if data is None:
-            self.id = None
+            self.vf_arg = None
             self.widget['text'] = '----'
         else:
-            self.id = data.id
-            self.widget['text'] = str(data)
+            self.vf_arg = getattr(data, self.attr)
+            self.widget['text'] = self.display(data)
 
     def get_simple(self):
         """return the previously set data"""
@@ -337,7 +339,7 @@ class SearchResultWidget(mtk.ContainingWidget):
             widgets.append((tk.Button, {
                 'text': r,
                 'wraplength': config.gui2.widget_size.main.width,
-                'command': partial(view_func, r.id)}))
+                'command': partial(view_func, r)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))
 
 
@@ -369,7 +371,7 @@ class BaseForm(formlib.Form):
 
     def get_name(self, name):
         """redirect to utils.get_name inserting a form-specific prefix"""
-        return utils.get_name('::'.join(('form', self.form_name, name)))
+        return utils.get_name('::'.join(('form', self.form_name, self.tag.name, name)))
 
 
 class SearchForm(BaseForm):
@@ -432,8 +434,9 @@ class EditForm(BaseForm):
 
 
 class ViewForm(BaseForm):
-    """insert DisplayWidgets where a specific widget for FormTag.VIEW is not specified
+    """Adapt a form to be suitable with FormTag.VIEW
 
+    Insert DisplayWidgets where a specific widget for FormTag.VIEW is not specified.
     If the default widget (or any other widget if the default is None)
     is MultiChoicePopup (or a subclass), use ``'list'`` for the DisplayWidget.
     Otherwise, use ``'str'``.
@@ -444,3 +447,10 @@ class ViewForm(BaseForm):
             current = next(w for w in (ws[None], *ws.values()) if w is not None)[0]
             display = 'list' if issubclass(current, MultiChoicePopup) else 'str'
             ws.setdefault(FormTag.VIEW, (DisplayWidget, display, {}))
+
+    def get_submit_widget(self):
+        """Don't show a submit button when used with FormTag.VIEW"""
+        if self.tag is FormTag.VIEW:
+            return None
+        else:
+            return super().get_submit_widget()
