@@ -245,6 +245,57 @@ class FlagEnumMultiChoice(MultiChoicePopup):
         super().set_simple([v for v in self.enum if v in data])
 
 
+class DisplayWidget(formlib.FormWidget):
+    """Widget that only shows data"""
+    sep = config.gui2.option_sep
+
+    def __init__(self, form, master, name, display='str'):
+        """Create a new DisplayWidget
+
+        :param display: specifies the type of data.
+          Currently, ``'str'`` and ``'list'`` are supported.
+        """
+        assert display in ('str', 'list')
+        super().__init__(form, master, name)
+        self.display = display
+        self.widget = tk.Label(self.master, wraplength=WRAPLENGTH)
+
+    def set_simple(self, data):
+        """Set the label text to ``data``"""
+        if self.display == 'list':
+            data = self.sep.join(data)
+        self.widget['text'] = data
+
+    def get_simple(self):
+        """return the currently displayed text"""
+        data = self.widget['text']
+        if self.display == 'list':
+            data = data.split(self.sep)
+        return data
+
+
+class LinkWidget(formlib.FormWidget):
+    """Display a button that opens an info display when clicked"""
+    def __init__(self, form, master, name, view_func):
+        super().__init__(form, master, name)
+        self.data = self.id = None
+        self.widget = tk.Button(
+            self.master,
+            command=lambda: view_func(self.id),
+            wraplength=WRAPLENGTH,
+        )
+
+    def set_simple(self, data):
+        """update the displayed data"""
+        self.data = data
+        self.id = data.id
+        self.widget['text'] = str(data)
+
+    def get_simple(self):
+        """return the previously set data"""
+        return self.data
+
+
 class Header:
     def __init__(self, master, login_data, info_text, reset_data, exit_data):
         self.container = mtk.ContainingWidget(
@@ -377,8 +428,15 @@ class EditForm(BaseForm):
 
 
 class ViewForm(BaseForm):
-    """insert DisplayWidgets where a specific widget for FormTag.VIEW is not specified"""
+    """insert DisplayWidgets where a specific widget for FormTag.VIEW is not specified
+
+    If the default widget (or any other widget if the default is None)
+    is MultiChoicePopup (or a subclass), use ``'list'`` for the DisplayWidget.
+    Otherwise, use ``'str'``.
+    """
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        for w in cls.all_widgets.values():
-            w.setdefault(FormTag.VIEW, DisplayWidget)
+        for ws in cls.all_widgets.values():
+            current = next(w for w in (ws[None], *ws.values()) if w is not None)[0]
+            display = 'list' if issubclass(current, MultiChoicePopup) else 'str'
+            ws.setdefault(FormTag.VIEW, (DisplayWidget, display, {}))
