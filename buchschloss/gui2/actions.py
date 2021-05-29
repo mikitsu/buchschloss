@@ -1,14 +1,14 @@
 """translate GUI actions to core-provided functions"""
 
 import collections.abc
-import itertools
 import tkinter as tk
+from tkinter import ttk
 import tkinter.messagebox as tk_msg
+import tkinter.font as tk_font
 from functools import partial
 import typing as T
-from typing import Type, Callable, Any, Iterable, Optional
+from typing import Type, Callable, Iterable, Optional, Sequence, Mapping
 
-from ..misc import tkstuff as mtk
 from ..misc.tkstuff import dialogs as mtkd
 from ..misc.tkstuff import forms as mtkf
 from . import main
@@ -83,7 +83,10 @@ def make_action(master: tk.Widget,
     if ans is None:
         ans = getattr(core, name.capitalize())
     ans = common.NSWithLogin(ans)
-    form_cls = globals()[name.capitalize() + 'Form']
+    form_cls = globals().get(
+        f'{name.capitalize()}{func.title().replace("_", "")}Form',
+        globals()[name.capitalize() + 'Form']
+    )
     tag = FormTag.__members__.get(func.upper())
     if func == 'view':
         return partial(view_action, master, ans)
@@ -306,12 +309,11 @@ ShowInfo.instances.update({k: ShowInfo(getattr(core, k))
                            for k in ('Library', 'Member', 'Script')})
 
 
-def login():
-    """log in"""
+def login_logout():
+    """log in or log out"""
     if main.app.current_login.type is core.LoginType.GUEST:
-        try:
-            data = mtkd.FormDialog.ask(main.app.root, forms.LoginForm)
-        except mtkd.UserExitedDialog:
+        data = form_dialog(main.app.root, LoginForm)
+        if data is None:
             return
         try:
             main.app.current_login = core.login(**data)
@@ -335,45 +337,52 @@ def display_lua_data(data):
     popup = tk.Toplevel(main.app.root)
     popup.transient(main.app.root)
     popup.grab_set()
-    widget_cls, kwargs = get_lua_data_widget(popup, data)
-    widget_cls = mtk.ScrollableWidget(**config.gui2.widget_size.popup.mapping)(widget_cls)
-    widget_cls(popup, *kwargs.pop('*args', ()), **kwargs).pack()
+    frame = tk.Frame(popup, **config.gui2.widget_size.popup.mapping)
+    frame.propagate(False)
+    frame.grid(row=0, column=0)
+    view = ttk.Treeview(frame)
+    height, width = add_lua_data_entries(view, '', data)
+    view.column('#0', width=width)
+    if height > view['height']:
+        sb = tk.Scrollbar(popup, command=view.yview, orient=tk.VERTICAL)
+        sb.grid(row=0, column=1, anchor=tk.NS)
+        view['yscrollcommand'] = sb.set
+    if width > config.gui2.widget_size.popup.width:
+        sb = tk.Scrollbar(popup, command=view.xview, orient=tk.HORIZONTAL)
+        sb.grid(row=1, column=0, anchor=tk.EW)
+        view['xscrollcommand'] = sb.set
     tk.Button(popup, command=popup.destroy, text='OK').pack()
 
 
-def get_lua_data_widget(master, data):
-    """recursively create a widget for lua display callback"""
-    if isinstance(data, dict):
-        return (mtk.ContainingWidget,
-                {'*args': itertools.chain(*(((tk.Label, {'text': k}),
-                                            get_lua_data_widget(master, v))
-                                            for k, v in data.items())),
-                 'horizontal': 2})
-    elif isinstance(data, T.Sequence) and not isinstance(data, str):
-        return (mtk.ContainingWidget,
-                {'*args': [get_lua_data_widget(master, d) for d in data],
-                 'direction': (tk.BOTTOM, tk.RIGHT)})
+def add_lua_data_entries(view, parent, data, width=0, height=0, indent=1):
+    """add entries to the Treeview and return (max width, total height)"""
+    if isinstance(data, Sequence) and not isinstance(data, str):
+        data = enumerate(data, 1)
+    elif isinstance(data, Mapping):
+        data = data.items()
     else:
-        return (tk.Label, {'text': data})
+        data = ((data, ()),)
+    for name, sub in data:
+        width = max(width, tk_font.nametofont('TkDefaultFont').measure(name) + 25*indent)
+        child = view.insert(parent, tk.END, text=name)
+        width, height = add_lua_data_entries(view, child, sub, width, height+1, indent+1)
+    return width, height
 
 
 def handle_lua_get_data(data_spec):
     """provide a callback for lua's get_data"""
     type_widget_map = {
         'int': widgets.IntEntry,
-        'bool': widgets.CheckbuttonWithVar,
-        'str': tk.Entry,
+        'bool': widgets.Checkbox,
+        'str': formlib.Entry,
     }
     name_data = {}
-    cls_body = {'get_name': name_data.__getitem__}
+    cls_body = {'get_name': staticmethod(name_data.__getitem__), 'all_widgets': {}}
     for k, name, v in data_spec:
-        cls_body[k] = mtkf.Element(type_widget_map[v])
+        cls_body['all_widgets'][k] = mtkf.Element(type_widget_map[v])
         name_data[k] = name
-    form = type('Cli2DataForm', (mtkf.Form,), cls_body)
-    try:
-        return mtkd.FormDialog.ask(main.app.root, form)
-    except mtkd.UserExitedDialog:
-        return None
+    form_cls = type('LuaGetDataForm', (BaseForm,), cls_body)
+    return form_dialog(main.app.root, form_cls)  # noqa
 
 
 def get_script_action(script_spec):
