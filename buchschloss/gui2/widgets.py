@@ -1,12 +1,11 @@
-"""specific widgets and FormWidget classes"""
+"""specific widgets and form helpers"""
 import functools
+import enum
 import operator
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox as tk_msg
-from tkinter import Label, Button
 from functools import partial
-from collections import abc
 
 from ..misc import tkstuff as mtk
 
@@ -15,6 +14,9 @@ from .. import utils
 from .. import config
 from . import formlib
 from . import common
+
+
+WRAPLENGTH = config.gui2.widget_size.main.width // 2
 
 
 class OptionsFromSearch(formlib.DropdownChoices):
@@ -160,14 +162,6 @@ ScriptNameEntry = (formlib.Entry, 'error', {'regex': r'^[a-zA-Z0-9 _-]*$'})
 PasswordEntry = (formlib.Entry, 'ignore', {'extra_kwargs': {'show': '*'}})
 
 
-class ActionChoiceWidget(mtk.ContainingWidget):
-    def __init__(self, master, actions, **kw):
-        widgets = [(Button, {'text': utils.get_name('action::' + txt), 'command': cmd,
-                             'padx': 50})
-                   for txt, cmd in actions]
-        super().__init__(master, *widgets, **kw)
-
-
 class Text(formlib.FormWidget):
     """Provide a tk.Text input widget"""
     widget: tk.Text
@@ -184,32 +178,6 @@ class Text(formlib.FormWidget):
         """set the text to the given value"""
         self.widget.delete('0.0', tk.END)
         self.widget.insert('0.0', data)
-
-
-@mtk.ScrollableWidget(height=config.gui2.widget_size.main.height,
-                      width=config.gui2.widget_size.main.width)
-class InfoWidget(mtk.ContainingWidget):
-    def __init__(self, master, data):
-        wraplength = config.gui2.widget_size.main.width / 2
-        widgets = []
-        for k, v in data.items():
-            widgets.append((Label, {'text': k}))
-            if v is None:
-                widgets.append((Label, {}))
-            elif isinstance(v, str):
-                widgets.append((Label, {'text': v, 'wraplength': wraplength}))
-            elif isinstance(v, abc.Sequence):
-                if len(v) and isinstance(v[0], type) and issubclass(v[0], tk.Widget):
-                    v = [v]
-                for w in v:
-                    if 'text' in w[1]:
-                        w[1].setdefault('wraplength', wraplength)
-                    widgets.append(w)
-                if not len(v) % 2:
-                    widgets.append((Label, {}))  # padding to keep `k` on left
-            else:
-                raise ValueError('`{}` could not be handled'.format(v))
-        super().__init__(master, *widgets, horizontal=2)
 
 
 class Checkbox(formlib.FormWidget):
@@ -243,10 +211,7 @@ class MultiChoicePopup(formlib.MultiChoicePopup):
     sep = config.gui2.option_sep
 
     def __init__(self, *args, button_options=None, **kwargs):
-        kwargs['button_options'] = {
-            **(button_options or {}),
-            'wraplength': config.gui2.widget_size.main.width // 2,
-        }
+        kwargs['button_options'] = {**(button_options or {}), 'wraplength': WRAPLENGTH}
         super().__init__(*args, **kwargs)
 
 
@@ -284,10 +249,10 @@ class Header:
     def __init__(self, master, login_data, info_text, reset_data, exit_data):
         self.container = mtk.ContainingWidget(
             master,
-            (Button, login_data),
-            (Label, {'text': info_text}),
-            (Button, reset_data),
-            (Button, exit_data)
+            (tk.Button, login_data),
+            (tk.Label, {'text': info_text}),
+            (tk.Button, reset_data),
+            (tk.Button, exit_data)
         )
 
     def set_info_text(self, new):
@@ -300,14 +265,120 @@ class Header:
         return getattr(self.container, name)
 
 
+class ActionChoiceWidget(mtk.ContainingWidget):
+    def __init__(self, master, actions, **kw):
+        widgets = [(tk.Button, {'text': utils.get_name('action::' + txt), 'command': cmd,
+                             'padx': 50})
+                   for txt, cmd in actions]
+        super().__init__(master, *widgets, **kw)
+
+
 @mtk.ScrollableWidget(height=config.gui2.widget_size.main.height,
                       width=config.gui2.widget_size.main.width)
 class SearchResultWidget(mtk.ContainingWidget):
     def __init__(self, master, results, view_func):
-        widgets = [(Label, {'text': utils.get_name('{}_results').format(len(results))})]
+        widgets = [(tk.Label, {'text': utils.get_name('{}_results').format(len(results))})]
         for r in results:
-            widgets.append((Button, {
+            widgets.append((tk.Button, {
                 'text': r,
                 'wraplength': config.gui2.widget_size.main.width,
                 'command': partial(view_func, r.id)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))
+
+
+class FormTag(enum.Enum):
+    SEARCH = '"search" action'
+    NEW = '"new" action'
+    EDIT = '"edit" action'
+    VIEW = '"view" action'
+
+
+class BaseForm(formlib.Form):
+    """Base class for forms, handling get_name, default content and autocompletes"""
+    form_name: str
+
+    def __init__(self, frame, tag, submit_callback):
+        super().__init__(frame, tag, submit_callback)
+        self.set_data(config.gui2.entry_defaults.get(self.form_name).mapping)
+
+    def __init_subclass__(cls, **kwargs):
+        """Handle autocompletes and set cls.form_name"""
+        cls.form_name = cls.__name__.replace('Form', '')
+        # This will put every widget spec into the standard form, required below
+        super().__init_subclass__(**kwargs)  # noqa -- it might accept kwargs later
+
+        for k, v in config.gui2.get('autocomplete').get(cls.form_name).mapping.items():
+            if k in cls.all_widgets:
+                for *_, w_kwargs in cls.all_widgets[k].values():
+                    w_kwargs.setdefault('autocomplete', v)
+
+    def get_name(self, name):
+        """redirect to utils.get_name inserting a form-specific prefix"""
+        return utils.get_name('::'.join(('form', self.form_name, name)))
+
+
+class SearchForm(BaseForm):
+    """Add search options (and/or) + exact matching"""
+    all_widgets = {
+        'search_mode': {FormTag.SEARCH: (
+            formlib.RadioChoices, [(c, utils.get_name(c)) for c in ('and', 'or')], {})},
+        'exact_match': {FormTag.SEARCH: Checkbox},
+    }
+
+    def get_data(self):
+        """ignore empty data"""
+        if self.tag is FormTag.SEARCH:
+            return {k: v for k, v in super().get_data() if v or isinstance(v, bool)}
+        else:
+            return super().get_data()
+
+    def validate(self):
+        """ignore errors from empty widgets"""
+        errors = super().validate()
+        # NOTE: the password entry will raise ValueError if the passwords don't
+        # match, but it shouldn't be used in searches anyway.
+        # All other widgets shouldn't raise exceptions in .get()
+        if self.tag is FormTag.SEARCH:
+            data = self.get_data()
+            for k in errors.keys() - data.keys():
+                del errors[k]
+
+
+class AuthedForm(BaseForm):
+    """add a 'current_password' field"""
+    all_widgets = {
+        'current_password': {
+            FormTag.SEARCH: None,
+            None: PasswordEntry,
+        }
+    }
+
+
+class EditForm(BaseForm):
+    """Adapt forms for the EDIT action.
+
+    On FormTag.EDIT:
+    Use OptionsFromSearch with setter=True for the first widget.
+    Modify ``.get_data`` to include the value of the first widget under ``'*args'``.
+    """
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.id_name, widget_spec = next(iter(cls.all_widgets.items()))
+        if FormTag.EDIT in widget_spec:
+            raise TypeError("can't use SetForEditForm if FormTag.EDIT is specified")
+        widget_spec[FormTag.EDIT] = (OptionsFromSearch, getattr(core, cls.form_name), {})
+
+    def get_data(self):
+        """put the value of the ID widget under ``'*args'``"""
+        data = super().get_data()
+        if self.tag is FormTag.EDIT:
+            data['*args'] = (data.pop(self.id_name),)
+        return data
+
+
+class ViewForm(BaseForm):
+    """insert DisplayWidgets where a specific widget for FormTag.VIEW is not specified"""
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for w in cls.all_widgets.values():
+            w.setdefault(FormTag.VIEW, DisplayWidget)

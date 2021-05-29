@@ -11,12 +11,19 @@ from ..misc import tkstuff as mtk
 from ..misc.tkstuff import dialogs as mtkd
 from ..misc.tkstuff import forms as mtkf
 from . import main
-from . import forms
+from . import formlib
 from . import widgets
 from . import common
 from .. import core
 from .. import config
 from .. import utils
+from .widgets import (
+    BaseForm, AuthedForm, EditForm, SearchForm, FormTag,
+    ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry, PasswordEntry,
+    IntEntry, NullREntry, Text, ConfirmedPasswordInput, DisplayWidget,
+    Checkbox, SeriesInput, OptionsFromSearch, search_multi_choice,
+    FlagEnumMultiChoice, ScriptNameEntry, MultiChoicePopup,
+)
 
 
 # noinspection PyDefaultArgument
@@ -393,3 +400,140 @@ def borrow_extend(book, weeks):
         weeks=weeks,
         login_context=main.app.current_login,
     )
+
+
+# Form definitions
+
+
+class BookForm(SearchForm, EditForm):
+    all_widgets = {
+        'id': {},
+        'isbn': {
+            FormTag.NEW: (ISBNEntry, True, {}),
+            None: (ISBNEntry, False, {}),
+        },
+        'author': NonEmptyREntry,
+        'title': NonEmptyEntry,
+        'series': SeriesInput,
+        'language': NonEmptyREntry,
+        'publisher': NonEmptyREntry,
+        'concerned_people': NullREntry,
+        'year': IntEntry,
+        'medium': NonEmptyREntry,
+        'genres': (MultiChoicePopup, lambda: core.Book.get_all_genres(), {}),
+        'library': {
+            None: (OptionsFromSearch, core.Library, {}),
+            FormTag.SEARCH: (OptionsFromSearch, core.Library, {'allow_none': True}),
+        },
+        'groups': (MultiChoicePopup, lambda: core.Book.get_all_groups(), {}),
+        'shelf': NonEmptyREntry,
+    }
+
+
+class PersonForm(SearchForm, EditForm):
+    all_widgets = {
+        'id_': {
+            FormTag.SEARCH: None,
+            FormTag.NEW: IntEntry,
+        },
+        'first_name': NonEmptyREntry,
+        'last_name': NonEmptyREntry,
+        'class_': ClassEntry,
+        'max_borrow': IntEntry,
+        'libraries': search_multi_choice(core.Library),
+        'pay': {
+            FormTag.SEARCH: None,
+            None: Checkbox,
+        },
+    }
+
+
+class MemberForm(AuthedForm, SearchForm, EditForm):
+    all_widgets = {
+        'name': NonEmptyREntry,
+        'level': (formlib.DropdownChoices, tuple(utils.level_names.items()), 1, {}),
+        'password': {FormTag.NEW: ConfirmedPasswordInput},
+    }
+
+
+class MemberChangePasswordForm(AuthedForm):
+    all_widgets = {
+        'member': NonEmptyREntry,
+        'new_password': ConfirmedPasswordInput,
+    }
+
+
+class LoginForm(BaseForm):
+    all_widgets = {
+        'name': NonEmptyREntry,
+        'password': PasswordEntry,
+    }
+
+
+class LibraryForm(SearchForm, EditForm):
+    all_widgets = {
+        'name': NonEmptyREntry,
+        'books': {FormTag.SEARCH: None,
+                  None: search_multi_choice(core.Book)},
+        'people': {FormTag.SEARCH: None,
+                   None: search_multi_choice(core.Person)},
+        'pay_required': Checkbox,
+        'action': {
+            FormTag.EDIT: (
+                formlib.DropdownChoices,
+                [(e, utils.get_name('from::library::action::' + e.value))
+                 for e in core.LibraryAction],
+                {},
+            ),
+        },
+    }
+
+
+class BorrowForm(BaseForm):
+    all_widgets = {
+        'person': (OptionsFromSearch, core.Person, {}),
+        'book': (OptionsFromSearch, core.Book, {}),
+        'weeks': IntEntry,
+        'override': Checkbox,
+    }
+
+
+class BorrowRestituteForm(BaseForm):
+    all_widgets = {
+        'book': (OptionsFromSearch, core.Book,
+                 {'condition': ('borrow.is_back', 'eq', False)}),
+    }
+
+
+class BorrowExtendForm(BaseForm):
+    all_widgets = {
+        'book': (OptionsFromSearch, core.Book, {}),
+        'weeks': IntEntry,
+    }
+
+
+class BorrowSearchForm(SearchForm):
+    all_widgets = {
+        'book__title': NullREntry,
+        'book__author': NullREntry,
+        'book__library': (OptionsFromSearch, core.Library, {'allow_none': True}),
+        'book__groups': (MultiChoicePopup, lambda: core.Book.get_all_groups(), {}),
+        # this has on_empty='error', but empty values are removed when searching
+        # the Null*Entries above are not really needed
+        'person__class_': ClassEntry,
+        'person__libraries': search_multi_choice(core.Library),
+        'is_back': (Checkbox, {'allow_none': True}),
+    }
+
+
+class ScriptForm(AuthedForm, SearchForm, EditForm):
+    all_widgets = {
+        'name': ScriptNameEntry,
+        'permissions': (FlagEnumMultiChoice, core.ScriptPermissions, {}),
+        'setlevel': (formlib.DropdownChoices,
+                     ((None, '-----'), *utils.level_names.items()), {}),
+        'code': {
+            None: Text,
+            FormTag.SEARCH: None,
+        }
+    }
