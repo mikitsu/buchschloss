@@ -288,8 +288,12 @@ class LinkWidget(formlib.FormWidget):
     def set_simple(self, data):
         """update the displayed data"""
         self.data = data
-        self.id = data.id
-        self.widget['text'] = str(data)
+        if data is None:
+            self.id = None
+            self.widget['text'] = '----'
+        else:
+            self.id = data.id
+            self.widget['text'] = str(data)
 
     def get_simple(self):
         """return the previously set data"""
