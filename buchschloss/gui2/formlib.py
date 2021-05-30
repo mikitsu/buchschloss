@@ -83,8 +83,9 @@ class Form:
         }
         i = -1
         for i, (name, widget) in enumerate(self.widget_dict.items()):
-            tk.Label(self.frame, text=self.get_name(name)).grid(row=i, column=0)
-            widget.widget.grid(row=i, column=1)
+            if widget.widget is not None:
+                tk.Label(self.frame, text=self.get_name(name)).grid(row=i, column=0)
+                widget.widget.grid(row=i, column=1)
         submit = self.get_submit_widget()
         if submit is not None:
             submit.grid(row=i+1, column=0, columnspan=3)
@@ -103,14 +104,15 @@ class Form:
     def get_data(self):
         """Get entered data from widgets"""
         data = {}
-        for widget in self.widget_dict.values():
-            data.update(widget.get())
+        for name, widget in self.widget_dict.items():
+            data[name] = widget.get()
         return data
 
     def set_data(self, data):
         """Set the given data"""
-        for widget in self.widget_dict.values():
-            widget.set(data)
+        for name, widget in self.widget_dict.items():
+            if name in data:
+                widget.set(data[name])
 
     def display_errors(self, errors):
         """Display the encountered errors as a popup and next to the fields"""
@@ -127,8 +129,10 @@ class Form:
     def validate(self):
         """Check for and return errors. Default: rely on widget validation"""
         errors = {}
-        for widget in self.widget_dict.values():
-            errors.update(widget.validate())
+        for name, widget in self.widget_dict.items():
+            widget_error = widget.validate()
+            if widget_error is not None:
+                errors[name] = widget_error
         return errors
 
     @staticmethod
@@ -162,41 +166,14 @@ class FormWidget:
         self.name = name
 
     def get(self):
-        """Return all values this widget provides in a dict.
-
-        This default implementation returns ``{self.name: self.get_simple()}``
-        """
-        return {self.name: self.get_simple()}
-
-    def get_simple(self):
         """Return a single value this widget provides"""
-        raise NotImplementedError("implement .get_simple() if you don't override .get()")
-    
-    def set(self, data):
-        """Set this widgets value to those provided (ignore unknown keys)
-        
-        This default implementation calls ``self.set_simple(data[self.name])``
-        if ``self.name in data``
-        """
-        if self.name in data:
-            self.set_simple(data[self.name])
-    
-    def set_simple(self, data):
-        """Set a single value this widget provides"""
-        raise NotImplementedError(
-            "implement .set_simple() if you don't override .set()")
-    
-    def validate(self):
-        """Validate this widget's data and return a dict of error messages.
-        
-        This default implementation returns ``{self.name: self.validate_simple()}``
-        if ``self.validate_simple() is not None`` and ``{}`` otherwise
-        calling ``.validate_simple()`` only once.
-        """
-        v = self.validate_simple()
-        return {} if v is None else {self.name: v}
+        raise NotImplementedError
 
-    def validate_simple(self):
+    def set(self, data):
+        """Set a single value this widget provides"""
+        raise NotImplementedError
+
+    def validate(self):
         """Validate this widget's data.
 
          Return None if valid (this default implementation) and
@@ -257,26 +234,26 @@ class Entry(FormWidget):
         if autocomplete:
             self.widget.bind('<Control-space>', self._do_autocomplete)
 
-    def get_simple(self):
+    def get(self):
         """delegate to self.widget.get() and handle on_empty=='none'"""
         v = self.widget.get()
         return None if not v and self.on_empty == 'none' else self.transform(v)
 
-    def set_simple(self, data):
+    def set(self, data):
         """delete current and insert new"""
         self.widget.delete(0, tk.END)
         if data is not None:
             self.widget.insert(0, data)
 
-    def validate_simple(self):
+    def validate(self):
         """handle on_empty='error' and validate_re"""
-        v = self.get_simple()
+        v = self.get()
         if self.on_empty == 'error' and not v:
             return self.form.get_name(f'{self.name}::error::empty')
         if self.regex is not None and self.regex.search(v) is None:
             return self.form.get_name(f'{self.name}::error::regex')
         try:
-            self.get_simple()
+            self.get()
         except ValueError:
             return self.form.get_name(f'{self.name}::error::transform')
         return None
@@ -306,7 +283,7 @@ class Entry(FormWidget):
         """move one item up (direction == 1) or down (direction == -1)"""
         if 0 <= self.history_index + direction < len(self.history):
             self.history_index += direction
-            self.set_simple(self.history[self.history_index])
+            self.set(self.history[self.history_index])
 
 
 class RadioChoices(FormWidget):
@@ -332,11 +309,11 @@ class RadioChoices(FormWidget):
                 radio.select()
             radio.pack(side=pack_side)
 
-    def get_simple(self):
+    def get(self):
         """return the code for the currently selected value"""
         return self.var.get()
 
-    def set_simple(self, data):
+    def set(self, data):
         """select the radio button with the given code"""
         self.var.set(data)
 
@@ -383,7 +360,7 @@ class DropdownChoices(FormWidget):
         if default is not None:
             self.widget.current(default)
 
-    def get_simple(self):
+    def get(self):
         """return the code for the currently selected value"""
         value = self.widget.get()
         try:
@@ -394,14 +371,14 @@ class DropdownChoices(FormWidget):
             else:
                 return None
 
-    def set_simple(self, data):
+    def set(self, data):
         """select the value with the given code"""
         self.widget['values'] = self.all_values
         self.widget.current(self.codes.index(data))
         if '_update_values' in self.widget['validatecommand']:
             self._update_values(self.get())
 
-    def validate_simple(self):
+    def validate(self):
         """check if the choice is unambiguous if not self.allow_new"""
         if self.allow_new or self.widget.current() != -1:
             return None
@@ -461,11 +438,11 @@ class MultiChoicePopup(FormWidget):
             self.codes = list(choices)
             self.values = list(choices)
 
-    def get_simple(self):
+    def get(self):
         """return a list of codes for the selected values"""
         return [self.codes[i] for i in self.active]
 
-    def set_simple(self, data):
+    def set(self, data):
         """activate the elements with the given codes"""
         self.active = [self.codes.index(elem) for elem in data]
         self.widget['text'] = self.sep.join(self.values[i] for i in self.active)

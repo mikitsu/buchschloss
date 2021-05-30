@@ -53,7 +53,7 @@ class OptionsFromSearch(formlib.DropdownChoices):
 
     def _do_set(self, event=None):  # noqa
         """Call .set() on the form with a .view_ns result"""
-        result = self.action_ns.view_ns(self.get_simple())
+        result = self.action_ns.view_ns(self.get())
         self.form.set_data({k: getattr(result, k) for k in dir(result)})
 
 
@@ -62,33 +62,41 @@ class SeriesInput(formlib.FormWidget):
     def __init__(self, form, master, name):
         super().__init__(form, master, name)
         self.widget = tk.Frame(self.form.frame)
-        self.subwidgets = {
-            'series': formlib.Entry(self.form, self.widget, 'series', 'none'),
-            'series_number': formlib.Entry(
-                self.form, self.widget, 'series_number', 'none',
-                transform=int, extra_kwargs={'width': 2},
-            ),
-        }
-        for w in self.subwidgets.values():
-            w.widget.pack(side=tk.LEFT)
+        self.series = formlib.Entry(self.form, self.widget, 'series', 'none')
+        self.series_number = formlib.Entry(
+            self.form, self.widget, 'series_number', 'none',
+            transform=int, extra_kwargs={'width': 2},
+        )
+        self.series.widget.pack(side=tk.LEFT)
+        self.series_number.widget.pack(side=tk.LEFT)
 
     def get(self):
-        """Return series name and number, under 'series' and 'series_number'"""
-        return {k: v for w in self.subwidgets.values() for k, v in w.get().items()}
+        """Return series name"""
+        return self.series.get()
 
     def set(self, data):
-        """Set series name and number"""
-        for w in self.subwidgets.values():
-            w.set(data)
+        """Set series name"""
+        self.series.set(data)
 
     def validate(self):
         """Validate name and number individually and together"""
-        r = {k: v for w in self.subwidgets.values() for k, v in w.validate().items()}
-        if all((not r,
-                self.subwidgets['series_number'].get_simple() is not None,
-                self.subwidgets['series'].get_simple() is None)):
-            r['series'] = self.form.get_name('error::series_number_without_series')
-        return r
+        val_num = self.series_number.validate()
+        if val_num is not None:
+            return val_num
+        if self.get() is None and self.series_number.get() is not None:
+            return self.form.get_name('error::series_number_without_series')
+
+    class NumberDummy(formlib.FormWidget):
+        """Dummy form widget for series numbers. Must be used with series"""
+        widget = None
+
+        def __init__(self, form, master, name, series_key='series'):
+            super().__init__(form, master, name)
+            for func in ('get', 'set', 'validate'):
+                def redirect(*args, __func=func):
+                    """Call function on series subwidget"""
+                    return getattr(self.form.widget_dict[series_key], __func)(*args)
+                setattr(self, func, redirect)
 
 
 class ConfirmedPasswordInput(formlib.FormWidget):
@@ -101,20 +109,20 @@ class ConfirmedPasswordInput(formlib.FormWidget):
         self.password_1.pack()
         self.password_2.pack()
 
-    def get_simple(self):
+    def get(self):
         """raise ValueError if the password don't match"""
         p1, p2 = self.password_1.get(), self.password_2.get()
         if p1 != p2:
             raise ValueError("the passwords don't match")
         return p1
 
-    def set_simple(self, data):
+    def set(self, data):
         """set both fields to the given value"""
         for w in (self.password_1, self.password_2):
             w.delete(0, tk.END)
             w.insert(0, data)
 
-    def validate_simple(self):
+    def validate(self):
         """check whether the passwords match"""
         p1, p2 = self.password_1.get(), self.password_2.get()
         if p1 != p2:
@@ -137,7 +145,7 @@ class ISBNEntry(formlib.Entry):
             if str(f) not in str(f.winfo_toplevel().focus_get()):
                 # going somewhere else
                 return
-        error = self.validate_simple()
+        error = self.validate()
         if error is not None:
             tk_msg.showerror(message=error)
             return
@@ -145,7 +153,7 @@ class ISBNEntry(formlib.Entry):
                                utils.get_name('interactive_question::isbn_autofill')):
             return
         try:
-            data = utils.get_book_data(self.get_simple())
+            data = utils.get_book_data(self.get())
         except core.BuchSchlossBaseError as e:
             tk_msg.showerror(e.title, e.message)
         else:
@@ -171,11 +179,11 @@ class Text(formlib.FormWidget):
         super().__init__(form, master, name)
         self.widget = tk.Text(self.master)
 
-    def get_simple(self):
+    def get(self):
         """return text in the widget"""
         return self.widget.get('0.0', tk.END)
 
-    def set_simple(self, data):
+    def set(self, data):
         """set the text to the given value"""
         self.widget.delete('0.0', tk.END)
         self.widget.insert('0.0', data)
@@ -194,14 +202,14 @@ class Checkbox(formlib.FormWidget):
         if not active:
             self.widget.state(['disabled'])
 
-    def get_simple(self):
+    def get(self):
         """Return checkbutton state"""
         if self.widget.state() == ('!alternate',):
             return None
         assert self.widget.state() == ()
         return self.var.get()
 
-    def set_simple(self, data):
+    def set(self, data):
         """Set the widget to the given value. ``allow_none`` is not enforced"""
         self.var.set(data)
         if data is None:
@@ -241,13 +249,13 @@ class FlagEnumMultiChoice(MultiChoicePopup):
         options = [(e, form.get_name('' + e.name)) for e in flag_enum]
         super().__init__(form, master, name, options)
 
-    def get_simple(self):
+    def get(self):
         """convert individual codes to a FlagEnum instance"""
-        return functools.reduce(operator.or_, super().get_simple(), self.enum(0))
+        return functools.reduce(operator.or_, super().get(), self.enum(0))
 
-    def set_simple(self, data):
+    def set(self, data):
         """convert a FlagEnum instance to individual codes"""
-        super().set_simple([v for v in self.enum if v in data])
+        super().set([v for v in self.enum if v in data])
 
 
 class DisplayWidget(formlib.FormWidget):
@@ -265,13 +273,13 @@ class DisplayWidget(formlib.FormWidget):
         self.display = display
         self.widget = tk.Label(self.master, wraplength=WRAPLENGTH)
 
-    def set_simple(self, data):
+    def set(self, data):
         """Set the label text to ``data``"""
         if self.display == 'list':
             data = self.sep.join(data)
         self.widget['text'] = data
 
-    def get_simple(self):
+    def get(self):
         """return the currently displayed text"""
         data = self.widget['text']
         if self.display == 'list':
@@ -291,7 +299,7 @@ class LinkWidget(formlib.FormWidget):
         self.view_func = view_func
         self.widget = tk.Frame(self.master)
 
-    def set_simple(self, data):
+    def set(self, data):
         """update the displayed data"""
         self.data = None
         if data is None:
@@ -311,7 +319,7 @@ class LinkWidget(formlib.FormWidget):
                 text=self.display(item),
             ).pack()
 
-    def get_simple(self):
+    def get(self):
         """return the previously set data"""
         return self.data
 

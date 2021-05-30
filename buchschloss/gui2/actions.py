@@ -351,6 +351,7 @@ class BookForm(SearchForm, EditForm, ViewForm):
         'author': NonEmptyREntry,
         'title': NonEmptyEntry,
         'series': SeriesInput,
+        'series_number': SeriesInput.NumberDummy,
         'language': NonEmptyREntry,
         'publisher': NonEmptyREntry,
         'concerned_people': NullREntry,
