@@ -31,6 +31,11 @@ class NSWithLogin:
         # some docs say sequence, some list
         return list({*dir(self.ans), *self.__overrides[self.ans.__name__]})
 
+    @property
+    def actions(self):
+        """insert actions created through override"""
+        return self.ans.actions | self.__overrides[self.ans.__name__].keys()
+
     @classmethod
     def override(cls, namespace, func_name):
         return partial(cls.__overrides[namespace].__setitem__, func_name)

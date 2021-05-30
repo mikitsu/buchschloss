@@ -144,6 +144,7 @@ def get_actions(master, spec):
     r = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
     for k, v in spec.items():
         cur_r: MutableMapping = functools.reduce(operator.getitem, k.split('::')[:-1], r)  # noqa
+        k = k.split('::')[-1]
         if v['type'] != 'gui2':
             cur_r[k] = actions.get_script_action(v)
             continue
@@ -151,17 +152,17 @@ def get_actions(master, spec):
         if name not in core.ActionNamespace.namespaces:
             logging.warning(f'unknown action namespace "{name}"')
             continue
-        core_ans = getattr(core, name)
+        ans = common.NSWithLogin(getattr(core, name))
         gui2_actions = [
-            a for a in core_ans.actions
+            a for a in ans.actions
             if not a.startswith(('view',) + ('get_all',) * (name == 'Book'))
-        ]
+        ] + ['view']
         if function is None:
-            cur_r = cur_r[k]
             for a in gui2_actions:
-                cur_r[a] = actions.make_action(master, name, a)
+                cur_r[k][a] = actions.make_action(master, name, a)
         elif function in gui2_actions:
-            cur_r[function] = actions.make_action(master, name, function)
+            assert isinstance(cur_r, collections.defaultdict)
+            cur_r[k] = actions.make_action(master, name, function)
         else:
             logging.warning(f'unknown action: "{name}:{function}"')
     return r

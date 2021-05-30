@@ -28,10 +28,14 @@ from .widgets import (
     LinkWidget, OptionsFromSearch, SearchMultiChoice,
 )
 
+Book = common.NSWithLogin(core.Book)
+Person = common.NSWithLogin(core.Person)
+Library = common.NSWithLogin(core.Library)
+
 
 def form_dialog(root: tk.Widget, form_cls: Type[BaseForm]) -> Optional[dict]:
     """Show a pop-up dialog based on a form"""
-    def callback(**kwargs):
+    def callback(kwargs):
         nonlocal data
         data = kwargs
         popup.destroy()
@@ -39,6 +43,7 @@ def form_dialog(root: tk.Widget, form_cls: Type[BaseForm]) -> Optional[dict]:
     data = None
     popup = tk.Toplevel(root)
     popup.transient(root)
+    popup.grab_set()
     form_cls(popup, None, callback)
     popup.mainloop()
     return data
@@ -268,8 +273,8 @@ def handle_lua_get_data(data_spec):
         'bool': Checkbox,
         'str': Entry,
     }
-    name_data = {}
-    cls_body = {'get_name': staticmethod(name_data.__getitem__), 'all_widgets': {}}
+    name_data = {'submit': utils.get_name('form::submit')}
+    cls_body = {'get_name': staticmethod(name_data.get), 'all_widgets': {}}
     for k, name, v in data_spec:
         cls_body['all_widgets'][k] = type_widget_map[v]
         name_data[k] = name
@@ -356,12 +361,12 @@ class BookForm(SearchForm, EditForm, ViewForm):
             partial(view_data, 'person'),
             {'attr': 'person'},
         )},
-        'genres': (MultiChoicePopup, lambda: core.Book.get_all_genres(), {}),
+        'genres': (MultiChoicePopup, lambda: Book.get_all_genres(), {}),
         'library': {
-            None: (OptionsFromSearch, core.Library, {}),
-            FormTag.SEARCH: (OptionsFromSearch, core.Library, {'allow_none': True}),
+            None: (OptionsFromSearch, Library, {}),
+            FormTag.SEARCH: (OptionsFromSearch, Library, {'allow_none': True}),
         },
-        'groups': (MultiChoicePopup, lambda: core.Book.get_all_groups(), {}),
+        'groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {}),
         'shelf': NonEmptyREntry,
     }
 
@@ -381,7 +386,7 @@ class PersonForm(SearchForm, EditForm, ViewForm):
             partial(view_data, 'book'),
             {'attr': 'book'},
         )},
-        'libraries': (SearchMultiChoice, core.Library, {}),
+        'libraries': (SearchMultiChoice, Library, {}),
         'pay': {
             FormTag.SEARCH: None,
             None: Checkbox,
@@ -416,11 +421,11 @@ class LibraryForm(SearchForm, EditForm, ViewForm):
         'name': NonEmptyREntry,
         'books': {
             FormTag.SEARCH: None,
-            None: (SearchMultiChoice, core.Book, {}),
+            None: (SearchMultiChoice, Book, {}),
         },
         'people': {
             FormTag.SEARCH: None,
-            None: (SearchMultiChoice, core.Person, {}),
+            None: (SearchMultiChoice, Person, {}),
         },
         'pay_required': Checkbox,
         'action': {
@@ -434,15 +439,15 @@ class LibraryForm(SearchForm, EditForm, ViewForm):
     }
 
 
-class BorrowForm(BaseForm, ViewForm):
+class BorrowForm(ViewForm):
     all_widgets = {
         'person': {
             FormTag.VIEW: (LinkWidget, partial(view_data, 'person'), {}),
-            None: (OptionsFromSearch, core.Person, {}),
+            None: (OptionsFromSearch, Person, {}),
         },
         'book': {
             FormTag.VIEW: (LinkWidget, partial(view_data, 'book'), {}),
-            None: (OptionsFromSearch, core.Book, {}),
+            None: (OptionsFromSearch, Book, {}),
         },
         'weeks': IntEntry,
         'override': Checkbox,
@@ -451,14 +456,14 @@ class BorrowForm(BaseForm, ViewForm):
 
 class BorrowRestituteForm(BaseForm):
     all_widgets = {
-        'book': (OptionsFromSearch, core.Book,
+        'book': (OptionsFromSearch, Book,
                  {'condition': ('borrow.is_back', 'eq', False)}),
     }
 
 
 class BorrowExtendForm(BaseForm):
     all_widgets = {
-        'book': (OptionsFromSearch, core.Book, {}),
+        'book': (OptionsFromSearch, Book, {}),
         'weeks': IntEntry,
     }
 
@@ -467,12 +472,12 @@ class BorrowSearchForm(SearchForm):
     all_widgets = {
         'book__title': NullREntry,
         'book__author': NullREntry,
-        'book__library': (OptionsFromSearch, core.Library, {'allow_none': True}),
-        'book__groups': (MultiChoicePopup, lambda: core.Book.get_all_groups(), {}),
+        'book__library': (OptionsFromSearch, Library, {'allow_none': True}),
+        'book__groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {}),
         # this has on_empty='error', but empty values are removed when searching
         # the Null*Entries above are not really needed
         'person__class_': ClassEntry,
-        'person__libraries': (SearchMultiChoice, core.Library, {}),
+        'person__libraries': (SearchMultiChoice, Library, {}),
         'is_back': (Checkbox, {'allow_none': True}),
     }
 

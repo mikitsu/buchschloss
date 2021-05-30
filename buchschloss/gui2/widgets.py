@@ -22,7 +22,7 @@ WRAPLENGTH = config.gui2.widget_size.main.width // 2
 class OptionsFromSearch(formlib.DropdownChoices):
     """A formlib.DropdownChoices tuple that gets choices from a search"""
     def __init__(self, form, master, name,
-                 action_ns, allow_none=False, setter=False, condition=()):
+                 action_ns, allow_none=False, setter=False, condition=(), default=0):
         """Create a new instance.
 
         :param action_ns: is the ActionNamespace to search in
@@ -31,6 +31,7 @@ class OptionsFromSearch(formlib.DropdownChoices):
           with results of ``action_ns.view_ns`` when a selection is made.
           This is especially/only useful for ID fields when editing.
         :param condition: specifies the condition with which to search
+        :param default: is passed on
 
         The parameters ``allow_none`` and ``setter`` are mutually exclusive.
         """
@@ -40,7 +41,7 @@ class OptionsFromSearch(formlib.DropdownChoices):
             if setter:
                 raise ValueError('``setter`` and ``allow_none`` are mutually exclusive')
             values.insert(0, (None, ''))
-        super().__init__(form, master, name, values)
+        super().__init__(form, master, name, values, default=default)
         if setter:
             self.widget.bind('<<ComboboxSelected>>', self._do_set)
             self._update_values = self._update_values_with_set
@@ -73,7 +74,7 @@ class SeriesInput(formlib.FormWidget):
 
     def get(self):
         """Return series name and number, under 'series' and 'series_number'"""
-        return {k: v for w in self.subwidgets.values() for k, v in w.get()}
+        return {k: v for w in self.subwidgets.values() for k, v in w.get().items()}
 
     def set(self, data):
         """Set series name and number"""
@@ -82,7 +83,7 @@ class SeriesInput(formlib.FormWidget):
 
     def validate(self):
         """Validate name and number individually and together"""
-        r = {k: v for w in self.subwidgets.values() for k, v in w.validate()}
+        r = {k: v for w in self.subwidgets.values() for k, v in w.validate().items()}
         if all((not r,
                 self.subwidgets['series_number'].get_simple() is not None,
                 self.subwidgets['series'].get_simple() is None)):
@@ -435,8 +436,12 @@ class EditForm(BaseForm):
         super().__init_subclass__(**kwargs)
         cls.id_name, widget_spec = next(iter(cls.all_widgets.items()))
         if FormTag.EDIT in widget_spec:
-            raise TypeError("can't use SetForEditForm if FormTag.EDIT is specified")
-        widget_spec[FormTag.EDIT] = (OptionsFromSearch, getattr(core, cls.form_name), {})
+            raise TypeError("can't use EditForm if FormTag.EDIT is specified")
+        widget_spec[FormTag.EDIT] = (
+            OptionsFromSearch,
+            common.NSWithLogin(getattr(core, cls.form_name)),
+            {'default': None, 'setter': True},
+        )
 
     def get_data(self):
         """put the value of the ID widget under ``'*args'``"""
@@ -465,7 +470,10 @@ class ViewForm(BaseForm):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         for ws in cls.all_widgets.values():
-            w, *a, kw = next(w for w in (ws[None], *ws.values()) if w is not None)
+            w, *a, kw = next(
+                (w for w in (ws[None], *ws.values()) if w is not None),
+                (type(None), {}),
+            )
             if issubclass(w, (SearchMultiChoice, OptionsFromSearch)):
                 ans = a[0] if a else kw.pop('action_ns')
                 new = (LinkWidget, ans, {'multiple': issubclass(w, SearchMultiChoice)})

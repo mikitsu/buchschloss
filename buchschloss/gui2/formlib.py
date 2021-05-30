@@ -265,7 +265,8 @@ class Entry(FormWidget):
     def set_simple(self, data):
         """delete current and insert new"""
         self.widget.delete(0, tk.END)
-        self.widget.insert(0, data)
+        if data is not None:
+            self.widget.insert(0, data)
 
     def validate_simple(self):
         """handle on_empty='error' and validate_re"""
@@ -494,8 +495,7 @@ class MultiChoicePopup(FormWidget):
         # but it doesn't always work, notably when moving the parent window.
         # <Configure> is bad because we update the button text.
         root = self.widget.winfo_toplevel()
-        bound = [(event, root.bind(event, dropup))
-                 for event in ('<Button>', '<Key>', '<FocusOut>')]
+        bound = [(event, root.bind(event, dropup)) for event in ('<Button>', '<Key>')]
         dropdown = tk.Toplevel(root)
         dropdown.overrideredirect(True)
         dropdown.geometry(f'+{x}+{y}')

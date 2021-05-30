@@ -652,13 +652,15 @@ class Book(ActionNamespace):
         logging.info('{} edited {}'.format(login_context, book))
 
     @staticmethod
-    def get_all_genres():
+    def get_all_genres(login_context):
         """return all known genres in the database"""
+        logging.info(f'{login_context} viewed all genres')
         return tuple(g.name for g in models.Genre.select(models.Genre.name).distinct())
 
     @staticmethod
-    def get_all_groups():
+    def get_all_groups(login_context):
         """return all known groups in the database"""
+        logging.info(f'{login_context} viewed all groups')
         return tuple(g.name for g in models.Group.select(models.Group.name).distinct())
 
 
