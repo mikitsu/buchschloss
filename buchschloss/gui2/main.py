@@ -1,5 +1,6 @@
 """GUIv2 for buchschloss"""
 
+import collections.abc
 import collections
 import functools
 import operator
@@ -7,27 +8,20 @@ import logging
 import tkinter.messagebox as tk_msg
 import tkinter.font as tk_font
 import tkinter as tk
+from tkinter import ttk
 import types
 from functools import partial
 import sys
 import typing as T
-
-from ..misc import tkstuff as mtk
-
-try:
-    from collections.abc import Mapping
-except ImportError:
-    Mapping = dict
+from typing import Type, MutableMapping
 
 from .. import core
 from .. import utils
 from .. import config
 from ..config.main import DummyErrorFile
-from . import forms
 from . import widgets
 from . import actions
 from . import common
-from .actions import generic_formbased_action, ShowInfo
 
 
 class ActionTree(dict):
@@ -78,6 +72,7 @@ class App:
         font_conf = {'family': config.gui2.font.family, 'size': config.gui2.font.size}
         for font_name in ('Default', 'Text', 'Menu'):
             tk_font.nametofont(font_name.join(('Tk', 'Font'))).config(**font_conf)
+        ttk.Style().configure('Treeview', rowheight=config.gui2.font.size*2)
         self.current_login = core.guest_lc
         self.on_next_reset = []
         self.greeter = tk.Label(self.root,
@@ -87,7 +82,7 @@ class App:
         self.center = tk.Frame(self.root)
         self.header = widgets.Header(
             self.root,
-            {'text': utils.get_name('action::login'), 'command': actions.login},
+            {'text': utils.get_name('action::login'), 'command': actions.login_logout},
             utils.get_name('not_logged_in'),
             {'text': utils.get_name('action::abort'), 'command': self.reset},
             {'text': utils.get_name('action::exit_app'), 'command': self.onexit}
@@ -143,87 +138,38 @@ class App:
             sys.exit()
 
 
-def get_actions(spec):
+def get_actions(master, spec):
     """return a dict of actions suitable for ActionTree.from_map"""
-    gfa = generic_formbased_action
-    wrapped_action_ns = {
-        k: common.NSWithLogin(getattr(core, k))
-        for k in core.ActionNamespace.namespaces
-    }
-    default_action_adapters = {
-        'new': lambda name, ns: gfa('new', get_form(name), ns.new),
-        'edit': lambda name, ns: gfa(
-            'edit', get_form(name), ns.edit, fill_data=ns.view_ns),
-        'view': lambda name, __: ShowInfo.instances.get(name),
-        'search': lambda name, ns: actions.search(
-            get_form(name + 'Search', get_form(name)), ns.search, ShowInfo.instances[name]),
-    }
-    special_action_funcs = {
-        ('Library', 'edit'): gfa(
-            'edit', forms.LibraryForm, wrapped_action_ns['Library'].edit),
-        ('Book', 'new'): gfa(  # not through override because of post_init
-            'new', forms.BookForm, actions.new_book, post_init=new_book_autofill),
-        ('Book', 'search'): actions.search(
-            forms.BookForm,
-            lambda c: wrapped_action_ns['Book'].search((c, 'and', ('is_active', 'eq', True))),
-            actions.ShowInfo.instances['Book'],
-        )
-    }
 
-    def get_form(name, *default):
-        return getattr(forms, name + 'Form', *default)
-
-    def get_gui2_action(namespace, func):
-        if (namespace, func) in special_action_funcs:
-            return special_action_funcs[(namespace, func)]
-        action_ns = wrapped_action_ns[namespace]
-        action_adapter = default_action_adapters.get(func)
-        if action_adapter is not None:
-            return action_adapter(namespace, action_ns)
-        special_func = getattr(action_ns, func, None)
-        if special_func is None:
-            logging.warning('unknown action "{}"'.format(':'.join((namespace, func))))
-            return None
-        else:
-            form_name = namespace.capitalize() + func.title().replace('_', '')
-            return gfa(None, get_form(form_name), special_func)
-
-    def set_gui2_action(namespace, func, insert_key):
-        action = get_gui2_action(namespace, func)
-        if action is not None:
-            cur_r[insert_key] = action
-
-    RType = T.DefaultDict[str, T.Union['RType', T.Callable[[T.Optional[tk.Event]], None]]]
-    r: RType = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
+    r = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
     for k, v in spec.items():
-        cur_r = functools.reduce(operator.getitem, k.split('::')[:-1], r)
-        if v['type'] == 'gui2':
-            if v['name'] not in wrapped_action_ns:
-                logging.warning('unknown action namespace "{}"'.format(v['name']))
-                continue
-            if v['function'] is None:
-                core_ans = wrapped_action_ns[v['name']]
-                cur_r = cur_r[k]
-                action_type = (types.FunctionType, types.MethodType)
-                for func_name in dir(core_ans):
-                    func_v = getattr(core_ans, func_name)
-                    if any((func_name.startswith(('_', 'view')),
-                            not isinstance(func_v, action_type),
-                            v['name'] == 'Book' and func_name.startswith('get_all'),
-                            )):
-                        continue
-                    set_gui2_action(v['name'], func_name, func_name)
-                set_gui2_action(v['name'], 'view', 'view')
-            else:
-                set_gui2_action(v['name'], v['function'], k)
-        else:
+        cur_r: MutableMapping = functools.reduce(operator.getitem, k.split('::')[:-1], r)  # noqa
+        if v['type'] != 'gui2':
             cur_r[k] = actions.get_script_action(v)
+            continue
+        name, function = v['name'], v['function']
+        if name not in core.ActionNamespace.namespaces:
+            logging.warning(f'unknown action namespace "{name}"')
+            continue
+        core_ans = getattr(core, name)
+        gui2_actions = [
+            a for a in core_ans.actions
+            if not a.startswith(('view',) + ('get_all',) * (name == 'Book'))
+        ]
+        if function is None:
+            cur_r = cur_r[k]
+            for a in gui2_actions:
+                cur_r[a] = actions.make_action(master, name, a)
+        elif function in gui2_actions:
+            cur_r[function] = actions.make_action(master, name, function)
+        else:
+            logging.warning(f'unknown action: "{name}:{function}"')
     return r
 
 
 app = App()
 
-action_tree = ActionTree.from_nested(get_actions(config.gui2.actions.mapping))
+action_tree = ActionTree.from_nested(get_actions(app.center, config.gui2.actions.mapping))
 
 
 lua_callbacks = {

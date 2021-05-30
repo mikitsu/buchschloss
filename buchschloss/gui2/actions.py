@@ -298,12 +298,20 @@ def get_script_action(script_spec):
 # the decorator registers them in common.NSWithLogin
 
 
-@common.NSWithLogin.override('Book', 'new')  # actually used because it's shorter
-def new_book(**kwargs):
+@common.NSWithLogin.override('Book', 'new')
+def book_new(**kwargs):
     tk_msg.showinfo(
         utils.get_name('Book'),
         utils.get_name('Book::new_id_{}').format(
             core.Book.new(login_context=main.app.current_login, **kwargs))
+    )
+
+
+@common.NSWithLogin.override('Book', 'search')
+def book_search(condition):
+    return core.Book.search(
+        (condition, 'and', ('is_active', 'eq', True)),
+        login_context=main.app.current_login,
     )
 
 
