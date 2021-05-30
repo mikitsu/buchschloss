@@ -1,5 +1,6 @@
 """shared utilities"""
 
+import tkinter as tk
 import typing
 import types
 import contextlib
@@ -45,3 +46,9 @@ def ignore_missing_messagebox():
             return
         else:
             raise
+
+
+def destroy_all_children(widget: tk.Widget):
+    """Destroy all children of the given widget"""
+    for child in tuple(widget.children.values()):
+        child.destroy()

@@ -6,24 +6,26 @@ from tkinter import ttk
 import tkinter.messagebox as tk_msg
 import tkinter.font as tk_font
 from functools import partial
-import typing as T
-from typing import Type, Callable, Iterable, Optional, Sequence, Mapping
+from typing import Type, Callable, Optional, Sequence, Mapping
 
-from ..misc.tkstuff import dialogs as mtkd
-from ..misc.tkstuff import forms as mtkf
 from . import main
-from . import formlib
-from . import widgets
 from . import common
 from .. import core
 from .. import config
 from .. import utils
+from .formlib import Entry, DropdownChoices
 from .widgets import (
+    # not form-related
+    SearchResultWidget,
+    # form-related, but not form widgets
     BaseForm, AuthedForm, EditForm, SearchForm, ViewForm, FormTag,
-    ISBNEntry, NonEmptyEntry, NonEmptyREntry, ClassEntry, PasswordEntry,
-    IntEntry, NullREntry, Text, ConfirmedPasswordInput, DisplayWidget,
-    Checkbox, SeriesInput, OptionsFromSearch, search_multi_choice,
-    FlagEnumMultiChoice, ScriptNameEntry, MultiChoicePopup, LinkWidget,
+    # generic form widgets and form widget tuples
+    NonEmptyEntry, NonEmptyREntry, PasswordEntry, IntEntry, NullREntry, Text,
+    ConfirmedPasswordInput, Checkbox, FlagEnumMultiChoice, MultiChoicePopup,
+    # specific form widgets and form widget tuples
+    SeriesInput, ISBNEntry, ClassEntry, ScriptNameEntry,
+    # complex form widgets
+    LinkWidget, OptionsFromSearch, SearchMultiChoice,
 )
 
 
@@ -100,36 +102,34 @@ def make_action(master: tk.Widget,
 
 
 def show_results(master: tk.Widget,
-                 results: Iterable,
+                 results: Sequence,
                  view_func: Callable[[tk.Widget, core.DataNamespace], None],
                  ):
     """show search results as buttons taking the user to the appropriate view
 
     :param master: is the master widget in which the results are displayed
-    :param results: is an iterable of objects as those returned by ``ANS.search``
+    :param results: is a sequence of DataNS objects
     :param view_func: is a function that displays data
     """
 
-    def search_hide():
-        rw.pack_forget()
-        show_btn = tk.Button(search_frame, text=utils.get_name('back_to_results'))
-        show_btn.config(command=partial(search_show, show_btn))
-        show_btn.pack()
-
-    def search_show(btn):
-        btn.destroy()
-        ShowInfo.to_destroy.container.destroy()
-        ShowInfo.to_destroy = None
-        rw.pack()
+    def search_show():
+        common.destroy_all_children(search_frame)
+        SearchResultWidget(search_frame, results, view_wrap).pack()
 
     def view_wrap(dns):
-        search_hide()
-        return view_func(search_frame, dns)
+        common.destroy_all_children(search_frame)
+        tk.Button(
+            search_frame,
+            text=utils.get_name('back_to_results'),
+            command=search_show,
+        ).pack()
+        result_frame = tk.Frame(search_frame)
+        result_frame.pack()
+        return view_func(result_frame, dns)
 
     search_frame = tk.Frame(master)
     search_frame.pack()
-    rw = widgets.SearchResultWidget(search_frame, tuple(results), view_wrap)
-    rw.pack()
+    search_show()
 
 
 def search_callback(master: tk.Widget,
@@ -170,7 +170,7 @@ def search_callback(master: tk.Widget,
         """wrap to get a complete DataNS"""
         return view_func(view_master, ans.view_ns(dns.id))
 
-    show_results(master, ans.search(q), wrapped_view)
+    show_results(master, tuple(ans.search(q)), wrapped_view)
 
 
 def view_data(name: str, master: tk.Widget, dns: core.DataNamespace):
@@ -199,114 +199,6 @@ def view_action(master: tk.Widget, ans: common.NSWithLogin):
         main.app.reset()
         return
     view_data(ans.ans.__name__, master, ans.view_ns(id_))
-
-
-class ShowInfo:
-    """provide callables that display information"""
-    to_destroy: T.ClassVar[T.Optional[tk.Widget]] = None
-    instances: T.ClassVar[T.Dict[str, 'ShowInfo']]
-    SpecialKeyFunc = T.Callable[[dict], T.Optional[T.Sequence]]
-
-    def __init__(
-            self,
-            namespace: T.Type[core.ActionNamespace],
-            special_keys: T.Mapping[str, SpecialKeyFunc] = {},  # noqa
-            id_type: type = str,
-        ):  # noqa
-        """Initialize
-
-        :param namespace: the action namespace to use for getting information
-        :param special_keys: a mapping from keys in the returned data to a function
-            taking the value mapped by the key and returning anew key
-            (may be None to use the default) and a value to pass
-            to widgets.InfoWidget.
-        :param id_type: the type of the ID
-        """
-        self.action_ns = common.NSWithLogin(namespace)
-        self.special_keys = special_keys
-        self.id_type = id_type
-        self.get_name_prefix = namespace.__name__ + '::'
-
-    def __call__(self, id_=None):
-        """ask for ID if not given"""
-        if id_ is None:
-            id_get_text = utils.get_name(self.get_name_prefix + 'id')
-            try:
-                id_ = mtkd.WidgetDialog.ask(
-                    main.app.root,
-                    widgets.OptionsFromSearch,
-                    {'action_ns': self.action_ns.ans},
-                    title=id_get_text,
-                    text=id_get_text,
-                )
-            except mtkd.UserExitedDialog:
-                main.app.reset()
-                return
-        self.display_information(id_)
-
-    def display_information(self, id_):
-        """actually display information"""
-        if ShowInfo.to_destroy is not None:
-            ShowInfo.to_destroy.container.destroy()
-        try:
-            data = self.action_ns.view_str(id_)
-        except core.BuchSchlossBaseError as e:
-            tk_msg.showerror(e.title, e.message)
-            main.app.reset()
-            return
-        pass_widgets = {utils.get_name('info_regarding'): data['__str__']}
-        for k, v in data.items():
-            display = utils.get_name(self.get_name_prefix + k)
-            if k in self.special_keys:
-                v = self.special_keys[k](data)
-                pass_widgets[display] = v
-            elif '_id' not in k and k != '__str__':
-                pass_widgets[display] = str(v)
-        iw = widgets.InfoWidget(main.app.center, pass_widgets)
-        iw.pack()
-        ShowInfo.to_destroy = iw
-
-
-ShowInfo.instances = {
-    'Book': ShowInfo(
-        core.Book,
-        {'borrowed_by': lambda d:
-            (widgets.Button, {
-                'text': d['borrowed_by'],
-                'command': (partial(ShowInfo.instances['Person'], d['borrowed_by_id'])
-                            if d['borrowed_by_id'] is not None else None)
-            })
-         },
-        int,
-    ),
-    'Person': ShowInfo(
-        core.Person,
-        {'borrows': lambda d:
-            [(widgets.Button, {
-                'text': t,
-                'command': partial(ShowInfo.instances['Book'], i)})
-             for t, i in zip(d['borrows'], d['borrow_book_ids'])],
-         },
-        int,
-    ),
-    'Borrow': ShowInfo(
-        core.Borrow,
-        {'person': lambda d:
-            (widgets.Button, {
-                'text': d['person'],
-                'command': partial(ShowInfo.instances['Person'], d['person_id'])
-            }),
-         'book': lambda d:
-             (widgets.Button, {
-                 'text': d['book'],
-                 'command': partial(ShowInfo.instances['Book'], d['book_id'])
-             }),
-         },
-        int,
-    ),
-}
-ShowInfo.instances.update({k: ShowInfo(getattr(core, k))
-                           for k in ('Library', 'Member', 'Script')})
 
 
 def login_logout():
@@ -372,14 +264,14 @@ def add_lua_data_entries(view, parent, data, width=0, height=0, indent=1):
 def handle_lua_get_data(data_spec):
     """provide a callback for lua's get_data"""
     type_widget_map = {
-        'int': widgets.IntEntry,
-        'bool': widgets.Checkbox,
-        'str': formlib.Entry,
+        'int': IntEntry,
+        'bool': Checkbox,
+        'str': Entry,
     }
     name_data = {}
     cls_body = {'get_name': staticmethod(name_data.__getitem__), 'all_widgets': {}}
     for k, name, v in data_spec:
-        cls_body['all_widgets'][k] = mtkf.Element(type_widget_map[v])
+        cls_body['all_widgets'][k] = type_widget_map[v]
         name_data[k] = name
     form_cls = type('LuaGetDataForm', (BaseForm,), cls_body)
     return form_dialog(main.app.root, form_cls)  # noqa
@@ -436,7 +328,7 @@ def borrow_extend(book, weeks):
 # Form definitions
 
 
-class BookForm(SearchForm, EditForm):
+class BookForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
         'id': {},
         'isbn': {
@@ -451,6 +343,11 @@ class BookForm(SearchForm, EditForm):
         'concerned_people': NullREntry,
         'year': IntEntry,
         'medium': NonEmptyREntry,
+        'borrow': {FormTag.VIEW: (
+            LinkWidget,
+            partial(view_data, 'person'),
+            {'attr': 'person'},
+        )},
         'genres': (MultiChoicePopup, lambda: core.Book.get_all_genres(), {}),
         'library': {
             None: (OptionsFromSearch, core.Library, {}),
@@ -461,7 +358,7 @@ class BookForm(SearchForm, EditForm):
     }
 
 
-class PersonForm(SearchForm, EditForm):
+class PersonForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
         'id_': {
             FormTag.SEARCH: None,
@@ -471,7 +368,12 @@ class PersonForm(SearchForm, EditForm):
         'last_name': NonEmptyREntry,
         'class_': ClassEntry,
         'max_borrow': IntEntry,
-        'libraries': search_multi_choice(core.Library),
+        'borrows': {FormTag.VIEW: (
+            LinkWidget,
+            partial(view_data, 'book'),
+            {'attr': 'book'},
+        )},
+        'libraries': (SearchMultiChoice, core.Library, {}),
         'pay': {
             FormTag.SEARCH: None,
             None: Checkbox,
@@ -479,10 +381,10 @@ class PersonForm(SearchForm, EditForm):
     }
 
 
-class MemberForm(AuthedForm, SearchForm, EditForm):
+class MemberForm(AuthedForm, SearchForm, EditForm, ViewForm):
     all_widgets = {
         'name': NonEmptyREntry,
-        'level': (formlib.DropdownChoices, tuple(utils.level_names.items()), 1, {}),
+        'level': (DropdownChoices, tuple(utils.level_names.items()), 1, {}),
         'password': {FormTag.NEW: ConfirmedPasswordInput},
     }
 
@@ -501,17 +403,21 @@ class LoginForm(BaseForm):
     }
 
 
-class LibraryForm(SearchForm, EditForm):
+class LibraryForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
         'name': NonEmptyREntry,
-        'books': {FormTag.SEARCH: None,
-                  None: search_multi_choice(core.Book)},
-        'people': {FormTag.SEARCH: None,
-                   None: search_multi_choice(core.Person)},
+        'books': {
+            FormTag.SEARCH: None,
+            None: (SearchMultiChoice, core.Book, {}),
+        },
+        'people': {
+            FormTag.SEARCH: None,
+            None: (SearchMultiChoice, core.Person, {}),
+        },
         'pay_required': Checkbox,
         'action': {
             FormTag.EDIT: (
-                formlib.DropdownChoices,
+                DropdownChoices,
                 [(e, utils.get_name('from::library::action::' + e.value))
                  for e in core.LibraryAction],
                 {},
@@ -520,10 +426,16 @@ class LibraryForm(SearchForm, EditForm):
     }
 
 
-class BorrowForm(BaseForm):
+class BorrowForm(BaseForm, ViewForm):
     all_widgets = {
-        'person': (OptionsFromSearch, core.Person, {}),
-        'book': (OptionsFromSearch, core.Book, {}),
+        'person': {
+            FormTag.VIEW: (LinkWidget, partial(view_data, 'person'), {}),
+            None: (OptionsFromSearch, core.Person, {}),
+        },
+        'book': {
+            FormTag.VIEW: (LinkWidget, partial(view_data, 'book'), {}),
+            None: (OptionsFromSearch, core.Book, {}),
+        },
         'weeks': IntEntry,
         'override': Checkbox,
     }
@@ -552,19 +464,20 @@ class BorrowSearchForm(SearchForm):
         # this has on_empty='error', but empty values are removed when searching
         # the Null*Entries above are not really needed
         'person__class_': ClassEntry,
-        'person__libraries': search_multi_choice(core.Library),
+        'person__libraries': (SearchMultiChoice, core.Library, {}),
         'is_back': (Checkbox, {'allow_none': True}),
     }
 
 
-class ScriptForm(AuthedForm, SearchForm, EditForm):
+class ScriptForm(AuthedForm, SearchForm, EditForm, ViewForm):
     all_widgets = {
         'name': ScriptNameEntry,
         'permissions': (FlagEnumMultiChoice, core.ScriptPermissions, {}),
-        'setlevel': (formlib.DropdownChoices,
+        'setlevel': (DropdownChoices,
                      ((None, '-----'), *utils.level_names.items()), {}),
         'code': {
             None: Text,
             FormTag.SEARCH: None,
+            FormTag.VIEW: None,
         }
     }

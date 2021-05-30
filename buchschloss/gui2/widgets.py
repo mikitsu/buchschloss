@@ -184,12 +184,14 @@ class Checkbox(formlib.FormWidget):
     """A checkbox entry. Optionally with third state."""
     widget: ttk.Checkbutton
 
-    def __init__(self, form, master, name, allow_none=False):
+    def __init__(self, form, master, name, allow_none=False, active=True):
         super().__init__(form, master, name)
         self.var = tk.BooleanVar()
         self.widget = ttk.Checkbutton(self.master, variable=self.var)
         if allow_none:
             self.widget.state(['alternate'])
+        if not active:
+            self.widget.state(['disabled'])
 
     def get_simple(self):
         """Return checkbutton state"""
@@ -206,7 +208,7 @@ class Checkbox(formlib.FormWidget):
 
 
 class MultiChoicePopup(formlib.MultiChoicePopup):
-    """provide thw ``wraplength`` argument and set ``max_height`` and ``sep``"""
+    """provide the ``wraplength`` argument and set ``max_height`` and ``sep``"""
     max_height = config.gui2.popup_height
     sep = config.gui2.option_sep
 
@@ -215,17 +217,19 @@ class MultiChoicePopup(formlib.MultiChoicePopup):
         super().__init__(*args, **kwargs)
 
 
-def search_multi_choice(action_ns, condition=()):
-    """Return a MultiChoicePopup tuple that gets choices from a search
+class SearchMultiChoice(MultiChoicePopup):
+    """MultiChoicePopup that gets choices from a search"""
+    def __init__(self, form, master, name, action_ns, condition=()):
+        """Use search results as values.
 
-    :param action_ns: is the ActionNamespace to search in
-    :param condition: is an optional condition to apply to the search
-    """
-    return (
-        MultiChoicePopup,
-        lambda: [(o.id, str(o)) for o in action_ns.search(condition)],
-        {},
-    )
+        :param action_ns: is the ActionNamespace to search in
+        :param condition: is an optional condition to apply to the search
+        """
+        # This isn't a function returning a tuple that uses
+        # the function providable for options to allow ViewForm
+        # to treat this differently than other MultiChoicePopups
+        values = [(o.id, str(o)) for o in action_ns.search(condition)]
+        super().__init__(form, master, name, values)
 
 
 class FlagEnumMultiChoice(MultiChoicePopup):
@@ -276,26 +280,35 @@ class DisplayWidget(formlib.FormWidget):
 
 class LinkWidget(formlib.FormWidget):
     """Display a button that opens an info display when clicked"""
-    def __init__(self, form, master, name, view_func, attr='id', display=str):
+    def __init__(self, form, master, name,
+                 view_func, attr=None, display=str, multiple=False):
         super().__init__(form, master, name)
         self.attr = attr
         self.display = display
-        self.data = self.vf_arg = None
-        self.widget = tk.Button(
-            self.master,
-            command=lambda: view_func(self.master, self.vf_arg),
-            wraplength=WRAPLENGTH,
-        )
+        self.multiple = multiple
+        self.data = None
+        self.view_func = view_func
+        self.widget = tk.Frame(self.master)
 
     def set_simple(self, data):
         """update the displayed data"""
-        self.data = data
+        self.data = None
         if data is None:
-            self.vf_arg = None
-            self.widget['text'] = '----'
-        else:
-            self.vf_arg = getattr(data, self.attr)
-            self.widget['text'] = self.display(data)
+            return
+        if not self.multiple:
+            data = [data]
+        common.destroy_all_children(self.widget)
+        for item in data:
+            if self.attr is None:
+                arg = item
+            else:
+                arg = getattr(item, self.attr)
+            tk.Button(
+                self.widget,
+                wraplength=WRAPLENGTH,
+                command=partial(self.view_func, self.master, arg),
+                text=self.display(item),
+            ).pack()
 
     def get_simple(self):
         """return the previously set data"""
@@ -402,11 +415,11 @@ class SearchForm(BaseForm):
 
 
 class AuthedForm(BaseForm):
-    """add a 'current_password' field"""
+    """add a 'current_password' field for NEW and EDIT"""
     all_widgets = {
         'current_password': {
-            FormTag.SEARCH: None,
-            None: PasswordEntry,
+            FormTag.NEW: PasswordEntry,
+            FormTag.EDIT: PasswordEntry,
         }
     }
 
@@ -436,17 +449,32 @@ class EditForm(BaseForm):
 class ViewForm(BaseForm):
     """Adapt a form to be suitable with FormTag.VIEW
 
-    Insert DisplayWidgets where a specific widget for FormTag.VIEW is not specified.
-    If the default widget (or any other widget if the default is None)
-    is MultiChoicePopup (or a subclass), use ``'list'`` for the DisplayWidget.
-    Otherwise, use ``'str'``.
+    Don't show a submit button when used with FormTag.VIEW.
+
+    Insert display widgets (DisplayWidget or LinkWidget) on subclassing
+    where a specific widget for FormTag.VIEW is not specified.
+    The widget and arguments are chosen based on the default widget
+    or any other widget if the default is None:
+
+    - ``SearchMultiChoice`` creates a ``LinkWidget`` with ``multiple=True``
+    - ``OptionsFromSearch`` creates a normal ``LinkWidget``
+    - ``Checkbox`` creates a ``Checkbox`` with ``active=False``
+    - ``MultiChoicePopup`` creates a ``DisplayWidget`` with ``display='list'``
+    - everything else creates a ``DisplayWidget`` with ``display='str'``
     """
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         for ws in cls.all_widgets.values():
-            current = next(w for w in (ws[None], *ws.values()) if w is not None)[0]
-            display = 'list' if issubclass(current, MultiChoicePopup) else 'str'
-            ws.setdefault(FormTag.VIEW, (DisplayWidget, display, {}))
+            w, *a, kw = next(w for w in (ws[None], *ws.values()) if w is not None)
+            if issubclass(w, (SearchMultiChoice, OptionsFromSearch)):
+                ans = a[0] if a else kw.pop('action_ns')
+                new = (LinkWidget, ans, {'multiple': issubclass(w, SearchMultiChoice)})
+            elif issubclass(w, Checkbox):
+                new = (Checkbox, {'active': False})
+            else:
+                display = 'list' if issubclass(w, MultiChoicePopup) else 'str'
+                new = (DisplayWidget, display, {})
+            ws.setdefault(FormTag.VIEW, new)
 
     def get_submit_widget(self):
         """Don't show a submit button when used with FormTag.VIEW"""
