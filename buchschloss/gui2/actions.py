@@ -42,10 +42,14 @@ def form_dialog(root: tk.Widget, form_cls: Type[BaseForm]) -> Optional[dict]:
 
     data = None
     popup = tk.Toplevel(root)
-    popup.transient(root)
-    popup.grab_set()
-    form_cls(popup, None, callback)
-    popup.mainloop()
+    try:
+        popup.transient(root)
+        popup.grab_set()
+        form_cls(popup, None, callback)
+        popup.wait_window()
+    except Exception:
+        popup.destroy()
+        raise
     return data
 
 
@@ -190,6 +194,7 @@ def view_data(name: str, master: tk.Widget, dns: core.DataNamespace):
     form_cls: Type[BaseForm] = globals()[name.capitalize() + 'Form']
     form = form_cls(master, FormTag.VIEW, lambda **kw: None)
     form.set_data({k: getattr(dns, k) for k in dir(dns)})  # TODO: make DataNS a mapping
+    print('viewing', dns)
 
 
 def view_action(master: tk.Widget, ans: common.NSWithLogin):
@@ -197,13 +202,13 @@ def view_action(master: tk.Widget, ans: common.NSWithLogin):
     temp_form = type(
         ans.ans.__name__ + 'Form',
         (BaseForm,),
-        {'all_widgets': {'id': (OptionsFromSearch, ans.ans, {})}},
+        {'all_widgets': {'id': (OptionsFromSearch, ans, {})}},
     )
-    id_ = form_dialog(master.winfo_toplevel(), temp_form)  # noqa
-    if id_ is None:
+    result = form_dialog(master.winfo_toplevel(), temp_form)  # noqa
+    if result is None:
         main.app.reset()
         return
-    view_data(ans.ans.__name__, master, ans.view_ns(id_))
+    view_data(ans.ans.__name__, master, ans.view_ns(result['id']))
 
 
 def login_logout():
@@ -343,7 +348,7 @@ def borrow_extend(book, weeks):
 
 class BookForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
-        'id': {},
+        'id': {FormTag.VIEW: DisplayWidget},
         'isbn': {
             FormTag.NEW: (ISBNEntry, True, {}),
             None: (ISBNEntry, False, {}),

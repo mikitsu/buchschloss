@@ -22,7 +22,7 @@ WRAPLENGTH = config.gui2.widget_size.main.width // 2
 class OptionsFromSearch(formlib.DropdownChoices):
     """A formlib.DropdownChoices tuple that gets choices from a search"""
     def __init__(self, form, master, name,
-                 action_ns, allow_none=False, setter=False, condition=(), default=0):
+                 action_ns, allow_none=False, setter=False, condition=(), default=None):
         """Create a new instance.
 
         :param action_ns: is the ActionNamespace to search in
@@ -54,7 +54,7 @@ class OptionsFromSearch(formlib.DropdownChoices):
     def _do_set(self, event=None):  # noqa
         """Call .set() on the form with a .view_ns result"""
         result = self.action_ns.view_ns(self.get())
-        self.form.set_data({k: getattr(result, k) for k in dir(result)})
+        self.form.set_data({k: getattr(result, k) for k in dir(result) if k != self.name})
 
 
 class SeriesInput(formlib.FormWidget):
@@ -168,7 +168,7 @@ NullIntEntry = (formlib.Entry, 'none', {'transform': int})
 NullEntry = (formlib.Entry, 'none', {'max_history': 0})
 NullREntry = (formlib.Entry, 'none', {})
 ScriptNameEntry = (formlib.Entry, 'error', {'regex': r'^[a-zA-Z0-9 _-]*$'})
-PasswordEntry = (formlib.Entry, 'ignore', {'extra_kwargs': {'show': '*'}})
+PasswordEntry = (formlib.Entry, 'keep', {'extra_kwargs': {'show': '*'}})
 
 
 class Text(formlib.FormWidget):
@@ -291,6 +291,7 @@ class LinkWidget(formlib.FormWidget):
     """Display a button that opens an info display when clicked"""
     def __init__(self, form, master, name,
                  view_func, attr=None, display=str, multiple=False):
+        assert callable(view_func), (form, name, view_func)
         super().__init__(form, master, name)
         self.attr = attr
         self.display = display

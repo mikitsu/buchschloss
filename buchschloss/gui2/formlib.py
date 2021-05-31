@@ -218,7 +218,8 @@ class Entry(FormWidget):
         """
         super().__init__(form, master, name)
         if on_empty not in ('error', 'none', 'keep'):
-            raise ValueError("on_empty must be 'error', 'none' or 'keep'")
+            raise ValueError("on_empty must be 'error', 'none' or 'keep'"
+                             f' (widget {name} in {form})')
         self.on_empty = on_empty
         self.regex = re.compile(regex) if isinstance(regex, str) else regex
         self.transform = lambda v: v if transform is None else transform
@@ -376,7 +377,7 @@ class DropdownChoices(FormWidget):
         self.widget['values'] = self.all_values
         self.widget.current(self.codes.index(data))
         if '_update_values' in self.widget['validatecommand']:
-            self._update_values(self.get())
+            self._update_values(self.widget.get())
 
     def validate(self):
         """check if the choice is unambiguous if not self.allow_new"""
