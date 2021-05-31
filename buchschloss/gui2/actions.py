@@ -1,6 +1,7 @@
 """translate GUI actions to core-provided functions"""
 
 import collections.abc
+import enum
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tk_msg
@@ -13,24 +14,160 @@ from . import common
 from .. import core
 from .. import config
 from .. import utils
-from .formlib import Entry, DropdownChoices
+from .formlib import Form as LibForm, Entry, DropdownChoices, RadioChoices
 from .widgets import (
     # not form-related
     SearchResultWidget,
-    # form-related, but not form widgets
-    BaseForm, AuthedForm, EditForm, SearchForm, ViewForm, FormTag,
     # generic form widgets and form widget tuples
     NonEmptyEntry, NonEmptyREntry, PasswordEntry, IntEntry, NullREntry, Text,
     ConfirmedPasswordInput, Checkbox, FlagEnumMultiChoice, MultiChoicePopup,
     # specific form widgets and form widget tuples
     SeriesInput, ISBNEntry, ClassEntry, ScriptNameEntry,
     # complex form widgets
-    LinkWidget, OptionsFromSearch, SearchMultiChoice,
+    LinkWidget, DisplayWidget, OptionsFromSearch, SearchMultiChoice,
 )
 
 Book = common.NSWithLogin(core.Book)
 Person = common.NSWithLogin(core.Person)
 Library = common.NSWithLogin(core.Library)
+
+
+class FormTag(enum.Enum):
+    SEARCH = '"search" action'
+    NEW = '"new" action'
+    EDIT = '"edit" action'
+    VIEW = '"view" action'
+
+
+class BaseForm(LibForm):
+    """Base class for forms, handling get_name, default content and autocompletes"""
+    form_name: str
+
+    def __init__(self, frame, tag, submit_callback):
+        super().__init__(frame, tag, submit_callback)
+        self.set_data(config.gui2.entry_defaults.get(self.form_name).mapping)
+
+    def __init_subclass__(cls, **kwargs):
+        """Handle autocompletes and set cls.form_name"""
+        cls.form_name = cls.__name__.replace('Form', '')
+        # This will put every widget spec into the standard form, required below
+        super().__init_subclass__(**kwargs)  # noqa -- it might accept kwargs later
+
+        for k, v in config.gui2.get('autocomplete').get(cls.form_name).mapping.items():
+            if k in cls.all_widgets:
+                for *_, w_kwargs in cls.all_widgets[k].values():
+                    w_kwargs.setdefault('autocomplete', v)
+
+    def get_name(self, name):
+        """redirect to utils.get_name inserting a form-specific prefix"""
+        if isinstance(self.tag, FormTag):
+            items = ('form', self.form_name, self.tag.name, name)
+        else:
+            items = ('form', self.form_name, name)
+        return utils.get_name('::'.join(items))
+
+
+class SearchForm(BaseForm):
+    """Add search options (and/or) + exact matching"""
+    all_widgets = {
+        'search_mode': {FormTag.SEARCH: (
+            RadioChoices, [(c, utils.get_name(c)) for c in ('and', 'or')], {})},
+        'exact_match': {FormTag.SEARCH: Checkbox},
+    }
+
+    def get_data(self):
+        """ignore empty data"""
+        if self.tag is FormTag.SEARCH:
+            return {k: v for k, v in super().get_data() if v or isinstance(v, bool)}
+        else:
+            return super().get_data()
+
+    def validate(self):
+        """ignore errors from empty widgets"""
+        errors = super().validate()
+        # NOTE: the password entry will raise ValueError if the passwords don't
+        # match, but it shouldn't be used in searches anyway.
+        # All other widgets shouldn't raise exceptions in .get()
+        if self.tag is FormTag.SEARCH:
+            data = self.get_data()
+            for k in errors.keys() - data.keys():
+                del errors[k]
+
+
+class AuthedForm(BaseForm):
+    """add a 'current_password' field for NEW and EDIT"""
+    all_widgets = {
+        'current_password': {
+            FormTag.NEW: PasswordEntry,
+            FormTag.EDIT: PasswordEntry,
+        }
+    }
+
+
+class EditForm(BaseForm):
+    """Adapt forms for the EDIT action.
+
+    On FormTag.EDIT:
+    Use OptionsFromSearch with setter=True for the first not-inherited widget.
+    Modify ``.get_data`` to include the value of the first widget under ``'*args'``.
+    """
+    def __init_subclass__(cls, **kwargs):
+        cls.id_name = next(iter(cls.all_widgets))
+        super().__init_subclass__(**kwargs)
+        widget_spec = cls.all_widgets[cls.id_name]
+        if FormTag.EDIT in widget_spec:
+            raise TypeError("can't use EditForm if FormTag.EDIT is specified")
+        widget_spec[FormTag.EDIT] = (
+            OptionsFromSearch,
+            common.NSWithLogin(getattr(core, cls.form_name)),
+            {'setter': True},
+        )
+
+    def get_data(self):
+        """put the value of the ID widget under ``'*args'``"""
+        data = super().get_data()
+        if self.tag is FormTag.EDIT:
+            data['*args'] = (data.pop(self.id_name),)
+        return data
+
+
+class ViewForm(BaseForm):
+    """Adapt a form to be suitable with FormTag.VIEW
+
+    Don't show a submit button when used with FormTag.VIEW.
+
+    Insert display widgets (DisplayWidget or LinkWidget) on subclassing
+    where a specific widget for FormTag.VIEW is not specified.
+    The widget and arguments are chosen based on the default widget:
+
+    - ``SearchMultiChoice`` creates a ``LinkWidget`` with ``multiple=True``
+    - ``OptionsFromSearch`` creates a normal ``LinkWidget``
+    - ``Checkbox`` creates a ``Checkbox`` with ``active=False``
+    - ``MultiChoicePopup`` creates a ``DisplayWidget`` with ``display='list'``
+    - everything else creates a ``DisplayWidget`` with ``display='str'``
+    """
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for ws in cls.all_widgets.values():
+            if ws[None] is None:
+                continue
+            w, *a, kw = ws[None]
+            if issubclass(w, (SearchMultiChoice, OptionsFromSearch)):
+                ans = a[0] if a else kw.pop('action_ns')
+                new = (LinkWidget, ans, {'multiple': issubclass(w, SearchMultiChoice)})
+            elif issubclass(w, Checkbox):
+                new = (Checkbox, {'active': False})
+            else:
+                display = 'list' if issubclass(w, MultiChoicePopup) else 'str'
+                new = (DisplayWidget, display, {})
+            ws.setdefault(FormTag.VIEW, new)
+
+    def get_submit_widget(self):
+        """Don't show a submit button when used with FormTag.VIEW"""
+        if self.tag is FormTag.VIEW:
+            return None
+        else:
+            return super().get_submit_widget()
 
 
 def form_dialog(root: tk.Widget, form_cls: Type[BaseForm]) -> Optional[dict]:
