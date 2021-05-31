@@ -124,7 +124,7 @@ class Form:
             w = tk.Label(self.frame, text=message, **self.error_text_config)
             w.grid(row=self.widget_dict[field].widget.grid_info()['row'], column=3)
             self._error_display_widgets.append(w)
-        tk_msg.showerror(self.get_name('error'), complete_message)
+        tk_msg.showerror(self.get_name('error'), '\n'.join(complete_message))
 
     def validate(self):
         """Check for and return errors. Default: rely on widget validation"""
@@ -259,7 +259,7 @@ class Entry(FormWidget):
         if self.regex is not None and self.regex.search(v) is None:
             return self.form.get_name(f'{self.name}::error::regex')
         try:
-            self.get()
+            self.transform(self.widget.get())
         except ValueError:
             return self.form.get_name(f'{self.name}::error::transform')
         return None

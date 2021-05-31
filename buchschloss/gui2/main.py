@@ -116,8 +116,7 @@ class App:
 
     def clear_center(self):
         """clear the center frame"""
-        for w in self.center.children.copy().values():
-            w.destroy()
+        common.destroy_all_children(self.center)
 
     def onexit(self):
         """execute when the user exits the application"""

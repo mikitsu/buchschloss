@@ -64,6 +64,7 @@ class BaseForm(LibForm):
             items = ('form', self.form_name, self.tag.name, name)
         else:
             items = ('form', self.form_name, name)
+        print(name, items, utils.get_name('::'.join(items)))
         return utils.get_name('::'.join(items))
 
 
@@ -427,13 +428,29 @@ def handle_lua_get_data(data_spec):
         'bool': Checkbox,
         'str': Entry,
     }
+    def get_name(internal):
+        try:
+            return name_data[internal]
+        except KeyError:
+            # only happens on errors
+            return utils.get_name('form::' + internal)
     name_data = {'submit': utils.get_name('form::submit')}
-    cls_body = {'get_name': staticmethod(name_data.get), 'all_widgets': {}}
+    cls_body = {'get_name': staticmethod(get_name), 'all_widgets': {}}
     for k, name, v in data_spec:
         cls_body['all_widgets'][k] = type_widget_map[v]
         name_data[k] = name
     form_cls = type('LuaGetDataForm', (BaseForm,), cls_body)
-    return form_dialog(main.app.root, form_cls)  # noqa
+    common.destroy_all_children(main.app.center)
+    watcher = tk.Variable()
+    data = None
+    def cb(new):
+        nonlocal data
+        data = new
+        watcher.set('set')
+    main.app.on_next_reset.append(lambda: watcher.set('set'))
+    form = form_cls(main.app.center, None, cb)
+    form.frame.wait_variable(watcher)
+    return data
 
 
 def get_script_action(script_spec):
@@ -449,7 +466,8 @@ def get_script_action(script_spec):
             )()
         except core.BuchSchlossBaseError as e:
             tk_msg.showerror(e.title, e.message)
-        main.app.reset()
+        finally:
+            main.app.reset()
 
     return action
 
