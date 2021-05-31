@@ -66,7 +66,6 @@ if log_conf.file:
         raise ValueError('config.core.log.rotate.how had an invalid value')
 else:
     handler = logging.StreamHandler(sys.stdout)
-del log_conf
 # noinspection PyArgumentList
 logging.basicConfig(level=getattr(logging, config.core.log.level),
                     format='{asctime} - {levelname}: {msg}',
@@ -74,6 +73,7 @@ logging.basicConfig(level=getattr(logging, config.core.log.level),
                     style='{',
                     handlers=[handler],
                     )
+del handler, log_conf
 
 
 class ScriptPermissions(enum.Flag):
@@ -458,7 +458,7 @@ class ActionNamespace:
             checker = partial(check_level, level=level, resource=f.__qualname__)
             return type(func)(wrapper)  # func is the static/classmethod from outside
 
-        cls.actions = {'view_ns', 'view_repr', 'search'}  # implemented here
+        cls.actions = {'view_ns', 'search'}  # implemented here
         cls.required_levels = getattr(config.core.required_levels, cls.__name__)
         for name, func in vars(cls).items():
             # the exception
@@ -492,9 +492,19 @@ class ActionNamespace:
         """Return a namespace of information"""
         check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_ns')
         try:
-            return DataNamespace(cls, cls.model.get_by_id(id_), login_context)
+            r = DataNamespace(cls, cls.model.get_by_id(id_), login_context, True)
         except cls.model.DoesNotExist:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
+        else:
+            logging.info(f'{login_context} viewed {r}')
+            return r
+
+    @classmethod
+    def check_view_permissions(cls, login_context, data_ns=None):
+        """Check whether the login context has viewing permission and log"""
+        check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_ns')
+        if data_ns is not None:
+            logging.info(f'{login_context} viewed {data_ns}')
 
     @classmethod
     def search(cls, condition: tuple, *, login_context):
@@ -580,7 +590,8 @@ class ActionNamespace:
 
         query = cls.model.select_str_fields().distinct()
         result = handle_condition(condition, query)
-        return (DataNamespace(cls, value, login_context) for value in result)
+        logging.info(f'{login_context} searched {cls.__name__}')
+        return (DataNamespace(cls, value, login_context, True) for value in result)
 
 
 class Book(ActionNamespace):
@@ -1104,9 +1115,12 @@ class DataNamespace:
                  ans: T.Type[ActionNamespace],
                  raw_data: T.Any,
                  login_context: LoginContext,
+                 verified=False,
                  ):
         """initialize this namespace with data from the database"""
+        self._verified = verified
         self._data = raw_data
+        self._ans = ans
         self._handlers = self.data_handling[ans]
         self._attributes = frozenset.union(*map(frozenset, self._handlers.values()))
         self._login_context = login_context
@@ -1133,6 +1147,9 @@ class DataNamespace:
         return str(self._data)  # TODO: replace with something that calls utils.get_name
 
     def __getattr__(self, item):
+        if not self._verified:
+            self._ans.check_view_permissions(self._login_context, self)
+            self._verified = True
         if item == 'id':
             # Not making the same mistake twice
             return getattr(self._data, type(self._data).pk_name)
@@ -1172,7 +1189,7 @@ class DataNamespace:
             'wrap_dns': {'library': Library, 'borrow': Borrow},
         },
         Person: {
-            'allow': 'first_name last_name class_ max_borrow pay_date'.split(),
+            'allow': 'first_name last_name class_ max_borrow borrow_permission'.split(),
             'transform': {'borrows': lambda bs: bs.where(models.Borrow.is_back == False)},  # noqa
             'wrap_iter': {'libraries': Library, 'borrows': Borrow},
         },

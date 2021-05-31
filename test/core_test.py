@@ -133,6 +133,20 @@ def test_data_ns():
     assert {data: 'xyz'}[1] == 'xyz' == {1: 'xyz'}[data]
 
 
+def test_data_ns_handlers(db):
+    models.Library.create(name='name')
+    create_book('name')
+    create_person(123)
+    models.Borrow.create(person=123, book=1, return_date=datetime.date.today())
+    models.Member.create(name='name', level=3, password=b'', salt=b'')
+    models.Script.create(name='name', code='', storage={}, permissions=core.ScriptPermissions(0))
+    ids = {'Book': 1, 'Person': 123, 'Borrow': 1}
+    for ns in core.ActionNamespace.namespaces:
+        dns = getattr(core, ns).view_ns(ids.get(ns, 'name'), login_context=core.internal_unpriv_lc)
+        for k in dir(dns):
+            getattr(dns, k)
+
+
 def test_person_new(db):
     """test Person.new"""
     ctxt = for_levels(
