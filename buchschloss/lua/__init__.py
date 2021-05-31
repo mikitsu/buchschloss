@@ -33,13 +33,15 @@ def data_to_table(runtime, data):
 
 
 def table_to_data(table):
-    """convert a Lua table to a dict or a list"""
+    """Convert a Lua table to a dict or a list. Handle LuaDataNS <-> DataNS"""
     if lupa.lua_type(table) == 'table':
         keys = set(table.keys())
         if keys == set(range(1, len(keys) + 1)):
             return [table_to_data(t) for t in table.values()]
         else:
             return {k: table_to_data(v) for k, v in table.items()}
+    elif isinstance(table, objects.LuaDataNS):
+        return table.data_ns
     else:
         return table
 

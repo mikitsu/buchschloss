@@ -222,7 +222,7 @@ class Entry(FormWidget):
                              f' (widget {name} in {form})')
         self.on_empty = on_empty
         self.regex = re.compile(regex) if isinstance(regex, str) else regex
-        self.transform = lambda v: v if transform is None else transform
+        self.transform = (lambda v: v) if transform is None else transform
         self.autocomplete = autocomplete or {}
         self.widget = tk.Entry(self.master, **(extra_kwargs or {}))
         if max_history:
@@ -238,7 +238,12 @@ class Entry(FormWidget):
     def get(self):
         """delegate to self.widget.get() and handle on_empty=='none'"""
         v = self.widget.get()
-        return None if not v and self.on_empty == 'none' else self.transform(v)
+        if not v and self.on_empty == 'none':
+            return None
+        try:
+            return self.transform(v)
+        except ValueError:
+            return None
 
     def set(self, data):
         """delete current and insert new"""

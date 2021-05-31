@@ -9,11 +9,10 @@ import tkinter.messagebox as tk_msg
 import tkinter.font as tk_font
 import tkinter as tk
 from tkinter import ttk
-import types
 from functools import partial
 import sys
 import typing as T
-from typing import Type, MutableMapping
+from typing import MutableMapping
 
 from .. import core
 from .. import utils

@@ -203,9 +203,8 @@ class Checkbox(formlib.FormWidget):
 
     def get(self):
         """Return checkbutton state"""
-        if self.widget.state() == ('!alternate',):
+        if 'alternate' in self.widget.state():
             return None
-        assert self.widget.state() == ()
         return self.var.get()
 
     def set(self, data):
@@ -311,7 +310,11 @@ class LinkWidget(formlib.FormWidget):
             if self.attr is None:
                 arg = item
             else:
-                arg = getattr(item, self.attr)
+                try:
+                    arg = getattr(item, self.attr)
+                except core.BuchSchlossPermError as e:
+                    tk.Label(self.widget, text=e.message).pack()
+                    continue
             tk.Button(
                 self.widget,
                 wraplength=WRAPLENGTH,

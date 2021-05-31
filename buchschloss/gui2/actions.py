@@ -78,7 +78,9 @@ class SearchForm(BaseForm):
     def get_data(self):
         """ignore empty data"""
         if self.tag is FormTag.SEARCH:
-            return {k: v for k, v in super().get_data() if v or isinstance(v, bool)}
+            return {k: v
+                    for k, v in super().get_data().items()
+                    if v or isinstance(v, bool)}
         else:
             return super().get_data()
 
@@ -154,7 +156,11 @@ class ViewForm(BaseForm):
             w, *a, kw = ws[None]
             if issubclass(w, (SearchMultiChoice, OptionsFromSearch)):
                 ans = a[0] if a else kw.pop('action_ns')
-                new = (LinkWidget, ans, {'multiple': issubclass(w, SearchMultiChoice)})
+                new = (
+                    LinkWidget,
+                    partial(view_data, ans.__name__),
+                    {'multiple': issubclass(w, SearchMultiChoice)},
+                )
             elif issubclass(w, Checkbox):
                 new = (Checkbox, {'active': False})
             else:
@@ -240,7 +246,7 @@ def make_action(master: tk.Widget,
         return partial(view_action, master, ans)
     if func == 'search':
         view_func = partial(view_data, name)
-        middle_callback = partial(search_callback, master, view_func, ans.search)
+        middle_callback = partial(search_callback, master, view_func, ans)
         callback = partial(callback_adapter, middle_callback, False)
     else:
         callback = partial(callback_adapter, getattr(ans, func), True)
@@ -273,6 +279,7 @@ def show_results(master: tk.Widget,
         result_frame.pack()
         return view_func(result_frame, dns)
 
+    common.destroy_all_children(master)
     search_frame = tk.Frame(master)
     search_frame.pack()
     search_show()
@@ -330,8 +337,13 @@ def view_data(name: str, master: tk.Widget, dns: core.DataNamespace):
         child.destroy()
     form_cls: Type[BaseForm] = globals()[name.capitalize() + 'Form']
     form = form_cls(master, FormTag.VIEW, lambda **kw: None)
-    form.set_data({k: getattr(dns, k) for k in dir(dns)})  # TODO: make DataNS a mapping
-    print('viewing', dns)
+    try:
+        form.set_data({k: getattr(dns, k) for k in dir(dns)})  # TODO: make DataNS a mapping
+    except core.BuchSchlossBaseError as e:
+        tk_msg.showerror(e.title, e.message)
+    except Exception:
+        tk_msg.showerror(None, utils.get_name('unexpected_error'))
+        raise
 
 
 def view_action(master: tk.Widget, ans: common.NSWithLogin):
@@ -465,7 +477,7 @@ def book_search(condition):
 @common.NSWithLogin.override('Borrow', 'restitute')
 def borrow_restitute(book):
     core.Borrow.edit(
-        common.NSWithLogin(core.Book).view_ns(book),
+        common.NSWithLogin(core.Book).view_ns(book).borrow,
         is_back=True,
         login_context=main.app.current_login,
     )
@@ -474,7 +486,7 @@ def borrow_restitute(book):
 @common.NSWithLogin.override('Borrow', 'extend')
 def borrow_extend(book, weeks):
     core.Borrow.edit(
-        common.NSWithLogin(core.Book).view_ns(book),
+        common.NSWithLogin(core.Book).view_ns(book).borrow,
         weeks=weeks,
         login_context=main.app.current_login,
     )
@@ -527,13 +539,15 @@ class PersonForm(SearchForm, EditForm, ViewForm):
         'borrows': {FormTag.VIEW: (
             LinkWidget,
             partial(view_data, 'book'),
-            {'attr': 'book'},
+            {'attr': 'book', 'multiple': True},
         )},
         'libraries': (SearchMultiChoice, Library, {}),
         'pay': {
             FormTag.SEARCH: None,
+            FormTag.VIEW: None,
             None: Checkbox,
         },
+        'borrow_permission': {FormTag.VIEW: DisplayWidget},
     }
 
 
@@ -606,7 +620,8 @@ class BorrowRestituteForm(BaseForm):
 
 class BorrowExtendForm(BaseForm):
     all_widgets = {
-        'book': (OptionsFromSearch, Book, {}),
+        'book': (OptionsFromSearch, Book,
+                 {'condition': ('borrow.is_back', 'eq', False)}),
         'weeks': IntEntry,
     }
 

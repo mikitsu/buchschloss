@@ -297,7 +297,9 @@ def from_db(*arguments: T.Type[models.Model], **keyword_arguments: T.Type[models
             with models.db.atomic():
                 for k, m in keyword_arguments.items():
                     arg = bound.arguments[k]
-                    if not isinstance(arg, m):  # allow direct passing
+                    if isinstance(arg, DataNamespace):
+                        arg = arg._data
+                    if not isinstance(arg, m):
                         try:
                             bound.arguments[k] = m.get_by_id(arg)
                         except m.DoesNotExist:
@@ -884,6 +886,7 @@ class Borrow(ActionNamespace):
             login_context, book, person, rdate, override * ' with override=True'))
 
     @staticmethod
+    @from_db(models.Borrow)
     def edit(borrow, *,
              login_context,
              is_back: bool = None,
@@ -892,37 +895,15 @@ class Borrow(ActionNamespace):
              ):
         """Edit a Borrow
 
-        :param borrow: is either a Borrow DataNS, a Borrow ID or a Book DataNS
+        :param borrow: is either a Borrow DataNS or a Borrow ID
         :param is_back: whether the book was returned
         :param return_date: the date on which the book has to be returned
-        :param weeks: the number of weeks to extend borrowing time
+        :param weeks: the number of weeks to extend borrowing time (from today on)
 
         :raise BuchSchlossBaseError: if ``borrow`` is a Book DataNS whose .borrow is None
 
         ``weeks`` and ``return_date`` may not be given together
         """
-        err = TypeError('``borrow`` must be a borrow ID or a Book or Borrow DataNS')
-        if isinstance(borrow, int):
-            try:
-                borrow = models.Borrow.get_by_id(borrow)
-            except models.Borrow.DoesNotExist:
-                raise BuchSchlossNotFoundError('Borrow', borrow)
-        else:  # is DataNamespace
-            try:
-                borrow = borrow._data  # noqa
-            except AttributeError:
-                raise err
-            if isinstance(borrow, models.Book):  # noqa
-                # here, ``borrow`` is, in fact, a Book DataNS
-                if borrow.borrow is None:
-                    raise BuchSchlossError(
-                        'Borrow::not_borrowed', 'Borrow::{}_not_borrowed', borrow.id)
-                borrow = borrow.borrow
-            elif isinstance(borrow, models.Borrow):
-                borrow = borrow
-            else:
-                raise err
-
         if return_date is not None and weeks is not None:
             raise TypeError('``return_date`` and ``weeks`` may not both be given')
         if weeks is not None:
