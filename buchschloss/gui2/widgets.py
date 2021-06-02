@@ -41,15 +41,17 @@ class OptionsFromSearch(formlib.DropdownChoices):
             if setter:
                 raise ValueError('``setter`` and ``allow_none`` are mutually exclusive')
             values.insert(0, (None, ''))
+        if setter:
+            self._update_values = self._update_values_with_set
         super().__init__(form, master, name, values, default=default)
         if setter:
             self.widget.bind('<<ComboboxSelected>>', self._do_set)
-            self._update_values = self._update_values_with_set
 
     def _update_values_with_set(self, new_value):
-        super()._update_values(new_value)
+        r = super()._update_values(new_value)
         if len(self.widget['values']) == 1:
             self._do_set()
+        return r
 
     def _do_set(self, event=None):  # noqa
         """Call .set() on the form with a .view_ns result"""
