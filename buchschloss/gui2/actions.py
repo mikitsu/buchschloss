@@ -579,7 +579,8 @@ class MemberForm(AuthedForm, SearchForm, EditForm, ViewForm):
 
 class MemberChangePasswordForm(AuthedForm):
     all_widgets = {
-        'member': NonEmptyREntry,
+        'member': (OptionsFromSearch, common.NSWithLogin(core.Member), {}),
+        'current_password': PasswordEntry,
         'new_password': ConfirmedPasswordInput,
     }
 

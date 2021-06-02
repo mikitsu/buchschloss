@@ -13,7 +13,7 @@ try:
     from . import config
 except ImportError:
     try:
-        from buchschloss import config
+        import config
     except ImportError:
         config = None
 if __name__ != '__main__':
@@ -270,16 +270,16 @@ if __name__ == '__main__':
           'and initialize them with basic data. Proceed? (y/n)')
     if not input().lower().startswith('y'):
         sys.exit()
+    import hashlib
+    if config is not None:
+        iterations = config.core.hash_iterations[0]
+    else:
+        iterations = int(input('iteration count -> '))
+    password = hashlib.pbkdf2_hmac('sha256', b'Pa$$w0rd', b'', iterations)
     db.create_tables(models)
     print('created tables...')
     Misc.create(pk='last_script_invocations', data={})
-    Member.create(name='SAdmin',
-                  password=b'\xd2Kf\xef#o\xba\xe2\x84i\x896\x13\x99\x80\x94P\xd4'
-                           b'\xab\x10n\xeaB\xda\x8c\xbf\xf9\x7f\xd4\xe7\x80\x87',
-                  salt=b'{\x7f\xa5\xe7\x07\x1e>\xdf$\xc6\x8cX\xe6\x15J\x8ds\x88'
-                       b'\x9d2}9\x98\x9b)x]\x8cc\x8a\xcb\xc8\x8aO\xb3y%g\x9d'
-                       b'\x94\xd8\x03m\xec$V\xfa\xcdW3',
-                  level=4)
+    Member.create(name='SAdmin', password=password, salt=b'', level=4)
     Library.create(name='main')
     print('Finished. Press return to exit')
     input()

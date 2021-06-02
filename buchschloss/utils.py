@@ -81,17 +81,18 @@ def check_isbn(isbn: str) -> int:
             digits.append(10)
     if len(digits) == 9:
         digits.insert(0, 0)
+    del isbn
     # check the checksum
     get_weighted_digits = functools.partial(zip, itertools.cycle((1, 3)))
     if len(digits) == 10:
-        if (sum((10 - i) * x for i, x in enumerate(isbn)) % 11
-                or sum(i * x for i, x in enumerate(isbn, 1)) % 11):
+        if (sum((10 - i) * x for i, x in enumerate(digits)) % 11
+                or sum(i * x for i, x in enumerate(digits, 1)) % 11):
             raise ValueError('checksum mismatch')
         else:
             digits = [9, 7, 8] + digits[:-1]
             digits.append(-sum(w * d for w, d in get_weighted_digits(digits)) % 10)
     elif len(digits) == 13:
-        if sum(w * d for w, d in get_weighted_digits(isbn)) % 10:
+        if sum(w * d for w, d in get_weighted_digits(digits)) % 10:
             raise ValueError('checksum mismatch')
     else:
         raise ValueError(f'ISBN has {len(digits)} digits, not 10 or 13')

@@ -142,7 +142,6 @@ def get_actions(master, spec):
     r = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
     for k, v in spec.items():
         cur_r: MutableMapping = functools.reduce(operator.getitem, k.split('::')[:-1], r)  # noqa
-        k = k.split('::')[-1]
         if v['type'] != 'gui2':
             cur_r[k] = actions.get_script_action(v)
             continue
@@ -157,7 +156,7 @@ def get_actions(master, spec):
         ] + ['view']
         if function is None:
             for a in gui2_actions:
-                cur_r[k][a] = actions.make_action(master, name, a)
+                cur_r[k][f'{k}::{a}'] = actions.make_action(master, name, a)
         elif function in gui2_actions:
             assert isinstance(cur_r, collections.defaultdict)
             cur_r[k] = actions.make_action(master, name, function)
