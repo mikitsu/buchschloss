@@ -110,22 +110,19 @@ class LuaActionNS(LuaObject):
 class LuaDataNS(LuaObject):
     """provide access to data as returned by view_ns"""
 
-    def __init__(self, data_ns, **kwargs):
+    def __init__(self, data_ns: 'core.DataNamespace', **kwargs):
         super().__init__(**kwargs)
         self.data_ns = data_ns
-        self._data = data_ns._data  # noqa: be core.DataNS for core.Borrow.edit
 
     def __repr__(self):
-        return str(self.data_ns)
+        return self.data_ns.string
 
     def lua_get(self, name):
         """return data values, re-wrapping if necessary"""
         if name == '__str__':
-            return str(self.data_ns)
-        elif name.startswith('_'):
-            raise LuaAccessForbidden(self, name)
+            return repr(self)
         else:
-            val = getattr(self.data_ns, name)
+            val = self.data_ns[name]
             if isinstance(val, core.DataNamespace):
                 return LuaDataNS(val, runtime=self.runtime)
             elif (isinstance(val, T.Sequence)

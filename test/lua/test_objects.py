@@ -65,7 +65,7 @@ def test_action_ns():
     def view_ns(a, *, login_context):
         assert login_context is FLAG
         if a == 1:
-            return Dummy(a=FLAG)
+            return {'a': FLAG}
         else:
             raise core.BuchSchlossBaseError('', '')
 
@@ -98,8 +98,8 @@ def test_action_ns():
 
 def test_data_ns(monkeypatch):
     """test LuaDataNS"""
-    monkeypatch.setattr(core, 'DataNamespace', Dummy)
-    data = Dummy(a=1, b=Dummy(x=1), c=[Dummy(x=2), Dummy(x=3)])
+    monkeypatch.setattr(core, 'DataNamespace', dict)
+    data = {'a': 1, 'b': {'x': 1}, 'c': [{'x': 2}, {'x': 3}]}
     rt = lupa.LuaRuntime(attribute_handlers=(lua.lua_get, lua.lua_set))  # noqa
     rt.globals()['ldn'] = objects.LuaDataNS(data, runtime=rt)
     assert rt.eval('type(ldn)') == 'userdata'

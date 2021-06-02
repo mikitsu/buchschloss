@@ -5,6 +5,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox as tk_msg
 from functools import partial
+from typing import Callable, Any, Optional
 
 from ..misc import tkstuff as mtk
 
@@ -35,7 +36,7 @@ class OptionsFromSearch(formlib.DropdownChoices):
         The parameters ``allow_none`` and ``setter`` are mutually exclusive.
         """
         self.action_ns = action_ns
-        values = [(o.id, str(o)) for o in action_ns.search(condition)]
+        values = [(o['id'], o.string) for o in action_ns.search(condition)]
         if allow_none:
             if setter:
                 raise ValueError('``setter`` and ``allow_none`` are mutually exclusive')
@@ -53,7 +54,7 @@ class OptionsFromSearch(formlib.DropdownChoices):
     def _do_set(self, event=None):  # noqa
         """Call .set() on the form with a .view_ns result"""
         result = self.action_ns.view_ns(self.get())
-        self.form.set_data({k: getattr(result, k) for k in dir(result) if k != self.name})
+        self.form.set_data({k: v for k, v in result.items() if k != self.name})
 
 
 class SeriesInput(formlib.FormWidget):
@@ -235,7 +236,7 @@ class SearchMultiChoice(MultiChoicePopup):
         # This isn't a function returning a tuple that uses
         # the function providable for options to allow ViewForm
         # to treat this differently than other MultiChoicePopups
-        values = [(o.id, str(o)) for o in action_ns.search(condition)]
+        values = [(o['id'], o.string) for o in action_ns.search(condition)]
         super().__init__(form, master, name, values)
 
 
@@ -288,7 +289,11 @@ class DisplayWidget(formlib.FormWidget):
 class LinkWidget(formlib.FormWidget):
     """Display a button that opens an info display when clicked"""
     def __init__(self, form, master, name,
-                 view_func, attr=None, display=str, multiple=False):
+                 view_func: Callable[[tk.Widget, Any], None],
+                 attr: Optional[str] = None,
+                 display: Callable[[Any], str] = operator.attrgetter('string'),
+                 multiple: bool = False,
+                 ):
         assert callable(view_func), (form, name, view_func)
         super().__init__(form, master, name)
         self.attr = attr

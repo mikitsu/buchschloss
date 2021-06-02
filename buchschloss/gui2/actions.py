@@ -322,7 +322,7 @@ def search_callback(master: tk.Widget,
 
     def wrapped_view(view_master, dns):
         """wrap to get a complete DataNS"""
-        return view_func(view_master, ans.view_ns(dns.id))
+        return view_func(view_master, ans.view_ns(dns['id']))
 
     show_results(master, tuple(ans.search(q)), wrapped_view)
 
@@ -339,7 +339,7 @@ def view_data(name: str, master: tk.Widget, dns: core.DataNamespace):
     form_cls: Type[BaseForm] = globals()[name.capitalize() + 'Form']
     form = form_cls(master, FormTag.VIEW, lambda **kw: None)
     try:
-        form.set_data({k: getattr(dns, k) for k in dir(dns)})  # TODO: make DataNS a mapping
+        form.set_data(dns)
     except core.BuchSchlossBaseError as e:
         tk_msg.showerror(e.title, e.message)
     except Exception:

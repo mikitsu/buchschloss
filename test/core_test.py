@@ -102,14 +102,18 @@ def test_misc_data(db):
 
 def test_data_ns():
     FLAG = object()
-    class DataA(core.Dummy): pk_name = 'a'
+    class DataA(core.Dummy):
+        pk_name = 'a'
+        @staticmethod
+        def check_view_permissions(lc, dns):
+            pass
     class DataB(core.Dummy): pass
 
     def validate_datab(data_val, x_val):
         assert isinstance(data_val, core.DataNamespace)
-        assert data_val._handlers == {'allow': 'ad'}
-        assert data_val._login_context is FLAG
-        assert data_val._data.x == x_val
+        assert data_val.handlers == {'allow': 'ad'}
+        assert data_val.login_context is FLAG
+        assert data_val.data.x == x_val
 
     core.DataNamespace.data_handling[DataA] = {
         'allow': 'ab',
@@ -124,11 +128,11 @@ def test_data_ns():
               g=[DataB(x=5), DataB(x=7)]),
         login_context=FLAG,
     )
-    assert data.a == 1
-    assert data.b == [1, 2, 3]
-    validate_datab(data.d, 0)
-    validate_datab(data.i[0], 1)
-    assert data.g == [5, 7]
+    assert data['a'] == 1
+    assert data['b'] == [1, 2, 3]
+    validate_datab(data['d'], 0)
+    validate_datab(data['i'][0], 1)
+    assert data['g'] == [5, 7]
     assert data == 1
     assert {data: 'xyz'}[1] == 'xyz' == {1: 'xyz'}[data]
 
@@ -143,8 +147,8 @@ def test_data_ns_handlers(db):
     ids = {'Book': 1, 'Person': 123, 'Borrow': 1}
     for ns in core.ActionNamespace.namespaces:
         dns = getattr(core, ns).view_ns(ids.get(ns, 'name'), login_context=core.internal_unpriv_lc)
-        for k in dir(dns):
-            getattr(dns, k)
+        for k in dns:
+            dns[k]
 
 
 def test_person_new(db):
@@ -475,8 +479,16 @@ def test_borrow_edit(db):
 def test_search(db):
     """test searches"""
     models.Library.create(name='main')
-    book_1 = core.DataNamespace(core.Book, create_book(author='author name', genres=('one', 'two')), None)
-    book_2 = core.DataNamespace(core.Book, create_book(author='author 2', year=2000), None)
+    book_1 = core.DataNamespace(
+        core.Book,
+        create_book(author='author name', genres=('one', 'two')),
+        core.internal_unpriv_lc,
+    )
+    book_2 = core.DataNamespace(
+        core.Book,
+        create_book(author='author 2', year=2000),
+        core.internal_unpriv_lc,
+    )
     person = core.DataNamespace(core.Person, create_person(123, class_='cls', libraries=['main']), None)
     ctxt_person = for_levels(partial(core.Person.search, ()), 1)
     person_search = partial(core.Person.search, login_context=ctxt_person)

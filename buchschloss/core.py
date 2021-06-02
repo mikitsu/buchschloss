@@ -10,7 +10,7 @@ __all__ exports:
         dealing with the respective objects
     - ScriptPermissions: flag enum of script permissions
 """
-
+import collections.abc
 import inspect
 import itertools
 import string
@@ -298,7 +298,7 @@ def from_db(*arguments: T.Type[models.Model], **keyword_arguments: T.Type[models
                 for k, m in keyword_arguments.items():
                     arg = bound.arguments[k]
                     if isinstance(arg, DataNamespace):
-                        arg = arg._data
+                        arg = arg.data
                     if not isinstance(arg, m):
                         try:
                             bound.arguments[k] = m.get_by_id(arg)
@@ -336,7 +336,7 @@ def auth_required(f):
                 status = 'unprivileged_login_context'
         elif login_context.type is LoginType.SCRIPT:
             data = Script.view_ns(login_context.name, login_context=internal_priv_lc)  # noqa
-            if ScriptPermissions.AUTH_GRANTED not in data.permissions:
+            if ScriptPermissions.AUTH_GRANTED not in data['permissions']:
                 status = 'no_script_perms'
         elif login_context.type is LoginType.MEMBER:
             if current_password is None:
@@ -1066,7 +1066,7 @@ class Script(ActionNamespace):
         if ScriptPermissions.STORE in script.permissions:
             edit_func = partial(Script.edit, script.name, login_context=internal_priv_lc)
             add_storage = (
-                lambda: Script.view_ns(script.name, login_context=internal_priv_lc).storage,
+                lambda: Script.view_ns(script.name, login_context=internal_priv_lc)['storage'],
                 lambda data: edit_func(storage=data),
             )
         else:
@@ -1090,7 +1090,7 @@ class Script(ActionNamespace):
             raise BuchSchlossError('Script::execute', 'script_{}_exec_problem', display)
 
 
-class DataNamespace:
+class DataNamespace(T.Mapping[str, T.Any]):
     """class for data namespaces returned by view_ns"""
     def __init__(self,
                  ans: T.Type[ActionNamespace],
@@ -1099,60 +1099,60 @@ class DataNamespace:
                  verified=False,
                  ):
         """initialize this namespace with data from the database"""
-        self._verified = verified
-        self._data = raw_data
-        self._ans = ans
-        self._handlers = self.data_handling[ans]
-        self._attributes = frozenset.union(*map(frozenset, self._handlers.values()))
-        self._login_context = login_context
+        self.verified = verified
+        self.data = raw_data
+        self.ans = ans
+        self.handlers = self.data_handling[ans]
+        self.attributes = frozenset.union(*map(frozenset, self.handlers.values()))
+        self.login_context = login_context
+        self.string = str(self.data)  # TODO: replace with a call to utils.get_name
 
     def __eq__(self, other):
         if isinstance(other, DataNamespace):
-            return self._data == other._data
-        elif isinstance(other, type(self.id)):
-            return self.id == other
+            return self.data == other.data
+        elif isinstance(other, type(self['id'])):
+            return self['id'] == other
         else:
             return NotImplemented
 
-    def __dir__(self) -> T.Iterable[str]:
-        return set(itertools.chain(
-            super().__dir__(),
-            ['id'],  # some already have it -> set
-            *self._handlers.values(),
-        ))
+    def __len__(self):
+        return len(tuple(self))
+
+    def __iter__(self):
+        return iter({'id', *itertools.chain.from_iterable(self.handlers.values())})
 
     def __hash__(self):
-        return hash(self.id)
+        return hash(self['id'])
 
     def __str__(self):
-        return str(self._data)  # TODO: replace with something that calls utils.get_name
+        return str(self.data)
 
-    def __getattr__(self, item):
-        if not self._verified:
-            self._ans.check_view_permissions(self._login_context, self)
-            self._verified = True
+    def __getitem__(self, item):
+        if not self.verified:
+            self.ans.check_view_permissions(self.login_context, self)
+            self.verified = True
         if item == 'id':
             # Not making the same mistake twice
-            return getattr(self._data, type(self._data).pk_name)
-        elif item in self._attributes:
-            obj = getattr(self._data, item)
+            return getattr(self.data, type(self.data).pk_name)
+        elif item in self.attributes:
+            obj = getattr(self.data, item)
         else:
-            raise AttributeError("DataNamespace object has no attribute '%s'" % item)
-        if item in self._handlers.get('transform', {}):
-            obj = self._handlers['transform'][item](obj)
-        if item in self._handlers.get('wrap_iter', {}):
+            raise KeyError(f"DataNamespace of {self.ans!r} has no key '{item}'")
+        if item in self.handlers.get('transform', {}):
+            obj = self.handlers['transform'][item](obj)
+        if item in self.handlers.get('wrap_iter', {}):
             new_dns = partial(type(self),
-                              self._handlers['wrap_iter'][item],
-                              login_context=self._login_context)
+                              self.handlers['wrap_iter'][item],
+                              login_context=self.login_context)
             return tuple(map(new_dns, obj))
-        elif item in self._handlers.get('wrap_dns', {}):
+        elif item in self.handlers.get('wrap_dns', {}):
             if obj is None:
                 return None
             else:
                 return type(self)(
-                    self._handlers['wrap_dns'][item],
+                    self.handlers['wrap_dns'][item],
                     obj,
-                    login_context=self._login_context,
+                    login_context=self.login_context,
                 )
         else:  # allow + transform without wrapping
             return obj

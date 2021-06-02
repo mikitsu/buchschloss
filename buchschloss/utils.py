@@ -173,11 +173,10 @@ def get_book_data(isbn: int):
     except StopIteration:
         pass
     else:
-        new_data = core.Book.view_str(book.id, login_context=core.internal_priv_lc)
-        for k in 'id status return_date borrowed_by_id __str__ borrowed_by'.split():
-            del new_data[k]
-        data.update(new_data)
-
+        new_data = core.Book.view_ns(book['id'], login_context=core.internal_priv_lc)
+        data.update({k: v for k, v in new_data.items()})
+    for k in ('id', 'borrow', 'is_active'):
+        data.pop(k, None)
     return data
 
 
