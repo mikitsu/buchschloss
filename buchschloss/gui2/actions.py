@@ -643,7 +643,12 @@ class BorrowSearchForm(SearchForm):
 class ScriptForm(AuthedForm, SearchForm, EditForm, ViewForm):
     all_widgets = {
         'name': ScriptNameEntry,
-        'permissions': (FlagEnumMultiChoice, core.ScriptPermissions, {}),
+        'permissions': {
+            None: (MultiChoicePopup, [
+                (p.name, utils.get_name('script::permissions::' + p.name))
+                for p in core.ScriptPermissions], {}),
+            FormTag.VIEW: (DisplayWidget, 'list', {'get_name': 'script::permissions::'}),
+        },
         'setlevel': (DropdownChoices,
                      ((None, '-----'), *utils.level_names.items()), {}),
         'code': {

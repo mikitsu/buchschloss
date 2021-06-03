@@ -505,7 +505,7 @@ def test_script_new(db):
         name='test-script',
         code='this should be valid Lua code',
         setlevel=3,
-        permissions=core.ScriptPermissions(3)),
+        permissions=['AUTH_GRANTED', 'REQUESTS']),
         4,
     )
     script_new = partial(core.Script.new, login_context=ctxt)
@@ -516,14 +516,14 @@ def test_script_new(db):
     assert script.storage == {}
     assert script.permissions is core.ScriptPermissions(3)
     script_new(name='with-setlevel-none', code='mode Lua code',
-               permissions=core.ScriptPermissions(0), setlevel=None)
+               permissions=(), setlevel=None)
     assert models.Script.get_by_id('with-setlevel-none').setlevel is None
     with pytest.raises(core.BuchSchlossBaseError):
         script_new(name='test-script', code='with the same name',
-                   permissions=core.ScriptPermissions(0), setlevel=None)
+                   permissions=(), setlevel=None)
     with pytest.raises(ValueError):
         script_new(name='contains:invalid"chars', code='',
-                   permissions=core.ScriptPermissions(0), setlevel=None)
+                   permissions=(), setlevel=None)
 
 
 def test_script_edit(db):
@@ -545,6 +545,10 @@ def test_script_edit(db):
         script_edit('name', unknown='attribute')
     with pytest.raises(core.BuchSchlossBaseError):
         script_edit('unknown', code='blah')
+    script_edit('name', permissions=['STORE'])
+    assert models.Script.get_by_id('name').permissions is core.ScriptPermissions.STORE
+    script_edit('name', permissions=['REQUESTS'])
+    assert models.Script.get_by_id('name').permissions is core.ScriptPermissions.REQUESTS
 
 
 def test_script_execute(db, monkeypatch):

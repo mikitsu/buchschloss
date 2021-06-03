@@ -10,6 +10,7 @@ __all__ exports:
         dealing with the respective objects
     - ScriptPermissions: flag enum of script permissions
 """
+import functools
 import inspect
 import itertools
 import string
@@ -327,8 +328,9 @@ def auth_required(f):
             if not login_context.level:
                 status = 'unprivileged_login_context'
         elif login_context.type is LoginType.SCRIPT:
-            data = Script.view_ns(login_context.name, login_context=internal_priv_lc)  # noqa
-            if ScriptPermissions.AUTH_GRANTED not in data['permissions']:
+            perms = (models.Script.select(models.Script.permissions)
+                     .where(name=login_context.name).get().permissions)  # noqa -- scritp LC has name
+            if ScriptPermissions.AUTH_GRANTED not in perms:
                 status = 'no_script_perms'
         elif login_context.type is LoginType.MEMBER:
             if current_password is None:
@@ -438,6 +440,8 @@ class ActionNamespace:
         cls.actions = {'view_ns', 'search'}  # implemented here
         cls.required_levels = getattr(config.core.required_levels, cls.__name__)
         for name, func in vars(cls).items():
+            if name.startswith('_'):
+                continue
             # the exception
             if (cls.__name__, name) == ('Member', 'change_password'):
                 cls.actions.add(name)
@@ -936,19 +940,29 @@ class Script(ActionNamespace):
     allowed_chars = set(string.ascii_letters + string.digits + ' _-')
     callbacks = None
 
+    @staticmethod
+    def _transform_permissions(perms):
+        """create a ScriptPermissions form an iterable of names"""
+        return functools.reduce(
+            operator.or_,
+            (ScriptPermissions[p] for p in perms),
+            ScriptPermissions(0),
+        )
+
     @classmethod
     @auth_required
     def new(cls, *,
             name: str,
             code: str,
             setlevel: T.Optional[int],
-            permissions: ScriptPermissions,
+            permissions: T.Iterable[str],
             login_context: LoginContext):
         """create a new script with the given arguments
 
         raise a BuchSchlossError if a script with the names name already exists
         see models.Script for details on arguments
         """
+        permissions = cls._transform_permissions(permissions)
         if not name:
             raise ValueError('Name is empty')
         if not set(name) <= cls.allowed_chars:
@@ -975,6 +989,8 @@ class Script(ActionNamespace):
         """edit a script"""
         if not set(kwargs) <= cls._model_fields or 'name' in kwargs:
             raise TypeError('unexpected kwarg')
+        if 'permissions' in kwargs:
+            kwargs['permissions'] = cls._transform_permissions(kwargs['permissions'])
         for k, v in kwargs.items():
             setattr(script, k, v)
         script.save()
@@ -1128,7 +1144,10 @@ class DataNamespace(T.Mapping[str, T.Any]):
             'allow': ('name', 'level'),
         },
         Script: {
-            'allow': ('name', 'code', 'setlevel', 'permissions', 'storage'),
+            'allow': ('name', 'code', 'setlevel', 'storage'),
+            'transform': {
+                'permissions': lambda ps: [p.name for p in ScriptPermissions if p in ps],
+            },
         },
     }
 
