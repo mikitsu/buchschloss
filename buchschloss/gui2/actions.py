@@ -64,7 +64,6 @@ class BaseForm(LibForm):
             items = ('form', self.form_name, self.tag.name, name)
         else:
             items = ('form', self.form_name, name)
-        print(name, items, utils.get_name('::'.join(items)))
         return utils.get_name('::'.join(items))
 
 
@@ -505,7 +504,7 @@ def book_search(condition):
 @common.NSWithLogin.override('Borrow', 'restitute')
 def borrow_restitute(book):
     core.Borrow.edit(
-        common.NSWithLogin(core.Book).view_ns(book).borrow,
+        common.NSWithLogin(core.Book).view_ns(book)['borrow'],
         is_back=True,
         login_context=main.app.current_login,
     )
@@ -514,7 +513,7 @@ def borrow_restitute(book):
 @common.NSWithLogin.override('Borrow', 'extend')
 def borrow_extend(book, weeks):
     core.Borrow.edit(
-        common.NSWithLogin(core.Book).view_ns(book).borrow,
+        common.NSWithLogin(core.Book).view_ns(book)['borrow'],
         weeks=weeks,
         login_context=main.app.current_login,
     )
@@ -544,9 +543,9 @@ class BookForm(SearchForm, EditForm, ViewForm):
             partial(view_data, 'person'),
             {'attr': 'person'},
         )},
-        'genres': (MultiChoicePopup, lambda: Book.get_all_genres(), {}),
+        'genres': (MultiChoicePopup, lambda: Book.get_all_genres(), {'new': True}),
         'library': (OptionsFromSearch, Library, {}),
-        'groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {}),
+        'groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {'new': True}),
         'shelf': NonEmptyREntry,
     }
 
