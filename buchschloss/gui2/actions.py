@@ -600,17 +600,14 @@ class LibraryForm(SearchForm, EditForm, ViewForm):
 
 
 class BorrowForm(ViewForm):
+    # NOTE: this form is actually only used for NEW and VIEW
+    # EDIT is split into restitute + extend, SEARCH is separate
     all_widgets = {
-        'person': {
-            FormTag.VIEW: (LinkWidget, partial(view_data, 'person'), {}),
-            None: (OptionsFromSearch, Person, {}),
-        },
-        'book': {
-            FormTag.VIEW: (LinkWidget, partial(view_data, 'book'), {}),
-            None: (OptionsFromSearch, Book, {}),
-        },
-        'weeks': IntEntry,
-        'override': Checkbox,
+        'person': (OptionsFromSearch, Person, {}),
+        'book': (OptionsFromSearch, Book, {}),
+        'weeks': {FormTag.NEW: IntEntry},
+        'override': {FormTag.NEW: Checkbox},
+        'return_date': {FormTag.VIEW: DisplayWidget},
     }
 
 

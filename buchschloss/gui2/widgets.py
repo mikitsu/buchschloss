@@ -318,7 +318,7 @@ class LinkWidget(formlib.FormWidget):
                 arg = item
             else:
                 try:
-                    arg = getattr(item, self.attr)
+                    arg = item[self.attr]
                 except core.BuchSchlossPermError as e:
                     tk.Label(self.widget, text=e.message).pack()
                     continue
