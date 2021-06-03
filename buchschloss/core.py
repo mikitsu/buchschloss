@@ -365,9 +365,7 @@ def auth_required(f):
     LoginContexts as well as SCRIPT LoginContexts without
     the AUTH_GRANTED permission.
     """), doc_indent)
-    auth_required.functions.append(f.__qualname__)
     return auth_required_wrapper
-auth_required.functions = []  # noqa
 
 
 def authenticate(m, password):
