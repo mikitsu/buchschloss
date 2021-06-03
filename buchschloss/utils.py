@@ -166,7 +166,10 @@ def get_book_data(isbn: int):
 
     data = {}
     for spec in config.utils.book_data_scripts:
-        get_data_from_script(spec)
+        try:
+            get_data_from_script(spec)
+        except core.BuchSchlossBaseError as e:
+            logging.warning(f'Error "{e.title}" fetching data for {isbn}: {e.message}')
     try:
         book = next(iter(core.Book.search(
             ('isbn', 'eq', isbn), login_context=core.internal_priv_lc)))

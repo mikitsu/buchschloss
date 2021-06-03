@@ -7,7 +7,7 @@ from tkinter import ttk
 import tkinter.messagebox as tk_msg
 import tkinter.font as tk_font
 from functools import partial
-from typing import Type, Callable, Optional, Sequence, Mapping
+from typing import Type, Callable, Optional, Sequence, Mapping, Any
 
 from . import main
 from . import common
@@ -20,7 +20,7 @@ from .widgets import (
     SearchResultWidget,
     # generic form widgets and form widget tuples
     NonEmptyEntry, NonEmptyREntry, PasswordEntry, IntEntry, NullREntry, Text,
-    ConfirmedPasswordInput, Checkbox, FlagEnumMultiChoice, MultiChoicePopup,
+    ConfirmedPasswordInput, Checkbox, MultiChoicePopup,
     # specific form widgets and form widget tuples
     SeriesInput, ISBNEntry, ClassEntry, ScriptNameEntry,
     # complex form widgets
@@ -69,12 +69,22 @@ class BaseForm(LibForm):
 
 
 class SearchForm(BaseForm):
-    """Add search options (and/or) + exact matching"""
-    all_widgets = {
+    """Add search options (and/or) + exact matching and adapt widgets"""
+    # PyCharm seems not to inherit the hint...
+    all_widgets: 'dict[str, dict[Any, Optional[tuple]]]' = {
         'search_mode': {FormTag.SEARCH: (
             RadioChoices, [(c, utils.get_name(c)) for c in ('and', 'or')], {})},
         'exact_match': {FormTag.SEARCH: Checkbox},
     }
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for ws in cls.all_widgets.values():
+            if ws[None] is not None:
+                w, *a, kw = ws[None]
+                if issubclass(w, (Checkbox, OptionsFromSearch)):
+                    kw = {**kw, 'allow_none': True}
+                    ws.setdefault(FormTag.SEARCH, (w, *a, kw))
 
     def get_data(self):
         """ignore empty data"""
@@ -397,11 +407,11 @@ def display_lua_data(data):
     view.column('#0', width=width)
     if height > view['height']:
         sb = tk.Scrollbar(popup, command=view.yview, orient=tk.VERTICAL)
-        sb.grid(row=0, column=1, anchor=tk.NS)
+        sb.grid(row=0, column=1, sticky=tk.NS)
         view['yscrollcommand'] = sb.set
     if width > config.gui2.widget_size.popup.width:
         sb = tk.Scrollbar(popup, command=view.xview, orient=tk.HORIZONTAL)
-        sb.grid(row=1, column=0, anchor=tk.EW)
+        sb.grid(row=1, column=0, sticky=tk.EW)
         view['xscrollcommand'] = sb.set
     tk.Button(popup, command=popup.destroy, text='OK').pack()
 
@@ -535,10 +545,7 @@ class BookForm(SearchForm, EditForm, ViewForm):
             {'attr': 'person'},
         )},
         'genres': (MultiChoicePopup, lambda: Book.get_all_genres(), {}),
-        'library': {
-            None: (OptionsFromSearch, Library, {}),
-            FormTag.SEARCH: (OptionsFromSearch, Library, {'allow_none': True}),
-        },
+        'library': (OptionsFromSearch, Library, {}),
         'groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {}),
         'shelf': NonEmptyREntry,
     }
@@ -630,7 +637,7 @@ class BorrowSearchForm(SearchForm):
     all_widgets = {
         'book__title': NullREntry,
         'book__author': NullREntry,
-        'book__library': (OptionsFromSearch, Library, {'allow_none': True}),
+        'book__library': (OptionsFromSearch, Library, {}),
         'book__groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {}),
         # this has on_empty='error', but empty values are removed when searching
         # the Null*Entries above are not really needed

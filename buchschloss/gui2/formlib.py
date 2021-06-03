@@ -7,6 +7,7 @@ import re
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tk_msg
+from typing import Any, Optional
 
 __all__ = ['Form', 'FormWidget', 'Entry', 'RadioChoices', 'DropdownChoices']
 
@@ -48,7 +49,7 @@ class Form:
     This tag is available as ``.tag`` (for use in e.g. validation functions)
     and is used to choose the appropriate widget for a field.
     """
-    all_widgets = {}
+    all_widgets: 'dict[str, dict[Any, Optional[tuple]]]' = {}
     error_text_config = {'fg': 'red'}
 
     def __init_subclass__(cls):
@@ -253,13 +254,13 @@ class Entry(FormWidget):
 
     def validate(self):
         """handle on_empty='error' and validate_re"""
-        v = self.get()
+        v = self.widget.get()
         if self.on_empty == 'error' and not v:
             return self.form.get_name(f'{self.name}::error::empty')
         if self.regex is not None and self.regex.search(v) is None:
             return self.form.get_name(f'{self.name}::error::regex')
         try:
-            self.transform(self.widget.get())
+            self.transform(v)
         except ValueError:
             return self.form.get_name(f'{self.name}::error::transform')
         return None

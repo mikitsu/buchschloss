@@ -242,50 +242,44 @@ class SearchMultiChoice(MultiChoicePopup):
         super().__init__(form, master, name, values)
 
 
-class FlagEnumMultiChoice(MultiChoicePopup):
-    """Use a FlagEnum as option source"""
-    def __init__(self, form, master, name, flag_enum):
-        """Get the options from ``flag_enum``"""
-        self.enum = flag_enum
-        options = [(e, form.get_name('' + e.name)) for e in flag_enum]
-        super().__init__(form, master, name, options)
-
-    def get(self):
-        """convert individual codes to a FlagEnum instance"""
-        return functools.reduce(operator.or_, super().get(), self.enum(0))
-
-    def set(self, data):
-        """convert a FlagEnum instance to individual codes"""
-        super().set([v for v in self.enum if v in data])
-
-
 class DisplayWidget(formlib.FormWidget):
     """Widget that only shows data"""
     sep = config.gui2.option_sep
 
-    def __init__(self, form, master, name, display='str'):
+    def __init__(self, form, master, name, display='str', get_name=None):
         """Create a new DisplayWidget
 
         :param display: specifies the type of data.
           Currently, ``'str'`` and ``'list'`` are supported.
+        :param get_name: specifies a prefix to use with ``utils.get_name`` to
+          lookup values for display. By default, don't use ``utils.get_name``.
         """
         assert display in ('str', 'list')
         super().__init__(form, master, name)
         self.display = display
+        self.get_name_prefix = get_name
         self.widget = tk.Label(self.master, wraplength=WRAPLENGTH)
+        self.data = None
+
+    def get_name(self, internal):
+        """Call utils.get_name based on self.get_name_prefix"""
+        if self.get_name_prefix is None:
+            return internal
+        else:
+            return utils.get_name(self.get_name_prefix + internal)
 
     def set(self, data):
         """Set the label text to ``data``"""
+        self.data = data
         if self.display == 'list':
-            data = self.sep.join(data)
+            data = self.sep.join(map(self.get_name, data))
+        else:
+            data = self.get_name(data)
         self.widget['text'] = data
 
     def get(self):
         """return the currently displayed text"""
-        data = self.widget['text']
-        if self.display == 'list':
-            data = data.split(self.sep)
-        return data
+        return self.data
 
 
 class LinkWidget(formlib.FormWidget):
