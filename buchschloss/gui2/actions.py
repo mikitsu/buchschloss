@@ -595,23 +595,7 @@ class LoginForm(BaseForm):
 class LibraryForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
         'name': NonEmptyREntry,
-        'books': {
-            FormTag.SEARCH: None,
-            None: (SearchMultiChoice, Book, {}),
-        },
-        'people': {
-            FormTag.SEARCH: None,
-            None: (SearchMultiChoice, Person, {}),
-        },
         'pay_required': Checkbox,
-        'action': {
-            FormTag.EDIT: (
-                DropdownChoices,
-                [(e, utils.get_name('from::library::action::' + e.value))
-                 for e in core.LibraryAction],
-                {},
-            ),
-        },
     }
 
 

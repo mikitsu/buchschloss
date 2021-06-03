@@ -171,10 +171,6 @@ def test_person_new(db):
     assert p.borrow_permission is None
     with pytest.raises(core.BuchSchlossBaseError):
         person_new(id_=123, first_name='first', last_name='last', class_='cls')
-    with pytest.raises(core.BuchSchlossBaseError):
-        person_new(id_=124, first_name='first', last_name='last', class_='cls',
-                   max_borrow=5, pay=True)
-    ctxt.level = 4
     person_new(id_=124, first_name='first', last_name='last', class_='cls',
                max_borrow=5, pay=True)
     p = models.Person.get_by_id(124)
@@ -191,6 +187,9 @@ def test_person_new(db):
     p = models.Person.get_by_id(126)
     assert p.id == 126
     assert list(p.libraries) == [models.Library.get_by_id('main')]
+    models.Library.create(name='lib')
+    person_new(id_=127, first_name='first', last_name='last', class_='cls', libraries=('lib',))
+    assert list(models.Person.get_by_id(127).libraries) == [models.Library.get_by_id('lib')]
 
 
 def test_person_edit(db):
@@ -210,8 +209,13 @@ def test_person_edit(db):
             == datetime.date.today() + datetime.timedelta(weeks=52))
     models.Library.create(name='lib_1')
     models.Library.create(name='lib_2')
-    e = person_edit(123, libraries=('lib_1', 'lib_does_not_exist'))
-    assert e
+    person_edit(123, libraries=['lib_2'])
+    with pytest.raises(core.BuchSchlossBaseError):
+        person_edit(123, first_name='another', libraries=('lib_1', 'lib_does_not_exist'))
+    assert (list(models.Person.get_by_id(123).libraries)
+            == [models.Library.get_by_id('lib_2')])
+    assert models.Person.get_by_id(123).first_name == 'other_value'
+    person_edit(123, libraries=['lib_1'])
     assert (list(models.Person.get_by_id(123).libraries)
             == [models.Library.get_by_id('lib_1')])
     with pytest.raises(core.BuchSchlossBaseError):
@@ -337,36 +341,14 @@ def test_library_new(db):
 def test_library_edit(db):
     """test Library.edit"""
     models.Library.create(name='main')
-    models.Library.create(name='testlib')
-    models.Library.create(name='test-2')
-    create_book()
-    create_book()
-    create_book()
-    create_book('test-2')
-    create_person(123)
-    create_person(124)
-    ctxt = for_levels(partial(core.Library.edit, core.LibraryAction.NONE, 'testlib'), 3)
+    ctxt = for_levels(partial(core.Library.edit, 'main'), 3)
     library_edit = partial(core.Library.edit, login_context=ctxt)
-    with pytest.raises(core.BuchSchlossBaseError):
-        library_edit(core.LibraryAction.NONE, 'does not exist')
-    library_edit(core.LibraryAction.ADD, 'testlib', books=[1])
-    assert models.Book.get_by_id(1).library.name == 'testlib'
-    library_edit(core.LibraryAction.ADD, 'testlib', books=[2, 3], people=[123])
-    assert all(models.Book.get_by_id(n).library.name == 'testlib' for n in range(1, 4))
-    assert [p.id for p in models.Library.get_by_id('testlib').people] == [123]
-    library_edit(core.LibraryAction.REMOVE, 'testlib', books=[3, 4], people=[123])
-    assert models.Book.get_by_id(4).library.name == 'test-2'
-    assert models.Book.get_by_id(3).library.name == 'main'
-    assert not models.Person.get_by_id(123).libraries
-    library_edit(core.LibraryAction.DELETE, 'testlib')
-    assert not models.Library.get_by_id('testlib').people
-    assert not models.Library.get_by_id('testlib').books
-    library_edit(core.LibraryAction.NONE, 'testlib', pay_required=True)
-    assert models.Library.get_by_id('testlib').pay_required
-    library_edit(core.LibraryAction.NONE, 'testlib', pay_required=None)
-    assert models.Library.get_by_id('testlib').pay_required
-    library_edit(core.LibraryAction.NONE, 'testlib', pay_required=False)
-    assert not models.Library.get_by_id('testlib').pay_required
+    library_edit('main', pay_required=True)
+    assert models.Library.get_by_id('main').pay_required
+    library_edit('main')
+    assert models.Library.get_by_id('main').pay_required
+    library_edit('main', pay_required=False)
+    assert not models.Library.get_by_id('main').pay_required
 
 
 def test_member_new(db):

@@ -10,7 +10,6 @@ __all__ exports:
         dealing with the respective objects
     - ScriptPermissions: flag enum of script permissions
 """
-import collections.abc
 import inspect
 import itertools
 import string
@@ -264,13 +263,6 @@ class Dummy:  # TODO: move this out to misc
             return self._default
 
 
-class LibraryAction(enum.Enum):
-    ADD = 'add'
-    REMOVE = 'remove'
-    DELETE = 'delete'
-    NONE = 'none'
-
-
 def pbkdf(pw, salt, iterations=config.core.hash_iterations[0]):
     """return pbkdf2_hmac('sha256', pw, salt, iterations)"""
     return pbkdf2_hmac('sha256', pw, salt, iterations)
@@ -413,23 +405,6 @@ def login(name: str, password: str):
     else:
         logging.info('login fail {}'.format(m))
         raise BuchSchlossError('login', 'wrong_password')
-
-
-def _update_library_group(lg_model: T.Type[models.Model],
-                          libgr: peewee.ManyToManyQuery,
-                          new: T.Set[str]):
-    errors = set()
-    old = set(lg.name for lg in libgr)
-    for add in new.difference(old):
-        try:
-            libgr.add(lg_model.get(name=add))
-        except lg_model.DoesNotExist:
-            errors.add(BuchSchlossNotFoundError(lg_model.__name__, add).message)
-    for rem in old.difference(new):
-        # these are the ones we just read from the database,
-        # if we get an error here it's bad, so let it crash
-        libgr.remove(lg_model.get(name=rem))
-    return errors
 
 
 class ActionNamespace:
@@ -699,8 +674,6 @@ class Person(ActionNamespace):
         """
         if borrow_permission is None and pay:
             borrow_permission = date.today() + timedelta(weeks=52)
-        if max_borrow > 3 and not login_context.level >= 4:
-            raise BuchSchlossPermError(4)
         p = models.Person(id=id_, first_name=first_name, last_name=last_name,
                           class_=class_, max_borrow=max_borrow,
                           borrow_permission=borrow_permission)
@@ -721,8 +694,7 @@ class Person(ActionNamespace):
     def edit(cls, person: T.Union[int, models.Person], *, login_context, **kwargs):
         """Edit a Person based on the arguments given.
 
-        :raise BuchSchlossBaseError: if the Person isn't found.
-        :return: a set of errors found during updating the person's libraries
+        :raise BuchSchlossBaseError: if the Person isn't found or a library doesn't exist.
 
         See Person.__doc__ for more information on the arguments.
 
@@ -731,14 +703,20 @@ class Person(ActionNamespace):
         """
         if not set(kwargs.keys()) - {'pay'} <= cls._model_fields - {'id'}:
             raise TypeError('unexpected kwarg')
-        if kwargs.get('max_borrow', 0) > 3 and not login_context.level >= 4:
-            raise BuchSchlossPermError(4)
         if kwargs.pop('pay', False):
+            if 'borrow_permission' in kwargs:
+                raise TypeError(
+                    '``pay`` and ``borrow_permission`` may not be given together')
             kwargs['borrow_permission'] = ((person.borrow_permission or date.today())
                                            + timedelta(weeks=52))
         errors = set()
-        lib = set(kwargs.pop('libraries', ()))
-        errors.update(_update_library_group(models.Library, person.libraries, lib))
+        if 'libraries' in kwargs:
+            lib_names = kwargs.pop('libraries')
+            libs = models.Library.select().where(models.Library.name << lib_names)
+            if libs.count() != len(lib_names):
+                not_found = set(lib_names) - {lib.name for lib in libs}
+                raise BuchSchlossNotFoundError('Library', next(iter(not_found)))
+            person.libraries.add(lib_names, clear_existing=True)
         for k, v in kwargs.items():
             setattr(person, k, v)
         person.save()
@@ -784,59 +762,23 @@ class Library(ActionNamespace):
                                    ).where(models.Book.id << books).execute()
 
     @staticmethod
-    def edit(action: LibraryAction, name: str, *,
-             people: T.Sequence[int] = (),
-             books: T.Sequence[int] = (),
+    @from_db(models.Library)
+    def edit(lib: T.Union[models.Library, str], *,
              pay_required: bool = None,
-             login_context):
-        """Perform the given action on the Library with the given name
+             login_context,
+             ):
+        """Set restriction status of a library
 
-            :param action: may be one of the following LibraryGroupAction constants:
-
-                - ``DELETE`` will remove the reference to the library from all people
-                  and books (setting their library to 'main'),
-                  but not actually delete the Library itself
-                  ``people`` and ``books`` are ignored in this case
-                - ``ADD`` will add the Library to all given people and set the library
-                  of all the given books to the specified one
-                - ``REMOVE`` will remove the reference to the given Library in the given
-                  people and set the library of the given books to 'main'
-                - ``NONE`` will ignore ``people`` and ``books`` and
-                  take no action other than setting ``pay_required``
-
-            :param name: is the name of the Library to modify
-            :param people: is an iterable of the IDs of the people to modify
-            :param books: is an iterable of IDs of the books to modify
+            :param lib: is the name of the Library to modify
             :param pay_required: will set the Library's payment
               requirement to itself if not None
 
             :raise BuchSchlossBaseError: if the Library doesn't exist
         """
-        try:
-            lib: models.Library = models.Library.get_by_id(name)
-        except models.Library.DoesNotExist:
-            raise BuchSchlossNotFoundError('Library', name)
-        with models.db:
-            if action is LibraryAction.DELETE:
-                lib.people = ()
-                models.Book.update({models.Book.library: models.Library.get_by_id('main')}
-                                   ).where(models.Book.library == lib).execute()
-            elif action is LibraryAction.ADD:
-                models.Book.update({models.Book.library: lib}
-                                   ).where(models.Book.id << books).execute()
-                for p in people:
-                    lib.people.add(p)
-            elif action is LibraryAction.REMOVE:
-                models.Book.update({models.Book.library: models.Library.get_by_id('main')}
-                                   ).where((models.Book.library == lib)
-                                           & (models.Book.id << books)).execute()
-                for p in people:
-                    lib.people.remove(p)
-            else:
-                assert action is LibraryAction.NONE
-            if pay_required is not None:
-                lib.pay_required = pay_required
-                lib.save()
+        if pay_required is not None:
+            lib.pay_required = pay_required
+            lib.save()
+        logging.info(f'{login_context} edited {lib}')
 
 
 class Borrow(ActionNamespace):
