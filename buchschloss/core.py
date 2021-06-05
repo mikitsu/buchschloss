@@ -489,23 +489,22 @@ class ActionNamespace:
     def search(cls, condition: tuple, *, login_context):
         """search for records.
 
-        :param condition: is a tuple of the form (<a>, <op>, <b>)
-            with <op> being a logical operation ("and" or "or") and <a>
-            and <b> in that case being condition tuples
+        :param condition: is a condition tuple.
 
-            or a comparison operation ("contains", "eq", "ne", "gt", "ge", "lt" or "le")
-            in which case <a> is a (possibly dotted) string corresponding
-            to the attribute name and <b> is the value to compare to.
+        Condition tuples are tuples of the form ``(a, op, b)`` or ``(func, c)``.
+        They may also be empty.
 
-            It (condition) may be empty, in which case it has no effect, i.e. is True
-            when used with an 'and' and False when used with an 'or'.
+        In the first case, ``op`` may be either a logical operation
+        ("and" or "or"), in which case ``a`` and ``b`` are condition tuples,
+        or a comparison operation ("contains", "eq", "ne", "gt", "ge", "lt" or "le"),
+        in which case ``a`` is a (possibly dotted) path to the field to test
+        and ``b`` is the value to test against.
 
-            If the top-level condition is empty, all existing values are returned.
+        In the second case, ``func`` is "not" or "exists".
+        This function is applied to the condition tuple ``c``.
 
-        .. note::
-
-            For ``condition``, there is no "not" available.
-            Use the inverse comparison operator instead
+        An empty condition tuple results in no change to the query state.
+        If the top-level condition tuple is empty, all existing values are returned.
         """
         check_level(login_context, cls.required_levels.search, cls.__name__ + '.search')
 
@@ -544,8 +543,15 @@ class ActionNamespace:
             return fv, q
 
         def handle_condition(cond, q):
-            if not cond:
-                return q
+            if len(cond) == 2:
+                func, c = cond
+                c, q = handle_condition(c, q)
+                if func == 'not':
+                    return ~c, q
+                elif func == 'exists':
+                    return peewee.fn.EXISTS(cls.model.alias().select().where(c)), q
+                else:
+                    raise ValueError('`func` must be "not" or "exists"')
             a, op, b = cond
             if op in ('and', 'or'):
                 if not a:
@@ -553,24 +559,27 @@ class ActionNamespace:
                 elif not b:
                     return handle_condition(a, q)
                 else:
-                    return getattr(operator, op + '_')(handle_condition(a, q),
-                                                       handle_condition(b, q))
+                    a, q = handle_condition(a, q)
+                    b, q = handle_condition(b, q)
+                    return getattr(operator, op + '_')(a, b), q
             else:
                 a, q = follow_path(a, q)
                 if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
-                    return q.where(getattr(operator, op)(a, b))
+                    return getattr(operator, op)(a, b), q
                 elif op == 'in':
-                    return q.where(a << b)
+                    return a << b, q
                 elif op == 'contains':
-                    return q.where(a.contains(b))
+                    return a.contains(b), q
                 else:
                     raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
                                      '"ge", "le" or "contains"')
 
         query = cls.model.select_str_fields().distinct()
-        result = handle_condition(condition, query)
+        if condition:
+            condition, query = handle_condition(condition, query)
+            query = query.where(condition)
         logging.info(f'{login_context} searched {cls.__name__}')
-        return (DataNamespace(cls, value, login_context, True) for value in result)
+        return (DataNamespace(cls, value, login_context, True) for value in query)
 
 
 class Book(ActionNamespace):

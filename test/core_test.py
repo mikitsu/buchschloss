@@ -461,6 +461,7 @@ def test_borrow_edit(db):
 def test_search(db):
     """test searches"""
     models.Library.create(name='main')
+    models.Library.create(name='lib')
     book_1 = core.DataNamespace(
         core.Book,
         create_book(author='author name', genres=('one', 'two')),
@@ -471,14 +472,19 @@ def test_search(db):
         create_book(author='author 2', year=2000),
         core.internal_unpriv_lc,
     )
+    book_3 = core.DataNamespace(
+        core.Book,
+        create_book(author='author 3', library='lib'),
+        core.internal_unpriv_lc,
+    )
     person = core.DataNamespace(core.Person, create_person(123, class_='cls', libraries=['main']), None)
     ctxt_person = for_levels(partial(core.Person.search, ()), 1)
     person_search = partial(core.Person.search, login_context=ctxt_person)
     book_search = partial(core.Book.search, login_context=core.internal_unpriv_lc)
     assert tuple(book_search(('author', 'eq', 'author name'))) == (book_1,)
-    assert set(book_search(())) == {book_1, book_2}
-    assert (tuple(book_search((('author', 'ne', 'author name'), 'or', ())))
-            == (book_2,))
+    assert set(book_search(())) == {book_1, book_2, book_3}
+    assert (set(book_search((('author', 'ne', 'author name'), 'or', ())))
+            == {book_2, book_3})
     assert (tuple(book_search((('author', 'contains', 'name'), 'and', ())))
             == (book_1,))
     assert (tuple(book_search((('library.people.class_', 'eq', 'cls'),
@@ -496,6 +502,10 @@ def test_search(db):
     assert tuple(book_search(('id', 'in', (1, 200, 300)))) == (book_1,)
     assert tuple(book_search(('author', 'in', ('neither', 'matches')))) == ()
     assert tuple(book_search(('genres', 'eq', 'one'))) == (book_1,)
+    assert (set(book_search(('not', (('library', 'eq', 'main'), 'and', ('id', 'gt', 1)))))
+            == {book_1, book_3})
+    assert set(book_search(('exists', ('library.people', 'ne', 321)))) == {book_1, book_2}
+    assert tuple(book_search(('not', ('exists', ('library', 'eq', 'main'))))) == (book_3,)
 
 
 def test_script_new(db):
