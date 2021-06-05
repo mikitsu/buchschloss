@@ -478,6 +478,9 @@ def test_search(db):
         core.internal_unpriv_lc,
     )
     person = core.DataNamespace(core.Person, create_person(123, class_='cls', libraries=['main']), None)
+    models.Borrow.create(book=1, person=123, is_back=False, return_date=0)
+    models.Borrow.create(book=2, person=123, is_back=True, return_date=0)
+    models.Borrow.create(book=1, person=123, is_back=True, return_date=0)
     ctxt_person = for_levels(partial(core.Person.search, ()), 1)
     person_search = partial(core.Person.search, login_context=ctxt_person)
     book_search = partial(core.Book.search, login_context=core.internal_unpriv_lc)
@@ -506,6 +509,8 @@ def test_search(db):
             == {book_1, book_3})
     assert set(book_search(('exists', ('library.people', 'ne', 321)))) == {book_1, book_2}
     assert tuple(book_search(('not', ('exists', ('library', 'eq', 'main'))))) == (book_3,)
+    assert (set(book_search(('not', ('exists', ('borrow.is_back', 'eq', False)))))
+            == {book_2, book_3})
 
 
 def test_script_new(db):

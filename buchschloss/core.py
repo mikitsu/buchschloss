@@ -545,11 +545,13 @@ class ActionNamespace:
         def handle_condition(cond, q):
             if len(cond) == 2:
                 func, c = cond
-                c, q = handle_condition(c, q)
                 if func == 'not':
+                    c, q = handle_condition(c, q)
                     return ~c, q
                 elif func == 'exists':
-                    return peewee.fn.EXISTS(cls.model.alias().select().where(c)), q
+                    sub_q = cls.model.alias().select(0)
+                    c, sub_q = handle_condition(c, sub_q)
+                    return peewee.fn.EXISTS(sub_q.where(c)), q
                 else:
                     raise ValueError('`func` must be "not" or "exists"')
             a, op, b = cond
