@@ -120,6 +120,7 @@ class App:
 
     def onexit(self):
         """execute when the user exits the application"""
+        self.reset()
         if tk_msg.askokcancel(utils.get_name('action::exit_app'),
                               utils.get_name('interactive_question::really_exit_app')):
             if (isinstance(sys.stderr, DummyErrorFile)

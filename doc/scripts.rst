@@ -141,9 +141,13 @@ following functions:
   The question is also passed through ``get_name``
 - ``display`` can be used to display (more) complex data. It will try to best display
   the passed data preserving hierarchies. Use this for displaying lists or mappings.
-- ``get_data`` can be used to get data of different types. It accepts a table mapping
-  names to types, where a type is one of ``'int', 'bool', 'str'`` (as a string).
-  The names will be passed through ``get_name``. When the user has provided the requested data,
+- ``get_data`` can be used to get data of different types. It accepts a table listing
+  ``{<key>, <type>}`` pairs or ``{<key>, <type>, <extra>}`` triplets.
+  ``<key>`` is the field name. A version passed through ``get_name`` will be displayed.
+  ``<type>`` may be one of ``'int'``, ``'bool'``, ``'str'`` or ``'choices'`` (as a string).
+  An input widget matching the given type is displayed.
+  For ``'choices'``, ``<extra>`` is a table of data namespaces to choose from.
+  When the user has provided the requested data,
   a table mapping the names to the data, provided as the requested type, is returned.
   If the user exits the data selection, ``nil`` is returned.
 - ``get_name`` provides access to the configured name file. Lookups are automatically

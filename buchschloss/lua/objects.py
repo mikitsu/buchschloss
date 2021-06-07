@@ -184,9 +184,8 @@ class LuaUIInteraction(LuaObject):
         return self.callbacks['display'](lua.table_to_data(data))
 
     def get_data(self, data_spec):
-        """get input from the user. Includes acceptable types (int, str, bool)"""
-        data_spec = ((k, self.get_name(k), v) for k, v in
-                     lua.table_to_data(data_spec).items())
+        """get input from the user. Includes acceptable types (int, str, bool, choice)"""
+        data_spec = ((k, self.get_name(k), *v) for k, *v in lua.table_to_data(data_spec))
         return lua.data_to_table(self.runtime, self.callbacks['get_data'](data_spec))
 
     @lupa.unpacks_lua_table_method

@@ -445,8 +445,12 @@ def handle_lua_get_data(data_spec):
             return utils.get_name('form::' + internal)
     name_data = {'submit': utils.get_name('form::submit')}
     cls_body = {'get_name': staticmethod(get_name), 'all_widgets': {}}
-    for k, name, v in data_spec:
-        cls_body['all_widgets'][k] = type_widget_map[v]
+    for k, name, t, *x in data_spec:
+        if t == 'choices':
+            w = (DropdownChoices, [(c['id'], c.string) for c in x[0]], {'default': None})
+        else:
+            w = type_widget_map[t]
+        cls_body['all_widgets'][k] = w
         name_data[k] = name
     form_cls = type('LuaGetDataForm', (BaseForm,), cls_body)
     common.destroy_all_children(main.app.center)
@@ -457,8 +461,13 @@ def handle_lua_get_data(data_spec):
         data = new
         watcher.set('set')
     main.app.on_next_reset.append(lambda: watcher.set('set'))
-    form = form_cls(main.app.center, None, cb)
-    form.frame.wait_variable(watcher)
+    try:
+        form = form_cls(main.app.center, None, cb)
+    except core.BuchSchlossBaseError as e:
+        tk_msg.showerror(e.title, e.message)
+        main.app.reset()
+    else:
+        form.frame.wait_variable(watcher)
     return data
 
 
@@ -572,7 +581,8 @@ class BorrowForm(ViewForm):
     # EDIT is split into restitute + extend, SEARCH is separate
     all_widgets = {
         'person': (OptionsFromSearch, Person, {}),
-        'book': (OptionsFromSearch, Book, {}),
+        'book': (OptionsFromSearch, Book, {
+            'condition': ('not', ('exists', ('borrow.is_back', 'eq', False)))}),
         'weeks': {FormTag.NEW: IntEntry},
         'override': {FormTag.NEW: Checkbox},
         'return_date': {FormTag.VIEW: DisplayWidget},

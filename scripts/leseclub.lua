@@ -39,7 +39,11 @@ end
 
 local function borrow()
     if check_leseclub_active(true) then return end
-    local data = ui.get_data{book='int', person='int'}
+    local data = ui.get_data{
+        {'book', 'choices', Book{'not', {'exists', {'borrow.is_back', 'eq', false}}}},
+        {'person', 'choices', Person{}},
+    }
+    local data = ui.get_data{book='int:book', person='int:person'}
     if not data then return end
     if check_book_in_lc_library(data.book) then return end
     data.weeks = borrow_weeks
@@ -48,16 +52,19 @@ end
 
 local function restitute()
     if check_leseclub_active(true) then return end
-    local data = ui.get_data{book='int', points='int'}
+    local data = ui.get_data{
+        {'book', 'choices', Book{'borrow.is_back', 'eq', false}},
+        {'points', 'int'},
+    }
     if not data then return end
     if check_book_in_lc_library(data.book) then return end
     local book = Book[data.book]
     if book.borrow == nil then return end
-    local ret = buchschloss.Borrow.edit{book.borrow, is_back=true}
+    buchschloss.Borrow.edit{book.borrow, is_back=true}
     local new_points = (storage.read_books[tostring(person)] or 0) + data.points
     storage.read_books[tostring(person)] = new_points
     buchschloss.set_storage(storage)
-    ui.alert('restitute_success_{}', ret)
+    ui.alert('restitute_success')
 end
 
 local function get_results()
