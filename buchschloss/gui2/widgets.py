@@ -64,7 +64,12 @@ class SeriesInput(formlib.FormWidget):
     def __init__(self, form, master, name):
         super().__init__(form, master, name)
         self.widget = tk.Frame(self.form.frame)
-        self.series = formlib.Entry(self.form, self.widget, 'series', 'none')
+        series = [(s, s) for s in common.NSWithLogin(core.Book).get_all_series()]
+        self.series = formlib.DropdownChoices(
+            self.form, self.widget, 'series',
+            [(None, '')] + series,  # no on_empty...
+            default=None, new=True,
+        )
         self.series_number = formlib.Entry(
             self.form, self.widget, 'series_number', 'none',
             transform=int, extra_kwargs={'width': 2},
