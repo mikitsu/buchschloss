@@ -480,44 +480,6 @@ def get_script_action(script_spec):
 
     return action
 
-# NOTE: the following functions aren't used anywhere
-# the decorator registers them in common.NSWithLogin
-
-
-@common.NSWithLogin.override('Book', 'new')
-def book_new(**kwargs):
-    tk_msg.showinfo(
-        utils.get_name('Book'),
-        utils.get_name('Book::new_id_{}').format(
-            core.Book.new(login_context=main.app.current_login, **kwargs))
-    )
-
-
-@common.NSWithLogin.override('Book', 'search')
-def book_search(condition):
-    return core.Book.search(
-        (condition, 'and', ('is_active', 'eq', True)),
-        login_context=main.app.current_login,
-    )
-
-
-@common.NSWithLogin.override('Borrow', 'restitute')
-def borrow_restitute(book):
-    core.Borrow.edit(
-        common.NSWithLogin(core.Book).view_ns(book)['borrow'],
-        is_back=True,
-        login_context=main.app.current_login,
-    )
-
-
-@common.NSWithLogin.override('Borrow', 'extend')
-def borrow_extend(book, weeks):
-    core.Borrow.edit(
-        common.NSWithLogin(core.Book).view_ns(book)['borrow'],
-        weeks=weeks,
-        login_context=main.app.current_login,
-    )
-
 
 # Form definitions
 
