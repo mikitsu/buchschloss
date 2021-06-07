@@ -46,6 +46,7 @@ class Form:
         Information for widget keyword arguments is not merged when subclassing.
 
     When instantiating a form, a tag value is given.
+    It should be a string or an enum value, although every hashable object should work.
     This tag is available as ``.tag`` (for use in e.g. validation functions)
     and is used to choose the appropriate widget for a field.
     """
@@ -204,11 +205,13 @@ class Entry(FormWidget):
         """Wrapped tk.Entry with history, autocomplete and regex validation
 
         :param form: is the form this widget is used in (passed up)
+        :param master: is the tk master widget (passed up)
         :param name: is the name of this widget in the form (passed up)
         :param on_empty: is a string specifying what to do when a value is empty:
           ``'error'`` will treat it as an error, ``'none'`` will transform it
           into ``None`` and ``'keep'`` will leave it unchanged, i.e. ``''``
-        :param regex: is an optional regular expression to apply to input
+        :param regex: is an optional regular expression to apply to input.
+          It is only used as validation, captured groups are not handled specially.
         :param transform: is an optional function that will be applied to values.
           A ValueError from this function will be treated as validation failure.
         :param autocomplete: may map characters to completion text,
@@ -302,7 +305,7 @@ class RadioChoices(FormWidget):
           the value returned by ``.get()`` and ``display`` is shown to the user.
         :param default: is the index of the choice to pre-select or None to not
           select any choice
-        :param pack_side: is used as argument when ``.pack()``ing the radio buttons
+        :param pack_side: is used as argument when ``.pack()``-ing the radio buttons
         """
         super().__init__(form, master, name)
         self.widget = tk.Frame(self.master)
@@ -429,7 +432,7 @@ class MultiChoicePopup(FormWidget):
           a sequence as described above.
         :param new: specifies whether to allow the user to add new values.
           In this case, an entry widget will be added
-        :param button_options: may be a dit of keyword arguments to pass to the button,
+        :param button_options: may be a dict of keyword arguments to pass to the button,
           excluding "command"
         """
         super().__init__(form, master, name)
