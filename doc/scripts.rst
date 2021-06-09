@@ -154,6 +154,8 @@ following functions:
   prefixed with ``'script-data::<script name>::``. You may use ``{}`` formatting.
 - ``get_level`` provides access to level names. It takes a level number and
   returns the corresponding name.
+- ``format_date`` provides access to date formatting as configured.
+  It takes a date and resuts the formatted string.
 
 Configuring scripts
 -------------------
