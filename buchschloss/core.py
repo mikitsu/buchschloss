@@ -827,7 +827,7 @@ class Borrow(ActionNamespace):
         The maximum amount of time a book may be borrowed for is defined
         in the configuration settings.
         """
-        if not book.is_active or book.borrow:
+        if not book.is_active or book.borrow.where(models.Borrow.is_back == False).count():  # noqa
             raise BuchSchlossError('Borrow', 'Borrow::Book_{}_not_available', book.id)
         if override:
             check_level(login_context, cls.required_levels.override, 'Borrow.new.override')
