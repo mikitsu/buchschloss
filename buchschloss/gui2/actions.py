@@ -398,27 +398,30 @@ def display_lua_data(data):
     popup = tk.Toplevel(main.app.root)
     popup.transient(main.app.root)
     popup.grab_set()
-    frame = tk.Frame(popup, **config.gui2.widget_size.popup.mapping)
+    outer_frame = tk.Frame(popup)
+    outer_frame.pack()
+    frame = tk.Frame(outer_frame, **config.gui2.widget_size.popup.mapping)
     frame.propagate(False)
     frame.grid(row=0, column=0)
     view = ttk.Treeview(frame)
-    height, width = add_lua_data_entries(view, '', data)
+    width, height = add_lua_data_entries(view, '', data)
     view.column('#0', width=width)
     if height > view['height']:
-        sb = tk.Scrollbar(popup, command=view.yview, orient=tk.VERTICAL)
+        sb = tk.Scrollbar(outer_frame, command=view.yview, orient=tk.VERTICAL)
         sb.grid(row=0, column=1, sticky=tk.NS)
         view['yscrollcommand'] = sb.set
     if width > config.gui2.widget_size.popup.width:
-        sb = tk.Scrollbar(popup, command=view.xview, orient=tk.HORIZONTAL)
+        sb = tk.Scrollbar(outer_frame, command=view.xview, orient=tk.HORIZONTAL)
         sb.grid(row=1, column=0, sticky=tk.EW)
         view['xscrollcommand'] = sb.set
+    view.pack(expand=True, fill=tk.BOTH)
     tk.Button(popup, command=popup.destroy, text='OK').pack()
 
 
 def add_lua_data_entries(view, parent, data, width=0, height=0, indent=1):
     """add entries to the Treeview and return (max width, total height)"""
     if isinstance(data, Sequence) and not isinstance(data, str):
-        data = enumerate(data, 1)
+        data = ((d, ()) if isinstance(d, str) else (i, d) for i, d in enumerate(data, 1))
     elif isinstance(data, Mapping):
         data = data.items()
     else:

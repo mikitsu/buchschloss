@@ -13,6 +13,13 @@ local manage_level = config['management level'] or 3
 local storage = buchschloss.get_storage()
 
 
+local function search_book(cond)
+    return Book{
+        {cond, 'and', {'is_active', 'eq', true}},
+        'and', {'library.name', 'eq', lc_library_name},
+    }
+end
+
 local function check_leseclub_active(wanted_active)
     -- no toboolean()?
     local is_active = storage.read_books and true or false
@@ -28,24 +35,13 @@ local function check_leseclub_active(wanted_active)
     end
 end
 
-local function check_book_in_lc_library(book)
-    if Book[book].library.name == lc_library_name then
-        return false
-    else
-        ui.alert('book_not_in_leseclub_library')
-        return true
-    end
-end
-
 local function borrow()
     if check_leseclub_active(true) then return end
     local data = ui.get_data{
-        {'book', 'choices', Book{'not', {'exists', {'borrow.is_back', 'eq', false}}}},
-        {'person', 'choices', Person{}},
+        {'book', 'choices', search_book{'not', {'exists', {'borrow.is_back', 'eq', false}}}},
+        {'person', 'choices', Person{'libraries.name', 'eq', lc_library_name}},
     }
-    local data = ui.get_data{book='int:book', person='int:person'}
     if not data then return end
-    if check_book_in_lc_library(data.book) then return end
     data.weeks = borrow_weeks
     Borrow:new(data)
 end
@@ -53,18 +49,16 @@ end
 local function restitute()
     if check_leseclub_active(true) then return end
     local data = ui.get_data{
-        {'book', 'choices', Book{'borrow.is_back', 'eq', false}},
+        {'book', 'choices', search_book{'borrow.is_back', 'eq', false}},
         {'points', 'int'},
     }
     if not data then return end
-    if check_book_in_lc_library(data.book) then return end
     local book = Book[data.book]
-    if book.borrow == nil then return end
+    local person = tostring(book.borrow.person.id)
     buchschloss.Borrow.edit{book.borrow, is_back=true}
-    local new_points = (storage.read_books[tostring(person)] or 0) + data.points
-    storage.read_books[tostring(person)] = new_points
+    local new_points = (storage.read_books[person] or 0) + data.points
+    storage.read_books[person] = new_points
     buchschloss.set_storage(storage)
-    ui.alert('restitute_success')
 end
 
 local function get_results()
