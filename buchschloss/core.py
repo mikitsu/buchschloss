@@ -291,8 +291,8 @@ def from_db(*arguments: T.Type[models.Model], **keyword_arguments: T.Type[models
                 for k, m in keyword_arguments.items():
                     arg = bound.arguments[k]
                     if isinstance(arg, DataNamespace):
-                        arg = arg.data
-                    if not isinstance(arg, m):
+                        bound.arguments[k] = arg.data
+                    elif not isinstance(arg, m):
                         try:
                             bound.arguments[k] = m.get_by_id(arg)
                         except m.DoesNotExist:
