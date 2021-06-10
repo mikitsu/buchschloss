@@ -244,9 +244,9 @@ class LuaRequestsInterface(LuaObject):
             logging.warning('blocked request to unallowed URL: ' + url)
             return None
         try:
-            r = requests.get(url)
-        except requests.RequestException:
-            raise core.BuchSchlossError('no_connection', 'no_connection')
+            r = requests.get(url, headers={'User-Agent': 'buchschloss-lua'})
+        except requests.RequestException as e:
+            raise core.BuchSchlossError('no_connection', 'no_connection_{}', str(e))
         if result == 'auto':
             result = r.headers.get('Content-Type', '').split('/')[-1]
         if result in ('html', 'xml'):
