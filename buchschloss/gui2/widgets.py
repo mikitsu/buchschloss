@@ -99,11 +99,15 @@ class SeriesInput(formlib.FormWidget):
 
         def __init__(self, form, master, name, series_key='series'):
             super().__init__(form, master, name)
-            for func in ('get', 'set', 'validate'):
-                def redirect(*args, __func=func):
-                    """Call function on series subwidget"""
-                    return getattr(self.form.widget_dict[series_key], __func)(*args)
-                setattr(self, func, redirect)
+            self.series_key = series_key
+
+        def get(self):
+            """return the series number from the main widget"""
+            return self.form.widget_dict[self.series_key].series_number.get()
+
+        def set(self, data):
+            """set the series number in the main widget"""
+            self.form.widget_dict[self.series_key].series_number.set(data)
 
 
 class ConfirmedPasswordInput(formlib.FormWidget):

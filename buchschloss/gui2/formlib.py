@@ -383,6 +383,9 @@ class DropdownChoices(FormWidget):
 
     def set(self, data):
         """select the value with the given code"""
+        if self.allow_new and data not in self.codes:
+            self.all_values = (*self.all_values, data)
+            self.codes = (*self.codes, data)
         self.widget['values'] = self.all_values
         self.widget.current(self.codes.index(data))
         if '_update_values' in self.widget['validatecommand']:
