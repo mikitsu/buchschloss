@@ -1,5 +1,4 @@
 """specific widgets and form helpers"""
-import functools
 import operator
 import tkinter as tk
 import tkinter.ttk as ttk
