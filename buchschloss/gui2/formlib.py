@@ -258,8 +258,11 @@ class Entry(FormWidget):
     def validate(self):
         """handle on_empty='error' and validate_re"""
         v = self.widget.get()
-        if self.on_empty == 'error' and not v:
-            return self.form.get_name(f'{self.name}::error::empty')
+        if not v:
+            if self.on_empty == 'error':
+                return self.form.get_name(f'{self.name}::error::empty')
+            elif self.on_empty == 'none':
+                return None
         if self.regex is not None and self.regex.search(v) is None:
             return self.form.get_name(f'{self.name}::error::regex')
         try:

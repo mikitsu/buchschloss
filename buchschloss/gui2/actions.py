@@ -104,6 +104,7 @@ class SearchForm(BaseForm):
             data = self.get_data()
             for k in errors.keys() - data.keys():
                 del errors[k]
+        return errors
 
 
 class AuthedForm(BaseForm):
