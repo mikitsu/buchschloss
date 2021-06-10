@@ -10,10 +10,15 @@ local r = {}
 -- Sadly, the UI interface is used for data passing here
 local translations = config['language translations'] or {}
 
-local page = requests.get('https://www.bookfinder.com/book/' .. isbn, 'html')
+-- We could use https://www.bookfinder.com/book/{isbn}, but this is faster (doesn't sort)
+local attribs = requests.get(
+    'https://www.bookfinder.com/search/?lang=any&isbn='
+    .. isbn .. '&classic=on&st=sr&ac=qr',
+    'html'
+).select_one('div.attributes')
 
 for key, selector in pairs({author='author', title='name', publisher='publisher', language='inLanguage'}) do
-    local field = page.select_one('span[itemprop="' .. selector .. '"]')
+    local field = attribs.select_one('span[itemprop="' .. selector .. '"]')
     if field ~= nil then
         r[key] = field.text
     end
