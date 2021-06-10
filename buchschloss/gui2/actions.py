@@ -450,8 +450,10 @@ def handle_lua_get_data(data_spec):
     name_data = {'submit': utils.get_name('form::submit')}
     cls_body = {'get_name': staticmethod(get_name), 'all_widgets': {}}
     for k, name, t, *x in data_spec:
-        if t == 'choices':
+        if t == 'choice':
             w = (DropdownChoices, [(c['id'], c.string) for c in x[0]], {'default': None})
+        elif t == 'multichoices':
+            w = (MultiChoicePopup, [(c['id'], c.string) for c in x[0]], {})
         else:
             w = type_widget_map[t]
         cls_body['all_widgets'][k] = w

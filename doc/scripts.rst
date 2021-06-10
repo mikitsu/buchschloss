@@ -144,9 +144,12 @@ following functions:
 - ``get_data`` can be used to get data of different types. It accepts a table listing
   ``{<key>, <type>}`` pairs or ``{<key>, <type>, <extra>}`` triplets.
   ``<key>`` is the field name. A version passed through ``get_name`` will be displayed.
-  ``<type>`` may be one of ``'int'``, ``'bool'``, ``'str'`` or ``'choices'`` (as a string).
+  ``<type>`` may be one of ``'int'``, ``'bool'``, ``'str'``, ``'choice'``
+  or ``'multichoices'`` (as a string).
   An input widget matching the given type is displayed.
-  For ``'choices'``, ``<extra>`` is a table of data namespaces to choose from.
+  For ``'choice'`` and ``'multichoices'``, ``<extra>`` is a table of data namespaces
+  to choose from. With ``'choice'``, exactly one ID is returned, with ``'multichoices'``
+  a table of selected IDs is returned.
   When the user has provided the requested data,
   a table mapping the names to the data, provided as the requested type, is returned.
   If the user exits the data selection, ``nil`` is returned.
@@ -155,7 +158,7 @@ following functions:
 - ``get_level`` provides access to level names. It takes a level number and
   returns the corresponding name.
 - ``format_date`` provides access to date formatting as configured.
-  It takes a date and resuts the formatted string.
+  It takes a date and returns the formatted string.
 
 Configuring scripts
 -------------------

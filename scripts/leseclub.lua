@@ -38,8 +38,8 @@ end
 local function borrow()
     if check_leseclub_active(true) then return end
     local data = ui.get_data{
-        {'book', 'choices', search_book{'not', {'exists', {'borrow.is_back', 'eq', false}}}},
-        {'person', 'choices', Person{'libraries.name', 'eq', lc_library_name}},
+        {'book', 'choice', search_book{'not', {'exists', {'borrow.is_back', 'eq', false}}}},
+        {'person', 'choice', Person{'libraries.name', 'eq', lc_library_name}},
     }
     if not data then return end
     data.weeks = borrow_weeks
@@ -49,7 +49,7 @@ end
 local function restitute()
     if check_leseclub_active(true) then return end
     local data = ui.get_data{
-        {'book', 'choices', search_book{'borrow.is_back', 'eq', false}},
+        {'book', 'choice', search_book{'borrow.is_back', 'eq', false}},
         {'points', 'int'},
     }
     if not data then return end
