@@ -154,20 +154,19 @@ def get_book_data(isbn: int):
             login_context=core.internal_unpriv_lc,
         )()
 
-    data = {}
-    for spec in config.utils.book_data_scripts:
-        try:
-            get_data_from_script(spec)
-        except core.BuchSchlossBaseError as e:
-            logging.warning(f'Error "{e.title}" fetching data for {isbn}: {e.message}')
     try:
         book = next(iter(core.Book.search(
             ('isbn', 'eq', isbn), login_context=core.internal_priv_lc)))
     except StopIteration:
-        pass
+        data = {}
+        for spec in config.utils.book_data_scripts:
+            try:
+                get_data_from_script(spec)
+            except core.BuchSchlossBaseError as e:
+                logging.warning(
+                    f'Error "{e.title}" fetching data for {isbn}: {e.message}')
     else:
-        new_data = core.Book.view_ns(book['id'], login_context=core.internal_priv_lc)
-        data.update({k: v for k, v in new_data.items()})
+        data = dict(core.Book.view_ns(book['id'], login_context=core.internal_priv_lc))
     for k in ('id', 'borrow', 'is_active'):
         data.pop(k, None)
     return data
