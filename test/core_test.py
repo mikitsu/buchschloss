@@ -294,7 +294,7 @@ def test_book_edit(db):
     assert models.Book.get_by_id(2).library.name == 'main'
     with pytest.raises(core.BuchSchlossBaseError):
         book_edit(1, library='does_not_exist')
-    assert not book_edit(1, groups=['group-1'])
+    book_edit(1, groups=['group-1'])
     assert set(g.name for g in models.Book.get_by_id(1).groups) == {'group-1'}
     assert models.Book.get_by_id(1).library.name == 'lib'
     book_edit(1, medium='med')
@@ -309,6 +309,9 @@ def test_book_edit(db):
         book_edit(1, genres=new)
         b = models.Book.get_by_id(1)
         assert set(b.genres) == {models.Genre.get_by_id((b, k)) for k in new}
+    assert models.Book.get_by_id(2).genres[0].name == 'two'
+
+    book_edit(2, author="I don't care")
     assert models.Book.get_by_id(2).genres[0].name == 'two'
 
 

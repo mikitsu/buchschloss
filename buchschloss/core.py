@@ -637,9 +637,9 @@ class Book(ActionNamespace):
                 book.library = models.Library.get_by_id(lib)
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', lib)
-        for k in ('genre', 'group'):
-            model: peewee.Model = getattr(models, k.capitalize())
-            values = kwargs.pop(k + 's', ())
+        for k in {'genres', 'groups'} & kwargs.keys():
+            model: peewee.Model = getattr(models, k[:-1].capitalize())
+            values = kwargs.pop(k, ())
             model.delete().where(model.book == book, model.name.not_in(values)).execute()
             for v in values:
                 try:
