@@ -17,7 +17,7 @@ from .. import utils
 from .formlib import Form as LibForm, Entry, DropdownChoices, RadioChoices
 from .widgets import (
     # not form-related
-    SearchResultWidget,
+    SearchResultWidget, WRAPLENGTH,
     # generic form widgets and form widget tuples
     NonEmptyEntry, NonEmptyREntry, PasswordEntry, IntEntry, NullREntry, Text,
     ConfirmedPasswordInput, Checkbox, MultiChoicePopup,
@@ -65,6 +65,13 @@ class BaseForm(LibForm):
         else:
             items = ('form', self.form_name, name)
         return utils.get_name('::'.join(items))
+
+    def get_widget_label(self, widget):
+        """add ``wraplength``"""
+        label = super().get_widget_label(widget)
+        if label is not None:
+            label['wraplength'] = WRAPLENGTH
+        return label
 
 
 class SearchForm(BaseForm):

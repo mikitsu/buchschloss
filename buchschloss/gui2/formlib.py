@@ -84,13 +84,10 @@ class Form:
             if widget is not None
         }
         i = -1
-        for i, (name, widget) in enumerate(self.widget_dict.items()):
-            if widget.widget is not None:
-                tk.Label(self.frame, text=self.get_name(name)).grid(row=i, column=0)
-                widget.widget.grid(row=i, column=1)
-        submit = self.get_submit_widget()
-        if submit is not None:
-            submit.grid(row=i+1, column=0, columnspan=3)
+        for i, widget in enumerate(self.widget_dict.values()):
+            self._grid_if_not_none(self.get_widget_label(widget), row=i, column=0)
+            self._grid_if_not_none(widget.widget, row=i, column=1)
+        self._grid_if_not_none(self.get_submit_widget(), row=i+1, column=0, columnspan=3)
         self._error_display_widgets = ()
 
     def handle_submit(self):
@@ -149,6 +146,18 @@ class Form:
             text=self.get_name('submit'),
             command=self.handle_submit,
         )
+
+    def get_widget_label(self, widget):
+        """return a tk widget to be used as label for the FormWidget ``widget``"""
+        if widget.widget is None:
+            return None
+        else:
+            return tk.Label(self.frame, text=self.get_name(widget.name))
+
+    @staticmethod
+    def _grid_if_not_none(widget, **kwargs):
+        if widget is not None:
+            widget.grid(**kwargs)
 
 
 class FormWidget:
