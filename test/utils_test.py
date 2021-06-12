@@ -59,7 +59,7 @@ def test_format_fields():
     }
     expected = ({'name'}, {'attr', 'format'}, {'attr2'}, {'all', 'attr', 'name'})
     for i, exp in enumerate(expected):
-        assert utils.get_format_fields(f'model-{i}') == exp
+        assert utils.get_format_fields(f'model-{i}::repr') == exp
 
 
 def test_script_exec(db, monkeypatch):

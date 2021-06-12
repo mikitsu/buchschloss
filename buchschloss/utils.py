@@ -112,9 +112,8 @@ def lookup_name_spec(spec: str):
     return None
 
 
-def get_format_fields(model_name: str) -> set:
+def get_format_fields(lookup_name: str) -> set:
     """return the field required to format a Model instance"""
-    lookup_name = model_name + '::repr'
     fmt_str = lookup_name_spec(lookup_name)
     if fmt_str is None:
         return set()

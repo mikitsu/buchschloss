@@ -371,7 +371,7 @@ class SearchResultWidget(mtk.ContainingWidget):
         widgets = [(tk.Label, {'text': utils.get_name('{}_results').format(len(results))})]
         for r in results:
             widgets.append((tk.Button, {
-                'text': r,
+                'text': r.string,
                 'wraplength': config.gui2.widget_size.main.width,
                 'command': partial(view_func, r)}))
         super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))

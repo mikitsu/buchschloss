@@ -411,20 +411,24 @@ class ActionNamespace:
     Library, Group, Borrow and Script namespaces"""
     model: T.ClassVar[models.Model]
     required_levels: T.Any
-    actions: 'set[str]'
+    # view_ns hacked in later because it uses 'view' permissions
+    actions: 'T.ClassVar[frozenset[str]]' = frozenset(('new', 'edit', 'search'))
     namespaces: 'T.ClassVar[list[str]]' = []
     _model_fields: T.ClassVar[set]
     _format_fields: T.ClassVar[set]
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls, extra_actions: dict = {}):  # noqa
         """add the _model_fields and required_levels attributes"""
+        if extra_actions is None:
+            extra_actions = dict()
         cls.namespaces.append(cls.__name__)
         cls.model = getattr(models, cls.__name__)
         cls._model_fields = {
             k for k in dir(cls.model)
             if isinstance(getattr(cls.model, k), (peewee.Field, peewee.BackrefAccessor))
         }
-        cls._format_fields = utils.get_format_fields(cls.model.__name__)
+        if not hasattr(cls, '_format_fields'):
+            cls._format_fields = utils.get_format_fields(f'{cls.model.__name__}::repr')
 
         def level_required(level, f):
             """due to scoping, this has to be a separate function"""
@@ -434,27 +438,18 @@ class ActionNamespace:
                 return f(*args, login_context=login_context, **kwargs)
 
             checker = partial(check_level, level=level, resource=f.__qualname__)
-            return type(func)(wrapper)  # func is the static/classmethod from outside
+            return wrapper
 
-        cls.actions = {'view_ns', 'search'}  # implemented here
+        extra_actions['view_ns'] = 'view'  # see ``actions = ...`` above
+        cls.actions |= extra_actions.keys()
         cls.required_levels = getattr(config.core.required_levels, cls.__name__)
-        for name, func in vars(cls).items():
-            if name.startswith('_'):
-                continue
-            # the exception
+        for name in cls.actions:
             if (cls.__name__, name) == ('Member', 'change_password'):
-                cls.actions.add(name)
-                continue
-            # since these are only namespaces, no normal methods
-            if isinstance(func, (staticmethod, classmethod)):
-                cls.actions.add(name)
-                if name.startswith('view'):
-                    req_level = cls.required_levels['view']
-                elif cls.__name__ == 'Book' and name.startswith('get_all'):
-                    req_level = cls.required_levels['view']
-                else:
-                    req_level = cls.required_levels[name]
-                setattr(cls, name, level_required(req_level, func.__func__))  # noqa
+                req_level = 0
+            else:
+                req_level = cls.required_levels[extra_actions.get(name) or name]
+            func = getattr(cls, name)
+            setattr(cls, name, level_required(req_level, func))
 
     @classmethod
     def format_object(cls, obj: peewee.Model):
@@ -473,7 +468,6 @@ class ActionNamespace:
     @classmethod
     def view_ns(cls, id_: T.Union[int, str], *, login_context):
         """Return a namespace of information"""
-        check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_ns')
         try:
             r = DataNamespace(cls, cls.model.get_by_id(id_), login_context, True)
         except cls.model.DoesNotExist:
@@ -510,8 +504,6 @@ class ActionNamespace:
         An empty condition tuple results in no change to the query state.
         If the top-level condition tuple is empty, all existing values are returned.
         """
-        check_level(login_context, cls.required_levels.search, cls.__name__ + '.search')
-
         def follow_path(path, q):
             def handle_many_to_many():
                 through = fv.through_model.alias()
@@ -588,7 +580,9 @@ class ActionNamespace:
         return (DataNamespace(cls, value, login_context, True) for value in query)
 
 
-class Book(ActionNamespace):
+class Book(ActionNamespace,
+           extra_actions={'get_all_genres': 'view', 'get_all_groups': 'view'},
+           ):
     """Namespace for Book-related functions"""
     @staticmethod
     def new(*, isbn: int, author: str, title: str, language: str, publisher: str,  # noqa
@@ -802,6 +796,20 @@ class Library(ActionNamespace):
 
 class Borrow(ActionNamespace):
     """Namespace for Borrow-related functions"""
+    _format_fields = None
+    _format_fields_back = utils.get_format_fields('Borrow::repr-back')
+    _format_fields_not_back = utils.get_format_fields('Borrow::repr-not-back')
+
+    @classmethod
+    def format_object(cls, obj: models.Borrow):
+        """differentiate between returned and not returned borrows"""
+        if obj.is_back:
+            attrs = {k: getattr(obj, k) for k in cls._format_fields_back}
+            return utils.get_name('Borrow::repr-back', **attrs)
+        else:
+            attrs = {k: getattr(obj, k) for k in cls._format_fields_not_back}
+            return utils.get_name('Borrow::repr-not-back', **attrs)
+
     @classmethod
     @from_db(book=models.Book, person=models.Person)
     def new(cls, book, person, weeks, *, override=False, login_context):
@@ -875,7 +883,7 @@ class Borrow(ActionNamespace):
         borrow.save()
 
 
-class Member(ActionNamespace):
+class Member(ActionNamespace, extra_actions={'change_password': None}):  # special-cased
     """namespace for Member-related functions"""
     @staticmethod
     @auth_required
@@ -945,7 +953,7 @@ class Member(ActionNamespace):
         logging.info("{} changed {}'s password".format(login_context, member))
 
 
-class Script(ActionNamespace):
+class Script(ActionNamespace, extra_actions={'execute': None}):
     """namespace for Script-related functions"""
     allowed_chars = set(string.ascii_letters + string.digits + ' _-')
     callbacks = None

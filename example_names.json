@@ -169,6 +169,8 @@
   },
   "Borrow": {
     "*this*": "borrowing action",
+    "repr-back": "{book} -> {person} [BACK]",
+    "repr-not-back": "{book} -> {person} [{return_date}]",
     "is_back": "is back",
     "until_{}": "borrowed until {}"
   },
