@@ -17,7 +17,6 @@ except ImportError:
     except ImportError:
         config = None
 if __name__ != '__main__':
-    from . import utils
     from . import core
 
 __all__ = [
@@ -53,16 +52,20 @@ class JSONField(peewee.TextField):
 class Model(peewee.Model):
     """Base class for all models."""
     DoesNotExist: peewee.DoesNotExist
-    str_fields: T.Iterable[peewee.Field]
+    str_fields: T.Set[peewee.Field]
     pk_name: str = 'id'
+    format_str: str = '<{0.__class__} object -- you should never see this text>'
 
     class Meta:
         database = db
 
     @classmethod
-    def select_str_fields(cls):
-        """return cls.select(*cls.str_fields)"""
-        return cls.select(*cls.str_fields)
+    def select_str_fields(cls, extra_fields: set):
+        """return cls.select(*<all string fields>)"""
+        return cls.select(*(getattr(cls, f) for f in cls.str_fields | extra_fields))
+
+    def __str__(self):
+        return self.format_str.format(self)
 
 
 class ScriptPermissionField(IntegerField):
@@ -98,12 +101,8 @@ class Person(Model):
     borrows: peewee.BackrefAccessor
     libraries: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # libraries as backref
 
-    str_fields = (id, last_name, first_name)
-
-    def __str__(self):
-        return utils.get_name('Person[{}]"{}, {}"').format(
-            self.id, self.last_name, self.first_name
-        )
+    str_fields = {'id', 'last_name', 'first_name'}
+    format_str = 'Person[{0.id}]"{0.last_name}, {0.first_name}"'
 
 
 class Library(Model):
@@ -114,10 +113,8 @@ class Library(Model):
     name: T.Union[str, CharField] = CharField(primary_key=True)
     pay_required: T.Union[bool, BooleanField] = BooleanField(default=True)
 
-    def __str__(self):
-        return utils.get_name('Library[{}]').format(self.name)
-
-    str_fields = (name,)
+    format_str = 'Library[{0.name}]'
+    str_fields = {'name'}
     pk_name = 'name'
 
 
@@ -153,10 +150,8 @@ class Book(Model):
     shelf: T.Union[str, CharField] = CharField()
     is_active: T.Union[bool, BooleanField] = BooleanField(default=True)
 
-    str_fields = (id, title)
-
-    def __str__(self):
-        return utils.get_name('Book[{}]"{}"').format(self.id, self.title)
+    str_fields = {'id', 'title'}
+    format_str = 'Book[{0.id}]"{0.title}"'
 
 
 class Genre(Model):
@@ -175,6 +170,8 @@ class Group(Model):
     book = ForeignKeyField(Book, backref='groups')
     name: T.Union[str, CharField] = CharField()
 
+    format_str = 'Group[{0.name}]'
+    str_fields = {'name'}
     pk_name = 'name'  # for search
 
     class Meta:
@@ -196,15 +193,8 @@ class Borrow(Model):
     is_back: T.Union[bool, BooleanField] = BooleanField(default=False)
     return_date: T.Union[datetime.date, DateField] = DateField()
 
-    # keep ID in, needed for further info
-    str_fields = (id, person, book, return_date, is_back)
-
-    def __str__(self):
-        if self.is_back:
-            is_back = utils.get_name('Borrow::is_back')
-        else:
-            is_back = utils.get_name('Borrow::until_{}').format(self.return_date)
-        return '{}: {} {}'.format(self.person, self.book, is_back)
+    str_fields = {'id', 'person', 'book'}
+    format_str = 'Borrow[{0.id}]({0.book}, {0.person})'
 
 
 class Member(Model):
@@ -214,12 +204,9 @@ class Member(Model):
     salt: T.Union[bytes, BlobField] = BlobField()
     level: T.Union[int, IntegerField] = IntegerField()
 
-    str_fields = (name, level)
+    format_str = 'Member[{0.name}]({0.level})'
+    str_fields = {'name', 'level'}
     pk_name = 'name'
-
-    def __str__(self):
-        return utils.get_name("Member[{}]({})").format(
-            self.name, utils.level_names[self.level])
 
 
 class Script(Model):
@@ -231,16 +218,9 @@ class Script(Model):
     permissions: 'T.Union[core.ScriptPermissions, ScriptPermissionField]' \
         = ScriptPermissionField()
 
-    str_fields = (name, setlevel)
+    format_str = 'Script[{0.name}]({0.setlevel})'
+    str_fields = {'name', 'setlevel'}
     pk_name = 'name'
-
-    def __str__(self):
-        if self.setlevel is None:
-            return '{}[{}]'.format(utils.get_name('Script'), self.name)
-        else:
-            return '{}[{}]({})'.format(
-                utils.get_name('Script'), self.name, utils.level_names[self.setlevel]
-            )
 
 
 class Misc(Model):
@@ -250,7 +230,7 @@ class Misc(Model):
     pk: T.Union[str, CharField] = CharField(primary_key=True)
     data: T.Any = PickleField()
 
-    str_fields = (pk,)
+    str_fields = {'pk'}
     pk_name = 'pk'
 
 

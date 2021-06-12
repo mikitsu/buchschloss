@@ -48,6 +48,20 @@ def test_get_name():
     assert utils.get_name('c::d::does::not::exist') == 'c::d::does::not::exist'
 
 
+def test_format_fields():
+    config.utils.names = {
+        f'model-{i}': {'repr': text} for i, text in enumerate((
+            'Literal {{braces}}, also}} this way{{, {0.name}',
+            'Uses {0.attr!a} ascii and (invalid) {0.format:spec}',
+            '{0.attr2!r:#<&%#JD} with both...',
+            'Putt{{ing it {{{{{0.all} together: }}{0.attr!r:37dj}}} {{{0.name}',
+        ))
+    }
+    expected = ({'name'}, {'attr', 'format'}, {'attr2'}, {'all', 'attr', 'name'})
+    for i, exp in enumerate(expected):
+        assert utils.get_format_fields(f'model-{i}') == exp
+
+
 def test_script_exec(db, monkeypatch):
     """test correct execution of task scripts"""
     invokes = set()

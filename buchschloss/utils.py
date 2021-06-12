@@ -5,11 +5,12 @@ contents (for use):
     - send_email() -- send an email
     - check_isbn() -- check an ISBN and convert it to ISBN-13
     - get_name() -- get a pretty name
+    - get_format_fields() -- get the names of format fields for models
     - format_date() -- format a date
     - level_names -- get a pretty level representation
     - get_book_data() -- attempt to get data about a book based on the ISBN
 """
-
+import ast
 import collections
 import functools
 import itertools
@@ -81,7 +82,54 @@ def check_isbn(isbn: str) -> int:
     return int(''.join(map(str, digits)))
 
 
-def get_name(internal: str):
+def lookup_name_spec(spec: str):
+    """Look up a name spec in config.utils.names. See get_name for strategy"""
+    *path, name = spec.split('::')
+    look_in = []
+    for components in range(2**len(path)-1, -1, -1):
+        try:
+            look_in.append(functools.reduce(
+                operator.getitem,
+                (ns for i, ns in enumerate(path, 1) if components & (1 << (len(path) - i))),
+                config.utils.names))
+        except (KeyError, TypeError):
+            pass
+    for ns in look_in:
+        if isinstance(ns, str):
+            continue
+        try:  # for some reason (configobj), this can't be written as if ... in ...
+            val = ns[name]
+        except KeyError:
+            continue
+        if isinstance(val, dict):
+            if '*this*' in val:
+                val = val['*this*']
+            else:
+                continue
+        elif not isinstance(val, str):
+            raise TypeError(f'{val!r} is neither dict nor str')
+        return val
+    return None
+
+
+def get_format_fields(model_name: str) -> set:
+    """return the field required to format a Model instance"""
+    lookup_name = model_name + '::repr'
+    fmt_str = lookup_name_spec(lookup_name)
+    if fmt_str is None:
+        return set()
+    # The string is formatted with exactly one object
+    # and may only lookup attributes (and use any format specifier)
+    expr_to_parse = 'f"' + fmt_str.replace('"', '\\"').replace('0.', '') + '"'
+    try:
+        values = ast.parse(expr_to_parse, mode='eval').body.values
+    except SyntaxError:
+        logging.error(f'Formatting error for "{lookup_name}" (resolved to "{fmt_str}")')
+        return set()
+    return {fv.value.id for fv in values if isinstance(fv, ast.FormattedValue)}
+
+
+def get_name(internal: str, *format_args, **format_kwargs):
     """Get an end-user suitable name.
 
     Try lookup in config.utils.names.
@@ -93,6 +141,8 @@ def get_name(internal: str):
         as namespace for the second (right).
     If a name isn't found, a warning is logged and the internal name returned,
         potentially modified
+
+    Returned names are formatted with ``format_args`` and ``format_kwargs``
     """
     internal = internal.lower()
     if '__' in internal:
@@ -103,35 +153,15 @@ def get_name(internal: str):
             r.append(get_name(prefix))
             prefix += '::'
         return ': '.join(r)
-    *path, name = internal.split('::')
-    components = 2**len(path)
-    look_in = []
-    while components:
-        components -= 1
-        try:
-            look_in.append(functools.reduce(
-                operator.getitem,
-                (ns for i, ns in enumerate(path, 1) if components & (1 << (len(path) - i))),
-                config.utils.names))
-        except (KeyError, TypeError):
-            pass
-    for ns in look_in:
-        if isinstance(ns, str):
-            continue
-        try:
-            val = ns[name]
-            if isinstance(val, str):
-                return val
-            elif isinstance(val, dict):
-                return val['*this*']
-            else:
-                raise TypeError('{!r} is neither dict nor str'.format(val))
-        except KeyError:
-            pass
-    name = '::'.join(path + [name])
-    if not config.debug:
-        logging.warning('Name "{}" was not found in the namefile'.format(name))
-    return name
+    val = lookup_name_spec(internal)
+    try:
+        return val.format(*format_args, **format_kwargs)
+    except (KeyError, IndexError, ValueError):
+        logging.error(f'Formatting error for "{internal}" (resolved to "{val}")')
+    except AttributeError:  # if val is None
+        if not config.debug:
+            logging.warning(f'Name "{internal}" was not found in the namefile')
+    return internal
 
 
 def format_date(date: datetime.date):

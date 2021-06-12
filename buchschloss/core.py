@@ -415,6 +415,7 @@ class ActionNamespace:
     actions: 'set[str]'
     namespaces: 'T.ClassVar[list[str]]' = []
     _model_fields: T.ClassVar[set]
+    _format_fields: T.ClassVar[set]
 
     def __init_subclass__(cls):
         """add the _model_fields and required_levels attributes"""
@@ -424,6 +425,7 @@ class ActionNamespace:
             k for k in dir(cls.model)
             if isinstance(getattr(cls.model, k), (peewee.Field, peewee.BackrefAccessor))
         }
+        cls._format_fields = utils.get_format_fields(cls.model.__name__)
 
         def level_required(level, f):
             """due to scoping, this has to be a separate function"""
@@ -456,13 +458,10 @@ class ActionNamespace:
                 setattr(cls, name, level_required(req_level, func.__func__))  # noqa
 
     @staticmethod
-    @abc.abstractmethod
     def new(*, login_context, **kwargs):
         """Create a new record"""
-        raise NotImplementedError
 
     @staticmethod
-    @abc.abstractmethod
     def edit(id_, *, login_context, **kwargs):
         """Edit an existing record"""
 
@@ -576,7 +575,7 @@ class ActionNamespace:
                     raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
                                      '"ge", "le" or "contains"')
 
-        query = cls.model.select_str_fields().distinct()
+        query = cls.model.select_str_fields(cls._format_fields).distinct()
         if condition:
             condition, query = handle_condition(condition, query)
             query = query.where(condition)
@@ -586,8 +585,6 @@ class ActionNamespace:
 
 class Book(ActionNamespace):
     """Namespace for Book-related functions"""
-    model = models.Book
-
     @staticmethod
     def new(*, isbn: int, author: str, title: str, language: str, publisher: str,  # noqa
             year: int, medium: str, shelf: str, series: T.Optional[str] = None,
@@ -675,8 +672,6 @@ class Book(ActionNamespace):
 
 class Person(ActionNamespace):
     """Namespace for Person-related functions"""
-    model = models.Person
-
     @staticmethod
     def new(*, id_: int, first_name: str, last_name: str, class_: str,  # noqa
             max_borrow: int = 3, libraries: T.Iterable[str] = ('main',),
@@ -750,8 +745,6 @@ class Person(ActionNamespace):
 
 class Library(ActionNamespace):
     """Namespace for Library-related functions"""
-    model = models.Library
-
     @staticmethod
     def new(name: str, *,  # noqa
             books: T.Sequence[int] = (),
@@ -804,8 +797,6 @@ class Library(ActionNamespace):
 
 class Borrow(ActionNamespace):
     """Namespace for Borrow-related functions"""
-    model = models.Borrow
-
     @classmethod
     @from_db(book=models.Book, person=models.Person)
     def new(cls, book, person, weeks, *, override=False, login_context):
@@ -881,8 +872,6 @@ class Borrow(ActionNamespace):
 
 class Member(ActionNamespace):
     """namespace for Member-related functions"""
-    model = models.Member
-
     @staticmethod
     @auth_required
     def new(name: str, password: str, level: int, *, login_context):
@@ -953,7 +942,6 @@ class Member(ActionNamespace):
 
 class Script(ActionNamespace):
     """namespace for Script-related functions"""
-    model = models.Script
     allowed_chars = set(string.ascii_letters + string.digits + ' _-')
     callbacks = None
 
@@ -1080,7 +1068,7 @@ class DataNamespace(T.Mapping[str, T.Any]):
         self.handlers = self.data_handling[ans]
         self.attributes = frozenset.union(*map(frozenset, self.handlers.values()))
         self.login_context = login_context
-        self.string = str(self.data)  # TODO: replace with a call to utils.get_name
+        self.string = utils.get_name(f'{type(self.data).__name__}::repr', self.data)
 
     def __eq__(self, other):
         if isinstance(other, DataNamespace):

@@ -8,11 +8,6 @@
   "logged_in_as_{}": "logged in as {}",
   "logged_out": "logged out",
   "not_logged_in": "not logged in",
-  "Person[{}]\"{}, {}\"": "Person[{}]\"{}, {}\"",
-  "Library[{}]": "Library[{}]",
-  "Book[{}]\"{}\"": "Book[{}]\"{}\"",
-  "Group[{}]": "Group[{}]",
-  "Member[{}]({})": "Member[{}]({})",
   "error": {
     "no_permission": "permission denied",
     "must_be_{}": "For this action, you must be at least {}.",
@@ -102,6 +97,7 @@
   },
   "Book": {
     "*this*": "book",
+    "repr": "\"{0.title}\" by {0.author}",
     "id": "ID",
     "new_id_{}": "The new book has the ID {}.",
     "borrowed": "borrowed",
@@ -126,6 +122,7 @@
   },
   "Person": {
     "*this*": "person",
+    "repr": "{0.first_name} {0.last_name}",
     "id": "ID",
     "id_": "ID",
     "first_name": "first name",
@@ -183,6 +180,7 @@
       "REQUESTS": "access the internet"
     }
   },
+  "repr": "{0.name}",
   "interactive_question": {
     "current_password": "Please enter your password",
     "new_password": "Please enter the new password",
