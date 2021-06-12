@@ -73,6 +73,13 @@ end
 local function start_leseclub()
     if check_level(manage_level) then return end
     if check_leseclub_active(false) then return end
+    local data = ui.get_data{{'groups', 'multichoices', Book.groups}}
+    if not data then return end
+    -- TODO: implement bulk editing
+    for _, b in pairs(Book{{'groups.name', 'in', data.groups}, 'and', {'library.name', 'eq', 'main'}}) do
+        Book[b.id]:edit{library=lc_library_name}
+    end
+    storage.groups = data.groups
     storage.read_books = {}
     buchschloss.set_storage(storage)
     ui.alert('leseclub_started')
@@ -84,7 +91,12 @@ local function end_leseclub()
     if not ui.ask('really_end_leseclub') then
         return
     end
+    -- TODO: implement bulk editing
+    for _, b in pairs(Book{{'groups.name', 'in', storage.groups}, 'and', {'library.name', 'eq', lc_library_name}}) do
+        Book[b.id]:edit{library='main'}
+    end
     storage.read_books = nil
+    storage.groups = nil
     buchschloss.set_storage(storage)
     ui.alert('leseclub_ended')
 end
