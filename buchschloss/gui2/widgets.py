@@ -327,7 +327,7 @@ class LinkWidget(formlib.FormWidget):
             tk.Button(
                 self.widget,
                 wraplength=WRAPLENGTH,
-                command=partial(self.view_func, self.master, arg),
+                command=partial(self.view_func, self.form.frame, arg),
                 text=self.display(item),
             ).pack()
 

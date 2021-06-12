@@ -9,7 +9,11 @@ from tkinter import ttk
 import tkinter.messagebox as tk_msg
 from typing import Any, Optional
 
-__all__ = ['Form', 'FormWidget', 'Entry', 'RadioChoices', 'DropdownChoices']
+__all__ = [
+    'Form', 'ScrolledForm',
+    'FormWidget',
+    'Entry', 'RadioChoices', 'DropdownChoices',
+]
 
 
 class Form:
@@ -158,6 +162,45 @@ class Form:
     def _grid_if_not_none(widget, **kwargs):
         if widget is not None:
             widget.grid(**kwargs)
+
+
+class ScrolledForm(Form):
+    """This form adds a vertical scrollbar"""
+    height: int
+
+    def __init__(self, frame, tag, submit_callback):
+        # outer = tk.Frame(frame)
+        self.canvas = canvas = tk.Canvas(frame, height=self.height)
+        sb = tk.Scrollbar(frame, command=canvas.yview)
+        canvas['yscrollcommand'] = sb.set
+        canvas.pack(expand=True, fill=tk.X, side=tk.LEFT)
+        sb.pack(expand=True, fill=tk.Y, side=tk.LEFT)
+        inner = tk.Frame(canvas)
+        canvas.create_window((0, 0), window=inner)
+        canvas.bind('<Configure>', lambda e: canvas.config(scrollregion=canvas.bbox('all')))
+        inner.bind('<Configure>', lambda e: canvas.config(scrollregion=canvas.bbox('all')))
+        inner.bind('<Configure>', lambda e: canvas.config(width=inner.winfo_width()))
+        # see https://stackoverflow.com/questions/17355902 for scrolling
+        # fids = (
+        #     inner.bind('<MouseWheel>', self._scroll, add=True),
+        #     inner.bind('<Button-4>', self._scroll, add=True),
+        #     inner.bind('<Button-5>', self._scroll, add=True),
+        # )
+        # inner.bind('<Destroy>', lambda e: [canvas.unbind(fid) for fid in fids])
+        # inner.bind('<Destroy>', lambda e: outer.destroy())
+        super().__init__(inner, tag, submit_callback)
+        self.frame = frame
+
+        def bind(w):
+            for code in ('<MouseWheel>', '<Button-4>', '<Button-5>'):
+                w.bind(code, self._scroll)
+            for child in w.children.values():
+                bind(child)
+        bind(inner)
+
+    def _scroll(self, event):
+        if str(event.widget).startswith(str(self.canvas)):
+            self.canvas.yview_scroll((event.delta > 0 or event.num == 5)*2 - 1, 'units')
 
 
 class FormWidget:

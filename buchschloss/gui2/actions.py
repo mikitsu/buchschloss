@@ -14,7 +14,7 @@ from . import common
 from .. import core
 from .. import config
 from .. import utils
-from .formlib import Form as LibForm, Entry, DropdownChoices, RadioChoices
+from .formlib import Form as LibForm, ScrolledForm, Entry, DropdownChoices, RadioChoices
 from .widgets import (
     # not form-related
     SearchResultWidget, WRAPLENGTH,
@@ -39,24 +39,14 @@ class FormTag(enum.Enum):
     VIEW = '"view" action'
 
 
-class BaseForm(LibForm):
-    """Base class for forms, handling get_name, default content and autocompletes"""
+class NameForm(LibForm):
+    """Use utils.get_name"""
     form_name: str
 
-    def __init__(self, frame, tag, submit_callback):
-        super().__init__(frame, tag, submit_callback)
-        self.set_data(config.gui2.entry_defaults.get(self.form_name).mapping)
-
     def __init_subclass__(cls, **kwargs):
-        """Handle autocompletes and set cls.form_name"""
+        """Set cls.form_name"""
         cls.form_name = cls.__name__.replace('Form', '')
-        # This will put every widget spec into the standard form, required below
         super().__init_subclass__(**kwargs)  # noqa -- it might accept kwargs later
-
-        for k, v in config.gui2.get('autocomplete').get(cls.form_name).mapping.items():
-            if k in cls.all_widgets:
-                for *_, w_kwargs in cls.all_widgets[k].values():
-                    w_kwargs.setdefault('autocomplete', v)
 
     def get_name(self, name):
         """redirect to utils.get_name inserting a form-specific prefix"""
@@ -65,6 +55,25 @@ class BaseForm(LibForm):
         else:
             items = ('form', self.form_name, name)
         return utils.get_name('::'.join(items))
+
+
+class BaseForm(NameForm, ScrolledForm):
+    """Base class for forms, handling default content and autocompletes"""
+    height = config.gui2.widget_size.main.height
+
+    def __init__(self, frame, tag, submit_callback):
+        super().__init__(frame, tag, submit_callback)
+        self.set_data(config.gui2.entry_defaults.get(self.form_name).mapping)
+
+    def __init_subclass__(cls, **kwargs):
+        """Handle autocompletes"""
+        # This will put every widget spec into the standard form, required below
+        super().__init_subclass__(**kwargs)
+
+        for k, v in config.gui2.get('autocomplete').get(cls.form_name).mapping.items():
+            if k in cls.all_widgets:
+                for *_, w_kwargs in cls.all_widgets[k].values():
+                    w_kwargs.setdefault('autocomplete', v)
 
     def get_widget_label(self, widget):
         """add ``wraplength``"""
@@ -194,7 +203,7 @@ class ViewForm(BaseForm):
             return super().get_submit_widget()
 
 
-def form_dialog(root: tk.Widget, form_cls: Type[BaseForm]) -> Optional[dict]:
+def form_dialog(root: tk.Widget, form_cls: Type[NameForm]) -> Optional[dict]:
     """Show a pop-up dialog based on a form"""
     def callback(kwargs):
         nonlocal data
@@ -351,8 +360,7 @@ def view_data(name: str, master: tk.Widget, dns: core.DataNamespace):
     :param master: is the master widget to display data in
     :param dns: is a DataNamespace of the object to display
     """
-    for child in master.children.copy().values():
-        child.destroy()
+    common.destroy_all_children(master)
     form_cls: Type[BaseForm] = globals()[name.capitalize() + 'Form']
     form = form_cls(master, FormTag.VIEW, lambda **kw: None)
     try:
@@ -368,7 +376,7 @@ def view_action(master: tk.Widget, ans: common.NSWithLogin):
     """Ask for an ID and call :func:`.view_data`. Useful with ``functools.partial``"""
     temp_form = type(
         ans.ans.__name__ + 'Form',
-        (BaseForm,),
+        (NameForm,),
         {'all_widgets': {'id': (OptionsFromSearch, ans, {})}},
     )
     result = form_dialog(master.winfo_toplevel(), temp_form)  # noqa
@@ -579,7 +587,7 @@ class MemberChangePasswordForm(AuthedForm):
     }
 
 
-class LoginForm(BaseForm):
+class LoginForm(NameForm):
     all_widgets = {
         'name': NonEmptyREntry,
         'password': PasswordEntry,
