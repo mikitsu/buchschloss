@@ -530,7 +530,10 @@ class MultiChoicePopup(FormWidget):
             listbox.select_set(i)
         listbox.pack(side=tk.LEFT)
         if self.allow_new or len(self.values) > self.max_height:
+            listbox['height'] = self.max_height
             scrollbar = tk.Scrollbar(top, command=listbox.yview)
             listbox['yscrollcommand'] = scrollbar.set
             scrollbar.pack(expand=True, fill=tk.Y, side=tk.LEFT)
+        else:
+            listbox['height'] = len(self.values)
         return listbox
