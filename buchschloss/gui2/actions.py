@@ -401,10 +401,14 @@ def display_lua_data(data):
     popup.grab_set()
     outer_frame = tk.Frame(popup)
     outer_frame.pack()
-    frame = tk.Frame(outer_frame, **config.gui2.widget_size.popup.mapping)
+    size = config.gui2.widget_size.popup
+    frame = tk.Frame(outer_frame, **size.mapping)
     frame.propagate(False)
     frame.grid(row=0, column=0)
-    view = ttk.Treeview(frame)
+    # This isn't quite right because the x-scrollbar (the button is outside the frame)
+    # should also be considered, but it's probably good enough
+    view_height = size.height // ttk.Style().configure('Treeview', 'rowheight')
+    view = ttk.Treeview(frame, height=view_height)
     width, height = add_lua_data_entries(view, '', data)
     view.column('#0', width=width)
     if height > view['height']:
