@@ -172,7 +172,7 @@ def test_ui_interaction(monkeypatch):
 
 def test_requests_bs4(monkeypatch):
     """test the requests and bs4 Lua interfaces"""
-    def get(url):
+    def get(url, **_):
         return {
             'https://test.invalid/plain.txt':
                 Dummy(headers={'Content-Type': 'text/plain'},
