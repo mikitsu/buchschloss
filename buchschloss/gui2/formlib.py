@@ -78,11 +78,11 @@ class Form:
         cls.all_widgets = all_widgets
 
     def __init__(self, frame, tag, submit_callback):
-        self.frame = frame
+        self.frame = self.master = frame
         self.tag = tag
         self.submit_callback = submit_callback
         self.widget_dict = {
-            name: widget[0](self, self.frame, name, *widget[1:-1], **widget[-1])
+            name: widget[0](self, self.master, name, *widget[1:-1], **widget[-1])
             for name, tag_alternatives in self.all_widgets.items()
             for widget in [tag_alternatives.get(tag, tag_alternatives[None])]
             if widget is not None
@@ -124,7 +124,7 @@ class Form:
         complete_message = []
         for field, message in errors.items():
             complete_message.append(f'{self.get_name(field)}: {message}')
-            w = tk.Label(self.frame, text=message, **self.error_text_config)
+            w = tk.Label(self.master, text=message, **self.error_text_config)
             w.grid(row=self.widget_dict[field].widget.grid_info()['row'], column=3)
             self._error_display_widgets.append(w)
         tk_msg.showerror(self.get_name('error'), '\n'.join(complete_message))
@@ -169,7 +169,6 @@ class ScrolledForm(Form):
     height: int
 
     def __init__(self, frame, tag, submit_callback):
-        # outer = tk.Frame(frame)
         self.canvas = canvas = tk.Canvas(frame, height=self.height)
         sb = tk.Scrollbar(frame, command=canvas.yview)
         canvas['yscrollcommand'] = sb.set
@@ -180,17 +179,10 @@ class ScrolledForm(Form):
         canvas.bind('<Configure>', lambda e: canvas.config(scrollregion=canvas.bbox('all')))
         inner.bind('<Configure>', lambda e: canvas.config(scrollregion=canvas.bbox('all')))
         inner.bind('<Configure>', lambda e: canvas.config(width=inner.winfo_width()))
-        # see https://stackoverflow.com/questions/17355902 for scrolling
-        # fids = (
-        #     inner.bind('<MouseWheel>', self._scroll, add=True),
-        #     inner.bind('<Button-4>', self._scroll, add=True),
-        #     inner.bind('<Button-5>', self._scroll, add=True),
-        # )
-        # inner.bind('<Destroy>', lambda e: [canvas.unbind(fid) for fid in fids])
-        # inner.bind('<Destroy>', lambda e: outer.destroy())
         super().__init__(inner, tag, submit_callback)
         self.frame = frame
 
+        # see https://stackoverflow.com/questions/17355902 for scrolling
         def bind(w):
             for code in ('<MouseWheel>', '<Button-4>', '<Button-5>'):
                 w.bind(code, self._scroll)
