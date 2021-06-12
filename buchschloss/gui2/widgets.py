@@ -58,6 +58,25 @@ class OptionsFromSearch(formlib.DropdownChoices):
         self.form.set_data({k: v for k, v in result.items() if k != self.name})
 
 
+class FallbackOFS(formlib.FormWidget):
+    """Attempt to display OptionsFromSearch and fall back to Entry on error"""
+    def __init__(self, form, master, name,
+                 action_ns, allow_none=False, fb_default=None):
+        basic = form, master, name
+        super().__init__(*basic)
+        try:
+            form_widget = OptionsFromSearch(*basic, action_ns, allow_none)
+        except core.BuchSchlossBaseError:
+            form_widget = formlib.Entry(*basic, ('none' if allow_none else 'error'))
+            if callable(fb_default):
+                fb_default = fb_default()
+            if fb_default is not None:
+                form_widget.set(fb_default)
+
+        for name in ('widget', 'get', 'set', 'validate'):
+            setattr(self, name, getattr(form_widget, name))
+
+
 class SeriesInput(formlib.FormWidget):
     """Provide Entry widgets for a series name and number"""
     def __init__(self, form, master, name):

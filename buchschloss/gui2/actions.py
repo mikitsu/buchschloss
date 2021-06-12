@@ -24,7 +24,7 @@ from .widgets import (
     # specific form widgets and form widget tuples
     SeriesInput, ISBNEntry, ClassEntry, ScriptNameEntry,
     # complex form widgets
-    LinkWidget, DisplayWidget, OptionsFromSearch, SearchMultiChoice,
+    LinkWidget, DisplayWidget, OptionsFromSearch, FallbackOFS, SearchMultiChoice,
 )
 
 Book = common.NSWithLogin(core.Book)
@@ -582,7 +582,11 @@ class MemberForm(AuthedForm, SearchForm, EditForm, ViewForm):
 
 class MemberChangePasswordForm(AuthedForm):
     all_widgets = {
-        'member': (OptionsFromSearch, common.NSWithLogin(core.Member), {}),
+        'member': (
+            FallbackOFS,
+            common.NSWithLogin(core.Member),
+            {'fb_default': lambda: getattr(main.app.current_login, 'name', None)},
+        ),
         'current_password': PasswordEntry,
         'new_password': ConfirmedPasswordInput,
     }
