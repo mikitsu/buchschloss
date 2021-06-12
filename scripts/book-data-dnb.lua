@@ -35,11 +35,9 @@ for _, tr in ipairs(data_table.select('tr')) do
     if #td == 2 then
         local key = strip(td[1].text)
         local value = strip(td[2].text)
-        -- I know all the ``end if`` should be ``else if``, but I'd end up with
-        -- an exorbitant number of ``end`` at the end
         if key == 'Titel' then
             r['title'] = value
-        end if key == 'Person(en)' then
+        elseif key == 'Person(en)' then
             for person, role in string.gmatch(value, '([%a %-]+, [%a %-]+) %(([%a %-]+)%)') do
                 if role == 'Verfasser' then
                     r.author = person
@@ -47,13 +45,13 @@ for _, tr in ipairs(data_table.select('tr')) do
                     table.insert(r.concerned_people, role .. ': ' .. person)
                 end
             end
-        end if key == 'Verlag' then
+        elseif key == 'Verlag' then
             r.publisher = string.match(value, '^.+%:%s*(.+)%s*$')
-        end if key == 'Zeitliche Einordnung' then
+        elseif key == 'Zeitliche Einordnung' then
             r.year = tonumber(string.match(value, '%d%d%d%d'))
-        end if key == 'Sprache(n)' then
+        elseif key == 'Sprache(n)' then
             r.language = string.match(value, '%a+')
-        end if key == 'Literarische Gattung' then
+        elseif key == 'Literarische Gattung' then
             -- not very sure about this one...
             r.genres = value
         end
