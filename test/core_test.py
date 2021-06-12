@@ -105,15 +105,24 @@ def test_data_ns():
     class DataA(core.Dummy):
         pk_name = 'a'
         @staticmethod
-        def check_view_permissions(lc, dns):
-            pass
-    class DataB(core.Dummy): pass
+        def format_object(obj):
+            return 'constA'
+    class DataB(core.Dummy):
+        verify_count = 0
+        @staticmethod
+        def format_object(obj):
+            return 'constB'
+        @classmethod
+        def check_view_permissions(cls, lc, dns):
+            cls.verify_count += 1
 
     def validate_datab(data_val, x_val):
         assert isinstance(data_val, core.DataNamespace)
-        assert data_val.handlers == {'allow': 'ad'}
+        assert data_val.handlers == {'allow': 'x'}
         assert data_val.login_context is FLAG
-        assert data_val.data.x == x_val
+        old = DataB.verify_count
+        assert data_val['x'] == x_val
+        assert DataB.verify_count == old + 1
 
     core.DataNamespace.data_handling[DataA] = {
         'allow': 'ab',
@@ -121,12 +130,13 @@ def test_data_ns():
         'wrap_dns': {'d': DataB, 'n': DataB},
         'transform': {'g': lambda gs: [g.x for g in gs]},
     }
-    core.DataNamespace.data_handling[DataB] = {'allow': 'ad'}
+    core.DataNamespace.data_handling[DataB] = {'allow': 'x'}
     data = core.DataNamespace(
         DataA,
         DataA(a=1, b=[1, 2, 3], d=DataB(x=0), i=[DataB(x=1), DataB(x=2)], n=None,
               g=[DataB(x=5), DataB(x=7)]),
         login_context=FLAG,
+        verified=True,
     )
     assert data['a'] == 1
     assert data['b'] == [1, 2, 3]
@@ -135,6 +145,8 @@ def test_data_ns():
     assert data['g'] == [5, 7]
     assert data == 1
     assert {data: 'xyz'}[1] == 'xyz' == {1: 'xyz'}[data]
+    assert data.string == 'constA'
+    assert data['d'].string == 'constB'
 
 
 def test_data_ns_handlers(db):

@@ -23,7 +23,6 @@ import sys
 import warnings
 import operator
 import enum
-import abc
 import logging
 import logging.handlers
 
@@ -456,6 +455,12 @@ class ActionNamespace:
                 else:
                     req_level = cls.required_levels[name]
                 setattr(cls, name, level_required(req_level, func.__func__))  # noqa
+
+    @classmethod
+    def format_object(cls, obj: peewee.Model):
+        """Wrap utils.get_name to format the ::repr with matching arguments"""
+        attrs = {k: getattr(obj, k) for k in cls._format_fields}
+        return utils.get_name(cls.__name__ + '::repr', **attrs)
 
     @staticmethod
     def new(*, login_context, **kwargs):
@@ -1068,7 +1073,7 @@ class DataNamespace(T.Mapping[str, T.Any]):
         self.handlers = self.data_handling[ans]
         self.attributes = frozenset.union(*map(frozenset, self.handlers.values()))
         self.login_context = login_context
-        self.string = utils.get_name(f'{type(self.data).__name__}::repr', self.data)
+        self.string = ans.format_object(raw_data)
 
     def __eq__(self, other):
         if isinstance(other, DataNamespace):

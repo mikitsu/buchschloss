@@ -84,7 +84,7 @@ def check_isbn(isbn: str) -> int:
 
 def lookup_name_spec(spec: str):
     """Look up a name spec in config.utils.names. See get_name for strategy"""
-    *path, name = spec.split('::')
+    *path, name = spec.lower().split('::')
     look_in = []
     for components in range(2**len(path)-1, -1, -1):
         try:
@@ -118,9 +118,8 @@ def get_format_fields(model_name: str) -> set:
     fmt_str = lookup_name_spec(lookup_name)
     if fmt_str is None:
         return set()
-    # The string is formatted with exactly one object
-    # and may only lookup attributes (and use any format specifier)
-    expr_to_parse = 'f"' + fmt_str.replace('"', '\\"').replace('0.', '') + '"'
+    # The string is formatted with keyword arguments corresponding to attributes
+    expr_to_parse = 'f' + repr(fmt_str)
     try:
         values = ast.parse(expr_to_parse, mode='eval').body.values
     except SyntaxError:
@@ -144,7 +143,6 @@ def get_name(internal: str, *format_args, **format_kwargs):
 
     Returned names are formatted with ``format_args`` and ``format_kwargs``
     """
-    internal = internal.lower()
     if '__' in internal:
         r = []
         prefix = ''

@@ -51,10 +51,10 @@ def test_get_name():
 def test_format_fields():
     config.utils.names = {
         f'model-{i}': {'repr': text} for i, text in enumerate((
-            'Literal {{braces}}, also}} this way{{, {0.name}',
-            'Uses {0.attr!a} ascii and (invalid) {0.format:spec}',
-            '{0.attr2!r:#<&%#JD} with both...',
-            'Putt{{ing it {{{{{0.all} together: }}{0.attr!r:37dj}}} {{{0.name}',
+            'Literal {{braces}}, also}} this way{{, {name}',
+            'Uses {attr!a} ascii and (invalid) {format:spec}',
+            '{attr2!r:#<&%#JD} with both...',
+            'Putt{{ing it {{{{{all} together: }}{attr!r:37dj}}} {{{name}',
         ))
     }
     expected = ({'name'}, {'attr', 'format'}, {'attr2'}, {'all', 'attr', 'name'})
