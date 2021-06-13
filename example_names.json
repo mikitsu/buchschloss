@@ -97,7 +97,7 @@
   },
   "Book": {
     "*this*": "book",
-    "repr": "\"{title}\" by {author}",
+    "repr": "\"{title}\" by {author} [{id}]",
     "id": "ID",
     "new_id_{}": "The new book has the ID {}.",
     "borrowed": "borrowed",
@@ -122,7 +122,7 @@
   },
   "Person": {
     "*this*": "person",
-    "repr": "{first_name} {last_name}",
+    "repr": "{first_name} {last_name} [{id_}]",
     "id": "ID",
     "id_": "ID",
     "first_name": "first name",

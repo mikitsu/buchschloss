@@ -885,6 +885,14 @@ class Borrow(ActionNamespace):
 
 class Member(ActionNamespace, extra_actions={'change_password': None}):  # special-cased
     """namespace for Member-related functions"""
+    @classmethod
+    def format_object(cls, obj: models.Member):
+        """Wrap utils.get_name to format the ::repr with matching arguments"""
+        attrs = {k: getattr(obj, k) for k in cls._format_fields}
+        if 'level' in attrs:
+            attrs['level'] = utils.level_names[obj.level]
+        return utils.get_name('Member::repr', **attrs)
+
     @staticmethod
     @auth_required
     def new(name: str, password: str, level: int, *, login_context):

@@ -387,7 +387,7 @@ class ActionChoiceWidget(mtk.ContainingWidget):
                       width=config.gui2.widget_size.main.width)
 class SearchResultWidget(mtk.ContainingWidget):
     def __init__(self, master, results, view_func):
-        widgets = [(tk.Label, {'text': utils.get_name('{}_results').format(len(results))})]
+        widgets = [(tk.Label, {'text': utils.get_name('{}_results', len(results))})]
         for r in results:
             widgets.append((tk.Button, {
                 'text': r.string,
