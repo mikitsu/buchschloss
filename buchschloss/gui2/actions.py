@@ -548,7 +548,7 @@ class BookForm(SearchForm, EditForm, ViewForm):
 
 class PersonForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
-        'id_': {
+        'id': {
             FormTag.SEARCH: None,
             FormTag.NEW: IntEntry,
         },

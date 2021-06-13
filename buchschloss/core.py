@@ -672,7 +672,7 @@ class Book(ActionNamespace,
 class Person(ActionNamespace):
     """Namespace for Person-related functions"""
     @staticmethod
-    def new(*, id_: int, first_name: str, last_name: str, class_: str,  # noqa
+    def new(*, id: int, first_name: str, last_name: str, class_: str,  # noqa
             max_borrow: int = 3, libraries: T.Iterable[str] = ('main',),
             pay: bool = None, borrow_permission: date = None,
             login_context):
@@ -689,7 +689,7 @@ class Person(ActionNamespace):
         """
         if borrow_permission is None and pay:
             borrow_permission = date.today() + timedelta(weeks=52)
-        p = models.Person(id=id_, first_name=first_name, last_name=last_name,
+        p = models.Person(id=id, first_name=first_name, last_name=last_name,
                           class_=class_, max_borrow=max_borrow,
                           borrow_permission=borrow_permission)
         p.libraries = libraries
@@ -697,7 +697,7 @@ class Person(ActionNamespace):
             p.save(force_insert=True)
         except peewee.IntegrityError as e:
             if str(e).startswith('UNIQUE'):
-                raise BuchSchlossExistsError('Person', id_)
+                raise BuchSchlossExistsError('Person', id)
             else:
                 raise
         else:

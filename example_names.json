@@ -122,9 +122,8 @@
   },
   "Person": {
     "*this*": "person",
-    "repr": "{first_name} {last_name} [{id_}]",
+    "repr": "{first_name} {last_name} [{id}]",
     "id": "ID",
-    "id_": "ID",
     "first_name": "first name",
     "last_name": "last name",
     "class_": "class",
