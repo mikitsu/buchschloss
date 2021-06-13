@@ -178,7 +178,7 @@ class ScrolledForm(Form):
         canvas.create_window((0, 0), window=inner)
         canvas.bind('<Configure>', lambda e: canvas.config(scrollregion=canvas.bbox('all')))
         inner.bind('<Configure>', lambda e: canvas.config(scrollregion=canvas.bbox('all')))
-        inner.bind('<Configure>', lambda e: canvas.config(width=inner.winfo_width()))
+        inner.bind('<Configure>', lambda e: canvas.config(width=inner.winfo_width()), add=True)
         super().__init__(inner, tag, submit_callback)
         self.frame = frame
 
