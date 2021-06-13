@@ -63,7 +63,8 @@ class BaseForm(NameForm, ScrolledForm):
 
     def __init__(self, frame, tag, submit_callback):
         super().__init__(frame, tag, submit_callback)
-        self.set_data(config.gui2.entry_defaults.get(self.form_name).mapping)
+        if tag is FormTag.NEW:
+            self.set_data(config.gui2.entry_defaults.get(self.form_name).mapping)
 
     def __init_subclass__(cls, **kwargs):
         """Handle autocompletes"""
