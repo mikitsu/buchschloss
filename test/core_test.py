@@ -168,7 +168,7 @@ def test_person_new(db):
     ctxt = for_levels(
         partial(
             core.Person.new,
-            id_=123,
+            id=123,
             first_name='first',
             last_name='last',
             class_='cls'),
@@ -182,25 +182,25 @@ def test_person_new(db):
     assert len(p.libraries) == 0
     assert p.borrow_permission is None
     with pytest.raises(core.BuchSchlossBaseError):
-        person_new(id_=123, first_name='first', last_name='last', class_='cls')
-    person_new(id_=124, first_name='first', last_name='last', class_='cls',
+        person_new(id=123, first_name='first', last_name='last', class_='cls')
+    person_new(id=124, first_name='first', last_name='last', class_='cls',
                max_borrow=5, pay=True)
     p = models.Person.get_by_id(124)
     assert p.id == 124
     assert p.max_borrow == 5
     assert p.borrow_permission == datetime.date.today() + datetime.timedelta(weeks=52)
-    person_new(id_=125, first_name='first', last_name='last', class_='cls',
+    person_new(id=125, first_name='first', last_name='last', class_='cls',
                borrow_permission=datetime.date(1956, 1, 31))
     p = models.Person.get_by_id(125)
     assert p.id == 125
     assert p.borrow_permission == datetime.date(1956, 1, 31)
     models.Library.create(name='main')
-    person_new(id_=126, first_name='first', last_name='last', class_='cls')
+    person_new(id=126, first_name='first', last_name='last', class_='cls')
     p = models.Person.get_by_id(126)
     assert p.id == 126
     assert list(p.libraries) == [models.Library.get_by_id('main')]
     models.Library.create(name='lib')
-    person_new(id_=127, first_name='first', last_name='last', class_='cls', libraries=('lib',))
+    person_new(id=127, first_name='first', last_name='last', class_='cls', libraries=('lib',))
     assert list(models.Person.get_by_id(127).libraries) == [models.Library.get_by_id('lib')]
 
 
