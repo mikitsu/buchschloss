@@ -796,9 +796,9 @@ class Library(ActionNamespace):
 
 class Borrow(ActionNamespace):
     """Namespace for Borrow-related functions"""
-    _format_fields = None
     _format_fields_back = utils.get_format_fields('Borrow::repr-back')
     _format_fields_not_back = utils.get_format_fields('Borrow::repr-not-back')
+    _format_fields = _format_fields_not_back | _format_fields_back | {'is_back'}
 
     @classmethod
     def format_object(cls, obj: models.Borrow):
