@@ -1066,6 +1066,8 @@ class Script(ActionNamespace, extra_actions={'execute': None}):
             ns = runtime.execute(script.code)
             if function is not None:
                 ns[function]()
+        except BuchSchlossBaseError:
+            raise
         except Exception as e:
             if config.debug:
                 raise
