@@ -1,5 +1,13 @@
 """Test gui2.formlib"""
-from buchschloss.gui2 import formlib
+import types
+import runpy
+import os
+
+# giant dance to prevent importing buchschloss.gui2 (uses tk)
+# TODO: rewrite gui2 so that it doesn't start on import
+formlib = types.SimpleNamespace(**runpy.run_path(
+    os.path.join(os.path.dirname(__file__), '..', 'buchschloss', 'gui2', 'formlib.py')))
+
 
 def test_merge():
     class NotAForm:
