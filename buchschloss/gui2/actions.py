@@ -404,7 +404,7 @@ def login_logout():
         main.app.header.set_login_text(utils.get_name('action::logout'))
     else:
         main.app.current_login = core.guest_lc
-        main.app.header.set_info_text(utils.get_name('logged_out'))
+        main.app.header.set_info_text(utils.get_name('not_logged_in'))
         main.app.header.set_login_text(utils.get_name('action::login'))
 
 

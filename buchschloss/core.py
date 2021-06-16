@@ -348,7 +348,7 @@ def auth_required(f):
         else:
             logging.info('{} was denied access to {} (auth)'
                          .format(login_context, f.__qualname__))
-            raise BuchSchlossError('auth_failure', status)
+            raise BuchSchlossError('no_permission', status)
 
     last_doc_line = f.__doc__.splitlines()[-1]
     if last_doc_line.isspace():
@@ -399,10 +399,10 @@ def login(name: str, password: str):
     except models.Member.DoesNotExist:
         raise BuchSchlossNotFoundError('Member', name)
     if authenticate(m, password):
-        logging.info('login success {}'.format(m))
+        logging.info(f'login success {m}')
         return LoginContext(LoginType.MEMBER, m.level, name=m.name)
     else:
-        logging.info('login fail {}'.format(m))
+        logging.info(f'login fail {m}')
         raise BuchSchlossError('login', 'wrong_password')
 
 
@@ -612,7 +612,7 @@ class Book(ActionNamespace,
                 models.Group.create(book=b, name=g)
             for g in genres:
                 models.Genre.create(book=b, name=g)
-            logging.info('{} created {}'.format(login_context, b))
+            logging.info(f'{login_context} created {b}')
         return b.id
 
     @classmethod
@@ -646,7 +646,7 @@ class Book(ActionNamespace,
         for k, v in kwargs.items():
             setattr(book, k, v)
         book.save()
-        logging.info('{} edited {}'.format(login_context, book))
+        logging.info(f'{login_context} edited {book}')
 
     @staticmethod
     def get_all_genres(login_context):
@@ -701,8 +701,8 @@ class Person(ActionNamespace):
             else:
                 raise
         else:
-            logging.info('{} created {} with borrow_permission={}'
-                         .format(login_context, p, borrow_permission))
+            logging.info(f'{login_context} created {p} '
+                         f'with borrow_permission={borrow_permission}')
 
     @classmethod
     @from_db(person=models.Person)
@@ -735,10 +735,10 @@ class Person(ActionNamespace):
         for k, v in kwargs.items():
             setattr(person, k, v)
         person.save()
-        logging.info('{} edited {}'.format(login_context, person)
-                     + (' setting borrow_permission to {}'
-                        .format(kwargs['borrow_permission'])
-                        if 'borrow_permission' in kwargs else ''))
+        msg = f'{login_context} edited {person}'
+        if 'borrow_permission' in kwargs:
+            msg += f' setting borrow_permission to {kwargs["borrow_permission"]}'
+        logging.info(msg)
         return errors
 
 
@@ -832,14 +832,14 @@ class Borrow(ActionNamespace):
         in the configuration settings.
         """
         if not book.is_active or book.borrow.where(models.Borrow.is_back == False).count():  # noqa
-            raise BuchSchlossError('Borrow', 'Borrow::Book_{}_not_available', book.id)
+            raise BuchSchlossError('Borrow', 'Borrow::{}_not_available', book)
         if override:
             check_level(login_context, cls.required_levels.override, 'Borrow.new.override')
         else:
             if book.library not in person.libraries:
                 raise BuchSchlossError(
-                    'Borrow', 'Borrow::{person}_not_in_Library_{library}',
-                    person=person, library=book.library.name)
+                    'Borrow', 'Borrow::{person}_not_in_{library}',
+                    person=person, library=book.library)
             if (book.library.pay_required
                     and (person.borrow_permission or date.min) < date.today()):
                 raise BuchSchlossError(
@@ -849,8 +849,9 @@ class Borrow(ActionNamespace):
                 raise BuchSchlossError('Borrow', 'Borrow::{}_reached_max_borrow', person)
         rdate = date.today() + timedelta(weeks=weeks)
         models.Borrow.create(person=person, book=book, return_date=rdate)
-        logging.info('{} borrowed {} to {} until {}{}'.format(
-            login_context, book, person, rdate, override * ' with override=True'))
+        logging.info(f'{login_context} borrowed {book} to {person} until {rdate}'
+                     + override * ' with override=True')
+
 
     @staticmethod
     @from_db(models.Borrow)
@@ -879,7 +880,7 @@ class Borrow(ActionNamespace):
             borrow.return_date = return_date
         if is_back is not None:
             borrow.is_back = is_back
-        logging.info('{} edited {}'.format(login_context, borrow))
+        logging.info(f'{login_context} edited {borrow}')
         borrow.save()
 
 
@@ -912,7 +913,7 @@ class Member(ActionNamespace, extra_actions={'change_password': None}):  # speci
                     raise BuchSchlossExistsError('Member', name)
                 else:
                     raise
-        logging.info('{} created {}'.format(login_context, m))
+        logging.info(f'{login_context} created {m}')
 
     @staticmethod
     @auth_required
@@ -937,7 +938,7 @@ class Member(ActionNamespace, extra_actions={'change_password': None}):  # speci
         for k, v in kwargs.items():
             setattr(member, k, v)
         member.save()
-        logging.info('{} edited {} to {}'.format(login_context, old_str, member))
+        logging.info(f'{login_context} edited {old_str} to {member}')
 
     @classmethod
     @auth_required
@@ -958,7 +959,7 @@ class Member(ActionNamespace, extra_actions={'change_password': None}):  # speci
         member.salt = urandom(config.core.salt_length)
         member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
-        logging.info("{} changed {}'s password".format(login_context, member))
+        logging.info(f"{login_context} changed {member}'s password")
 
 
 class Script(ActionNamespace, extra_actions={'execute': None}):
@@ -1006,7 +1007,7 @@ class Script(ActionNamespace, extra_actions={'execute': None}):
             else:
                 raise
         else:
-            logging.info('{} created {}'.format(login_context, new))
+            logging.info(f'{login_context} created {new}')
 
     @classmethod
     @auth_required
@@ -1020,7 +1021,7 @@ class Script(ActionNamespace, extra_actions={'execute': None}):
         for k, v in kwargs.items():
             setattr(script, k, v)
         script.save()
-        logging.info('{} edited {}'.format(login_context, script))
+        logging.info(f'{login_context} edited {script}')
 
     @classmethod
     @from_db(script=models.Script)
@@ -1045,7 +1046,7 @@ class Script(ActionNamespace, extra_actions={'execute': None}):
         script_lc = LoginContext(
             LoginType.SCRIPT, script_lc_level, name=script.name, invoker=login_context)
         ui_callbacks = callbacks or cls.callbacks
-        get_name_prefix = 'script-data::{}::'.format(script.name)
+        get_name_prefix = f'script-data::{script.name}::'
         script_config = config.scripts.lua.get(script.name).mapping
         if ScriptPermissions.STORE in script.permissions:
             edit_func = partial(Script.edit, script.name, login_context=internal_priv_lc)
@@ -1072,7 +1073,9 @@ class Script(ActionNamespace, extra_actions={'execute': None}):
             if config.debug:
                 raise
             logging.error('error executing script function: ' + str(e))
-            display = ':'.join((script.name, function))
+            display = script.name
+            if function is not None:
+                display += ':' + function
             raise BuchSchlossError('Script::execute', 'script_{}_exec_problem', display)
 
 
