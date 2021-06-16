@@ -316,12 +316,14 @@ class LinkWidget(formlib.FormWidget):
                  attr: Optional[str] = None,
                  display: Callable[[Any], str] = operator.attrgetter('string'),
                  multiple: bool = False,
+                 wraplength=WRAPLENGTH,
                  ):
         assert callable(view_func), (form, name, view_func)
         super().__init__(form, master, name)
         self.attr = attr
         self.display = display
         self.multiple = multiple
+        self.wraplength = wraplength
         self.data = None
         self.view_func = view_func
         self.widget = tk.Frame(self.master)
@@ -345,7 +347,7 @@ class LinkWidget(formlib.FormWidget):
                     continue
             tk.Button(
                 self.widget,
-                wraplength=WRAPLENGTH,
+                wraplength=self.wraplength,
                 command=partial(self.view_func, self.form.frame, arg),
                 text=self.display(item),
             ).pack()
@@ -381,16 +383,3 @@ class ActionChoiceWidget(mtk.ContainingWidget):
                              'padx': 50})
                    for txt, cmd in actions]
         super().__init__(master, *widgets, **kw)
-
-
-@mtk.ScrollableWidget(height=config.gui2.widget_size.main.height,
-                      width=config.gui2.widget_size.main.width)
-class SearchResultWidget(mtk.ContainingWidget):
-    def __init__(self, master, results, view_func):
-        widgets = [(tk.Label, {'text': utils.get_name('{}_results', len(results))})]
-        for r in results:
-            widgets.append((tk.Button, {
-                'text': r.string,
-                'wraplength': config.gui2.widget_size.main.width,
-                'command': partial(view_func, r)}))
-        super().__init__(master, *widgets, direction=(tk.BOTTOM, tk.LEFT))

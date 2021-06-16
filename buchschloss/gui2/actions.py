@@ -17,7 +17,7 @@ from .. import utils
 from .formlib import Form as LibForm, ScrolledForm, Entry, DropdownChoices, RadioChoices
 from .widgets import (
     # not form-related
-    SearchResultWidget, WRAPLENGTH,
+    WRAPLENGTH,
     # generic form widgets and form widget tuples
     NonEmptyEntry, NonEmptyREntry, PasswordEntry, IntEntry, NullREntry, Text,
     ConfirmedPasswordInput, Checkbox, MultiChoicePopup,
@@ -204,6 +204,17 @@ class ViewForm(BaseForm):
             return super().get_submit_widget()
 
 
+class SearchResultForm(BaseForm):
+    """Pseudo-form for displaying search results. Subclass setting ``all_widgets``"""
+    def get_widget_label(self, widget):
+        """No labels for search results"""
+        return None
+
+    def get_submit_widget(self):
+        """no submit widget"""
+        return None
+
+
 def form_dialog(root: tk.Widget, form_cls: Type[NameForm]) -> Optional[dict]:
     """Show a pop-up dialog based on a form"""
     def callback(kwargs):
@@ -293,23 +304,31 @@ def show_results(master: tk.Widget,
     """
 
     def search_show():
-        common.destroy_all_children(search_frame)
-        SearchResultWidget(search_frame, results, view_wrap).pack()
+        common.destroy_all_children(result_frame)
+        btn.config(text='')
+        f = form_cls(result_frame, None, lambda d: None)
+        f.set_data({str(i): dns for i, dns in enumerate(results)})
 
-    def view_wrap(dns):
-        common.destroy_all_children(search_frame)
-        tk.Button(
-            search_frame,
-            text=utils.get_name('back_to_results'),
-            command=search_show,
-        ).pack()
-        result_frame = tk.Frame(search_frame)
-        result_frame.pack()
+    def view_wrap(_master, dns):
+        common.destroy_all_children(result_frame)
+        btn.config(text=utils.get_name('back_to_results'), command=search_show)
         return view_func(result_frame, dns)
 
+    all_widgets = {str(i): (LinkWidget, view_wrap, {'wraplength': WRAPLENGTH * 2})
+                   for i in range(len(results))}
+    form_cls = type('ConcreteSRForm', (SearchResultForm,), {'all_widgets': all_widgets})
     common.destroy_all_children(master)
-    search_frame = tk.Frame(master)
-    search_frame.pack()
+    header = tk.Frame(master)
+    header.pack()
+    tk.Label(
+        header,
+        text=utils.get_name('{}_results', len(results)),
+        wraplength=WRAPLENGTH,
+    ).pack(side=tk.LEFT)
+    btn = tk.Button(header, wraplength=WRAPLENGTH)
+    btn.pack(side=tk.LEFT)
+    result_frame = tk.Frame(master)
+    result_frame.pack()
     search_show()
 
 
