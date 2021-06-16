@@ -852,7 +852,6 @@ class Borrow(ActionNamespace):
         logging.info(f'{login_context} borrowed {book} to {person} until {rdate}'
                      + override * ' with override=True')
 
-
     @staticmethod
     @from_db(models.Borrow)
     def edit(borrow, *,
@@ -1154,7 +1153,7 @@ class DataNamespace(T.Mapping[str, T.Any]):
                 'genres': lambda gs: [g.name for g in gs],
                 'groups': lambda gs: [g.name for g in gs],
                 'borrow': lambda bs:
-                    next(iter(bs.where(models.Borrow.is_back == False).limit(1)), None),
+                    next(iter(bs.where(models.Borrow.is_back == False).limit(1)), None),  # noqa
             },
             'wrap_dns': {'library': Library, 'borrow': Borrow},
         },

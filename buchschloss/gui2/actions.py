@@ -459,12 +459,14 @@ def handle_lua_get_data(data_spec):
         'bool': Checkbox,
         'str': Entry,
     }
+
     def get_name(internal):
         try:
             return name_data[internal]
         except KeyError:
             # only happens on errors
             return utils.get_name('form::' + internal)
+
     name_data = {'submit': utils.get_name('form::submit')}
     cls_body = {'get_name': staticmethod(get_name), 'all_widgets': {}}
     for k, name, t, *x in data_spec:
@@ -481,10 +483,12 @@ def handle_lua_get_data(data_spec):
     common.destroy_all_children(main.app.center)
     watcher = tk.Variable()
     data = None
+
     def cb(new):
         nonlocal data
         data = new
         watcher.set('set')
+
     main.app.on_next_reset.append(lambda: watcher.set('set'))
     try:
         form = form_cls(main.app.center, None, cb)

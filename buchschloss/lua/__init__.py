@@ -114,11 +114,6 @@ def prepare_runtime(login_context: 'core.LoginContext', *,
         ``add_config`` may be a combination of basic values, dicts
             and tuples/lists. It will be assigned to a global variable
     """
-    ans_extended_funcs = {
-        'Group': ('activate',),
-        'Member': ('change_password',),
-        'Script': ('execute',),
-    }
     # noinspection PyArgumentList
     runtime = lupa.LuaRuntime(attribute_handlers=(lua_get, lua_set))
     restrict_runtime(runtime, config.lua.whitelist.mapping)

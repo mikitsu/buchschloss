@@ -27,7 +27,7 @@ class GroupTemp(peewee.Model):
 
 db.create_tables([GroupTemp])
 db.execute_sql("""
-INSERT INTO grouptemp (book_id, name) 
+INSERT INTO grouptemp (book_id, name)
     SELECT book_id, group_id FROM group_book_through;
 """)
 db.execute_sql('DROP TABLE group_book_through;')
