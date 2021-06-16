@@ -375,11 +375,3 @@ class Header:
 
     def __getattr__(self, name):
         return getattr(self.container, name)
-
-
-class ActionChoiceWidget(mtk.ContainingWidget):
-    def __init__(self, master, actions, **kw):
-        widgets = [(tk.Button, {'text': utils.get_name('action::' + txt), 'command': cmd,
-                             'padx': 50})
-                   for txt, cmd in actions]
-        super().__init__(master, *widgets, **kw)

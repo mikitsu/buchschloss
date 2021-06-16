@@ -31,7 +31,14 @@ class ActionTree(dict):
         orphan_n = len(self) % width or float('inf')
         orphan_nm1 = len(self) % (width - 1 or width) or float('inf')
         width -= (orphan_n < orphan_nm1)
-        widgets.ActionChoiceWidget(app.center, self.items(), horizontal=width).pack()
+        for i, (name, cmd) in enumerate(self.items()):
+            r, c = divmod(i, width)
+            tk.Button(
+                app.center,
+                padx=50,
+                text=utils.get_name('action::' + name),
+                command=cmd,
+            ).grid(row=r, column=c)
 
     @classmethod
     def from_nested(cls, mapping: T.Mapping):
