@@ -535,8 +535,14 @@ class MultiChoicePopup(FormWidget):
         bound = [(event, root.bind(event, dropup)) for event in ('<Button>', '<Key>')]
         dropdown = tk.Toplevel(root)
         dropdown.overrideredirect(True)
-        dropdown.geometry(f'+{x}+{y}')
         listbox = self.make_dropdown_content(dropdown)
+        root.update()
+        # don't go off screen
+        w_width, w_height = root.winfo_screenwidth(), root.winfo_screenheight()
+        p_width, p_height = dropdown.winfo_width(), dropdown.winfo_height()
+        x = min(x, w_width - p_width)
+        y = min(y, w_height - p_height)
+        dropdown.geometry(f'+{x}+{y}')
 
     def make_dropdown_content(self, top):
         """Create and display the dropdown widgets and return the listbox
