@@ -2,6 +2,7 @@
 
 import collections.abc
 import enum
+import logging
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tk_msg
@@ -72,9 +73,15 @@ class BaseForm(NameForm, ScrolledForm):
         super().__init_subclass__(**kwargs)
 
         for k, v in config.gui2.get('autocomplete').get(cls.form_name).mapping.items():
+            warn = True
             if k in cls.all_widgets:
-                for *_, w_kwargs in cls.all_widgets[k].values():
-                    w_kwargs.setdefault('autocomplete', v)
+                for w, *_, w_kwargs in cls.all_widgets[k].values():
+                    if issubclass(w, Entry):
+                        warn = False
+                        w_kwargs.setdefault('autocomplete', v)
+            if warn:
+                logging.warning(
+                    f'autocomplete for {cls.form_name}.{k} specified, but no applied')
 
     def get_widget_label(self, widget):
         """add ``wraplength``"""
