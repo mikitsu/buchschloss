@@ -142,6 +142,7 @@ def prepare_runtime(login_context: 'core.LoginContext', *,
 
 def start():
     """provide a REPL"""
+    print(config.lua.intro.text)
     username = input(utils.get_name('interactive_question::username'))
     if username:
         password = getpass.getpass(utils.get_name('interactive_question::password'))
@@ -156,7 +157,8 @@ def start():
     rt.globals()['getpass'] = getpass.getpass  # for auth_required functions
     while True:
         try:
-            line = input(str(login_context) + '@buchschloss-lua ==> ')
+            line = input(config.lua.prompt.safe_substitute(
+                login_context=login_context, username=username))
         except EOFError:
             print()
             return

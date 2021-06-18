@@ -18,7 +18,7 @@ DEFAULT_INTRO_TEXT = """Buchschloss
 https://github.com/mik2k2/buchschloss"""
 MODULE_DIR = os.path.dirname(__file__)
 INCLUDE_NAME = 'include'  # I'd love to make this configurable...
-UI_SECTIONS = ('cli', 'gui2')
+UI_SECTIONS = ('lua', 'gui2')
 ExceptSpec = T.Union[T.Type[BaseException], T.Tuple[T.Type[BaseException], ...]]
 ActuallyPathLike = T.Union[bytes, str, os.PathLike]
 

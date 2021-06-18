@@ -6,6 +6,7 @@ import base64
 import binascii
 import re
 import functools
+import string
 
 from configobj import validate
 
@@ -129,4 +130,5 @@ validator = validate.Validator({
     'file': is_file,
     'base64bytes': is_base64bytes,
     'regex': is_regex,
+    'template': string.Template,
 })
