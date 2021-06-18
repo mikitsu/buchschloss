@@ -217,5 +217,6 @@
       "late": "late:",
       "warn": "nearly late:"
     }
-  }
+  },
+  "level_names": {"1":  "basic", "4": "superadmin"}
 }

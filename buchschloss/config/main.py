@@ -150,7 +150,7 @@ def load_names(name_file: ActuallyPathLike,
     # TODO: this is not very nice.
     #   is there a way to make sure the keys are valid without going berserk
     #   if something unexpected happens?
-    level_names = processed_data.get('level names')
+    level_names = processed_data.get('level_names')
     if not isinstance(level_names, dict):
         level_names = {}
     for k, v in level_names.copy().items():
@@ -162,10 +162,13 @@ def load_names(name_file: ActuallyPathLike,
             if 0 <= new_k <= MAX_LEVEL and isinstance(v, str):
                 level_names[new_k] = v
         del level_names[k]
-    if not len(level_names) >= 2:
+    if len(level_names) < 2:
         # gui2 needs at least two
-        sys.stderr.write('ATTENTION: filling default values for level names\n')
-        level_names = {i: 'level_' + str(i) for i in range(MAX_LEVEL + 1)}
+        if level_names and 0 not in level_names:
+            level_names[0] = '-----'
+        else:
+            sys.stderr.write('ATTENTION: filling default values for level names\n')
+            level_names = {i: 'level_' + str(i) for i in range(MAX_LEVEL + 1)}
     processed_data['level names'] = level_names
     return processed_data
 

@@ -182,25 +182,23 @@ class BuchSchlossError(BuchSchlossBaseError):
 
         The title will be passed through utils.get_name normally
 
-        The message will be passed through utils.get_name and .format will
-        be called with an optional tuple (unpacked) given
+        The message will be passed through utils.get_name with any extra arguments
 
         'error::' will be prepended to both title and message
     """
 
     def __init__(self, title, message, *message_args, **message_kwargs):
-        super().__init__(utils.get_name('error::' + title),
-                         utils.get_name('error::' + message)
-                         .format(*message_args, **message_kwargs))
+        super().__init__(
+            utils.get_name('error::' + title),
+            utils.get_name('error::' + message, *message_args, **message_kwargs),
+        )
 
 
-class BuchSchlossPermError(BuchSchlossBaseError):
+class BuchSchlossPermError(BuchSchlossError):
     """use utils.get_name for level and message name"""
 
     def __init__(self, level):
-        super().__init__(utils.get_name('no_permission'),
-                         utils.get_name('must_be_{}').format(
-                             utils.level_names[level]))
+        super().__init__('no_permission', 'must_be_{}', utils.level_names[level])
 
 
 class BuchSchlossNotFoundError(BuchSchlossError.template_title('%s_not_found')
