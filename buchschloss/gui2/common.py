@@ -66,11 +66,8 @@ def destroy_all_children(widget: tk.Widget):
 
 @NSWithLogin.override('Book', 'new')
 def book_new(**kwargs):
-    tk_msg.showinfo(
-        utils.get_name('Book'),
-        utils.get_name('Book::new_id_{}').format(
-            core.Book.new(login_context=main.app.current_login, **kwargs))
-    )
+    b_id = core.Book.new(login_context=main.app.current_login, **kwargs)
+    tk_msg.showinfo(utils.get_name('Book'), utils.get_name('Book::new_id_{}', b_id))
 
 
 @NSWithLogin.override('Book', 'search')
