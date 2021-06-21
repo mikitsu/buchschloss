@@ -17,6 +17,8 @@ local attribs = requests.get(
     'html'
 ).select_one('div.attributes')
 
+if attribs == nil then return end
+
 for key, selector in pairs({author='author', title='name', publisher='publisher', language='inLanguage'}) do
     local field = attribs.select_one('span[itemprop="' .. selector .. '"]')
     if field ~= nil then

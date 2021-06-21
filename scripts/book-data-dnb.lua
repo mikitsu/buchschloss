@@ -51,9 +51,6 @@ for _, tr in ipairs(data_table.select('tr')) do
             r.year = tonumber(string.match(value, '%d%d%d%d'))
         elseif key == 'Sprache(n)' then
             r.language = string.match(value, '%a+')
-        elseif key == 'Literarische Gattung' then
-            -- not very sure about this one...
-            r.genres = value
         end
     end
 end

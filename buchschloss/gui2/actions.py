@@ -483,7 +483,7 @@ def handle_lua_get_data(data_spec):
     type_widget_map = {
         'int': IntEntry,
         'bool': Checkbox,
-        'str': Entry,
+        'str': NonEmptyEntry,
     }
 
     def get_name(internal):
