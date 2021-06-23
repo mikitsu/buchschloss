@@ -650,21 +650,21 @@ class Book(ActionNamespace,
     def get_all_genres(login_context):
         """return all known genres in the database"""
         logging.info(f'{login_context} viewed all genres')
-        return tuple(g.name for g in models.Genre.select(models.Genre.name).distinct())
+        return sorted(g.name for g in models.Genre.select(models.Genre.name).distinct())
 
     @staticmethod
     def get_all_groups(login_context):
         """return all known groups in the database"""
         logging.info(f'{login_context} viewed all groups')
-        return tuple(g.name for g in models.Group.select(models.Group.name).distinct())
+        return sorted(g.name for g in models.Group.select(models.Group.name).distinct())
 
     @staticmethod
     def get_all_series(login_context):
         """return all known series names in the database"""
         logging.info(f'{login_context} viewed all series names')
-        return tuple(b.series for b in
-                     models.Book.select(models.Book.series).distinct()
-                     .where(models.Book.series != None))  # noqa
+        return sorted(b.series for b in
+                      models.Book.select(models.Book.series).distinct()
+                      .where(models.Book.series != None))  # noqa
 
 
 class Person(ActionNamespace):
