@@ -8,11 +8,6 @@
   "logged_in_as_{}": "logged in as {}",
   "logged_out": "logged out",
   "not_logged_in": "not logged in",
-  "Person[{}]\"{}, {}\"": "Person[{}]\"{}, {}\"",
-  "Library[{}]": "Library[{}]",
-  "Book[{}]\"{}\"": "Book[{}]\"{}\"",
-  "Group[{}]": "Group[{}]",
-  "Member[{}]({})": "Member[{}]({})",
   "error": {
     "no_permission": "permission denied",
     "must_be_{}": "For this action, you must be at least {}.",
@@ -88,7 +83,7 @@
   "form": {
     "name": "name",
     "current_password": "your password",
-    "password2": "repeat password",
+    "submit": "Submit",
     "Borrow": {
       "weeks": "borrow time (weeks)"
     },
@@ -102,6 +97,7 @@
   },
   "Book": {
     "*this*": "book",
+    "repr": "\"{title}\" by {author} [{id}]",
     "id": "ID",
     "new_id_{}": "The new book has the ID {}.",
     "borrowed": "borrowed",
@@ -126,8 +122,8 @@
   },
   "Person": {
     "*this*": "person",
+    "repr": "{first_name} {last_name} [{id}]",
     "id": "ID",
-    "id_": "ID",
     "first_name": "first name",
     "last_name": "last name",
     "class_": "class",
@@ -172,6 +168,8 @@
   },
   "Borrow": {
     "*this*": "borrowing action",
+    "repr-back": "{book} -> {person} [BACK]",
+    "repr-not-back": "{book} -> {person} [{return_date}]",
     "is_back": "is back",
     "until_{}": "borrowed until {}"
   },
@@ -183,6 +181,7 @@
       "REQUESTS": "access the internet"
     }
   },
+  "repr": "{name}",
   "interactive_question": {
     "current_password": "Please enter your password",
     "new_password": "Please enter the new password",
@@ -218,5 +217,6 @@
       "late": "late:",
       "warn": "nearly late:"
     }
-  }
+  },
+  "level_names": {"1":  "basic", "4": "superadmin"}
 }

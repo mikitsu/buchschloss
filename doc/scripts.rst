@@ -141,15 +141,24 @@ following functions:
   The question is also passed through ``get_name``
 - ``display`` can be used to display (more) complex data. It will try to best display
   the passed data preserving hierarchies. Use this for displaying lists or mappings.
-- ``get_data`` can be used to get data of different types. It accepts a table mapping
-  names to types, where a type is one of ``'int', 'bool', 'str'`` (as a string).
-  The names will be passed through ``get_name``. When the user has provided the requested data,
+- ``get_data`` can be used to get data of different types. It accepts a table listing
+  ``{<key>, <type>}`` pairs or ``{<key>, <type>, <extra>}`` triplets.
+  ``<key>`` is the field name. A version passed through ``get_name`` will be displayed.
+  ``<type>`` may be one of ``'int'``, ``'bool'``, ``'str'``, ``'choice'``
+  or ``'multichoices'`` (as a string).
+  An input widget matching the given type is displayed.
+  For ``'choice'`` and ``'multichoices'``, ``<extra>`` is a table of data namespaces
+  to choose from. With ``'choice'``, exactly one ID is returned, with ``'multichoices'``
+  a table of selected IDs is returned.
+  When the user has provided the requested data,
   a table mapping the names to the data, provided as the requested type, is returned.
   If the user exits the data selection, ``nil`` is returned.
 - ``get_name`` provides access to the configured name file. Lookups are automatically
   prefixed with ``'script-data::<script name>::``. You may use ``{}`` formatting.
 - ``get_level`` provides access to level names. It takes a level number and
   returns the corresponding name.
+- ``format_date`` provides access to date formatting as configured.
+  It takes a date and returns the formatted string.
 
 Configuring scripts
 -------------------

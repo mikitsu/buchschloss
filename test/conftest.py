@@ -16,6 +16,5 @@ def db():
     # we don't need an explicit drop_tables
     models.db.create_tables(models.models)
     models.Misc.create(pk='last_script_invocations', data={})
-    models.Misc.create(pk='latest_borrowers', data=[])
     with models.db:
         yield

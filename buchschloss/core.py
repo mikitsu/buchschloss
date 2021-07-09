@@ -6,11 +6,11 @@ __all__ exports:
         Instances come with a nice description of what exactly failed.
     - misc_data: provide easy access to data stored in Misc by attribute lookup
     - login: to get a LoginContext for a user
-    - Book, Person, Borrow, Member, Library, Group: namespaces for functions
+    - Book, Person, Borrow, Member, Library, Group, Script: namespaces for functions
         dealing with the respective objects
-    - ComplexSearch: for very complex search queries
+    - ScriptPermissions: flag enum of script permissions
 """
-
+import functools
 import inspect
 import itertools
 import string
@@ -23,7 +23,6 @@ import sys
 import warnings
 import operator
 import enum
-import abc
 import logging
 import logging.handlers
 
@@ -42,7 +41,7 @@ from . import lua
 
 __all__ = [
     'BuchSchlossBaseError', 'misc_data',
-    'Person', 'Book', 'Member', 'Borrow', 'Library', 'Group', 'Script',
+    'Person', 'Book', 'Member', 'Borrow', 'Library', 'Script',
     'login', 'ScriptPermissions',
 ]
 
@@ -66,7 +65,6 @@ if log_conf.file:
         raise ValueError('config.core.log.rotate.how had an invalid value')
 else:
     handler = logging.StreamHandler(sys.stdout)
-del log_conf
 # noinspection PyArgumentList
 logging.basicConfig(level=getattr(logging, config.core.log.level),
                     format='{asctime} - {levelname}: {msg}',
@@ -74,6 +72,7 @@ logging.basicConfig(level=getattr(logging, config.core.log.level),
                     style='{',
                     handlers=[handler],
                     )
+del handler, log_conf
 
 
 class ScriptPermissions(enum.Flag):
@@ -183,25 +182,23 @@ class BuchSchlossError(BuchSchlossBaseError):
 
         The title will be passed through utils.get_name normally
 
-        The message will be passed through utils.get_name and .format will
-        be called with an optional tuple (unpacked) given
+        The message will be passed through utils.get_name with any extra arguments
 
         'error::' will be prepended to both title and message
     """
 
     def __init__(self, title, message, *message_args, **message_kwargs):
-        super().__init__(utils.get_name('error::' + title),
-                         utils.get_name('error::' + message)
-                         .format(*message_args, **message_kwargs))
+        super().__init__(
+            utils.get_name('error::' + title),
+            utils.get_name('error::' + message, *message_args, **message_kwargs),
+        )
 
 
-class BuchSchlossPermError(BuchSchlossBaseError):
+class BuchSchlossPermError(BuchSchlossError):
     """use utils.get_name for level and message name"""
 
     def __init__(self, level):
-        super().__init__(utils.get_name('no_permission'),
-                         utils.get_name('must_be_{}').format(
-                             utils.level_names[level]))
+        super().__init__('no_permission', 'must_be_{}', utils.level_names[level])
 
 
 class BuchSchlossNotFoundError(BuchSchlossError.template_title('%s_not_found')
@@ -264,13 +261,6 @@ class Dummy:  # TODO: move this out to misc
             return self._default
 
 
-class LibraryGroupAction(enum.Enum):
-    ADD = 'add'
-    REMOVE = 'remove'
-    DELETE = 'delete'
-    NONE = 'none'
-
-
 def pbkdf(pw, salt, iterations=config.core.hash_iterations[0]):
     """return pbkdf2_hmac('sha256', pw, salt, iterations)"""
     return pbkdf2_hmac('sha256', pw, salt, iterations)
@@ -297,7 +287,9 @@ def from_db(*arguments: T.Type[models.Model], **keyword_arguments: T.Type[models
             with models.db.atomic():
                 for k, m in keyword_arguments.items():
                     arg = bound.arguments[k]
-                    if not isinstance(arg, m):  # allow direct passing
+                    if isinstance(arg, DataNamespace):
+                        bound.arguments[k] = arg.data
+                    elif not isinstance(arg, m):
                         try:
                             bound.arguments[k] = m.get_by_id(arg)
                         except m.DoesNotExist:
@@ -333,8 +325,9 @@ def auth_required(f):
             if not login_context.level:
                 status = 'unprivileged_login_context'
         elif login_context.type is LoginType.SCRIPT:
-            data = Script.view_ns(login_context.name, login_context=internal_priv_lc)  # noqa
-            if ScriptPermissions.AUTH_GRANTED not in data.permissions:
+            perms = (models.Script.select(models.Script.permissions)
+                     .where(name=login_context.name).get().permissions)  # noqa -- scritp LC has name
+            if ScriptPermissions.AUTH_GRANTED not in perms:
                 status = 'no_script_perms'
         elif login_context.type is LoginType.MEMBER:
             if current_password is None:
@@ -353,7 +346,7 @@ def auth_required(f):
         else:
             logging.info('{} was denied access to {} (auth)'
                          .format(login_context, f.__qualname__))
-            raise BuchSchlossError('auth_failure', status)
+            raise BuchSchlossError('no_permission', status)
 
     last_doc_line = f.__doc__.splitlines()[-1]
     if last_doc_line.isspace():
@@ -369,9 +362,7 @@ def auth_required(f):
     LoginContexts as well as SCRIPT LoginContexts without
     the AUTH_GRANTED permission.
     """), doc_indent)
-    auth_required.functions.append(f.__qualname__)
     return auth_required_wrapper
-auth_required.functions = []  # noqa
 
 
 def authenticate(m, password):
@@ -406,28 +397,11 @@ def login(name: str, password: str):
     except models.Member.DoesNotExist:
         raise BuchSchlossNotFoundError('Member', name)
     if authenticate(m, password):
-        logging.info('login success {}'.format(m))
+        logging.info(f'login success {m}')
         return LoginContext(LoginType.MEMBER, m.level, name=m.name)
     else:
-        logging.info('login fail {}'.format(m))
+        logging.info(f'login fail {m}')
         raise BuchSchlossError('login', 'wrong_password')
-
-
-def _update_library_group(lg_model: T.Type[models.Model],
-                          libgr: peewee.ManyToManyQuery,
-                          new: T.Set[str]):
-    errors = set()
-    old = set(lg.name for lg in libgr)
-    for add in new.difference(old):
-        try:
-            libgr.add(lg_model.get(name=add))
-        except lg_model.DoesNotExist:
-            errors.add(BuchSchlossNotFoundError(lg_model.__name__, add).message)
-    for rem in old.difference(new):
-        # these are the ones we just read from the database,
-        # if we get an error here it's bad, so let it crash
-        libgr.remove(lg_model.get(name=rem))
-    return errors
 
 
 class ActionNamespace:
@@ -435,12 +409,24 @@ class ActionNamespace:
     Library, Group, Borrow and Script namespaces"""
     model: T.ClassVar[models.Model]
     required_levels: T.Any
+    # view_ns hacked in later because it uses 'view' permissions
+    actions: 'T.ClassVar[frozenset[str]]' = frozenset(('new', 'edit', 'search'))
+    namespaces: 'T.ClassVar[list[str]]' = []
     _model_fields: T.ClassVar[set]
+    _format_fields: T.ClassVar[set]
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls, extra_actions: dict = {}):  # noqa
         """add the _model_fields and required_levels attributes"""
-        cls._model_fields = {k for k in dir(cls.model)
-                             if isinstance(getattr(cls.model, k), peewee.Field)}
+        if extra_actions is None:
+            extra_actions = dict()
+        cls.namespaces.append(cls.__name__)
+        cls.model = getattr(models, cls.__name__)
+        cls._model_fields = {
+            k for k in dir(cls.model)
+            if isinstance(getattr(cls.model, k), (peewee.Field, peewee.BackrefAccessor))
+        }
+        if not hasattr(cls, '_format_fields'):
+            cls._format_fields = utils.get_format_fields(f'{cls.model.__name__}::repr')
 
         def level_required(level, f):
             """due to scoping, this has to be a separate function"""
@@ -450,81 +436,72 @@ class ActionNamespace:
                 return f(*args, login_context=login_context, **kwargs)
 
             checker = partial(check_level, level=level, resource=f.__qualname__)
-            return type(func)(wrapper)  # func is the static/classmethod from outside
+            return wrapper
 
+        extra_actions['view_ns'] = 'view'  # see ``actions = ...`` above
+        cls.actions |= extra_actions.keys()
         cls.required_levels = getattr(config.core.required_levels, cls.__name__)
-        for name, func in vars(cls).items():
-            # the two exceptions
-            if (cls.__name__, name) in (('Borrow', 'new'), ('Member', 'change_password')):
-                continue
-            # since these are only namespaces, no normal methods
-            if isinstance(func, (staticmethod, classmethod)):
-                if name.startswith('view'):
-                    req_level = cls.required_levels['view']
-                else:
-                    req_level = cls.required_levels[name]
-                setattr(cls, name, level_required(req_level, func.__func__))  # noqa
+        for name in cls.actions:
+            if (cls.__name__, name) == ('Member', 'change_password'):
+                req_level = 0
+            else:
+                req_level = cls.required_levels[extra_actions.get(name) or name]
+            func = getattr(cls, name)
+            setattr(cls, name, level_required(req_level, func))
+
+    @classmethod
+    def format_object(cls, obj: peewee.Model):
+        """Wrap utils.get_name to format the ::repr with matching arguments"""
+        attrs = {k: getattr(obj, k) for k in cls._format_fields}
+        return utils.get_name(cls.__name__ + '::repr', **attrs)
 
     @staticmethod
-    @abc.abstractmethod
     def new(*, login_context, **kwargs):
         """Create a new record"""
-        raise NotImplementedError
 
     @staticmethod
-    @abc.abstractmethod
     def edit(id_, *, login_context, **kwargs):
         """Edit an existing record"""
-
-    @staticmethod
-    @abc.abstractmethod
-    def view_str(id_: T.Union[int, str], *, login_context) -> dict:
-        """Return information in a dict"""
-        raise NotImplementedError
 
     @classmethod
     def view_ns(cls, id_: T.Union[int, str], *, login_context):
         """Return a namespace of information"""
-        check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_ns')
         try:
-            return DataNamespace(cls, cls.model.get_by_id(id_), login_context)
+            r = DataNamespace(cls, cls.model.get_by_id(id_), login_context, True)
         except cls.model.DoesNotExist:
             raise BuchSchlossNotFoundError(cls.model.__name__, id_)
+        else:
+            logging.info(f'{login_context} viewed {r}')
+            return r
 
     @classmethod
-    def view_repr(cls, id_: T.Union[str, int], *, login_context) -> str:
-        """Return a string representation"""
-        check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_repr')
-        try:
-            return str(next(iter(cls.model.select_str_fields().where(
-                getattr(cls.model, cls.model.pk_name) == id_).limit(1))))
-        except StopIteration:
-            raise BuchSchlossNotFoundError(cls.model.__name__, id_)
+    def check_view_permissions(cls, login_context, data_ns=None):
+        """Check whether the login context has viewing permission and log"""
+        check_level(login_context, cls.required_levels.view, cls.__name__ + '.view_ns')
+        if data_ns is not None:
+            logging.info(f'{login_context} viewed {data_ns}')
 
     @classmethod
     def search(cls, condition: tuple, *, login_context):
         """search for records.
 
-        :param condition: is a tuple of the form (<a>, <op>, <b>)
-            with <op> being a logical operation ("and" or "or") and <a>
-            and <b> in that case being condition tuples
+        :param condition: is a condition tuple.
 
-            or a comparison operation ("contains", "eq", "ne", "gt", "ge", "lt" or "le")
-            in which case <a> is a (possibly dotted) string corresponding
-            to the attribute name and <b> is the value to compare to.
+        Condition tuples are tuples of the form ``(a, op, b)`` or ``(func, c)``.
+        They may also be empty.
 
-            It (condition) may be empty, in which case it has no effect, i.e. is True
-            when used with an 'and' and False when used with an 'or'.
+        In the first case, ``op`` may be either a logical operation
+        ("and" or "or"), in which case ``a`` and ``b`` are condition tuples,
+        or a comparison operation ("contains", "eq", "ne", "gt", "ge", "lt" or "le"),
+        in which case ``a`` is a (possibly dotted) path to the field to test
+        and ``b`` is the value to test against.
 
-            If the top-level condition is empty, all existing values are returned.
+        In the second case, ``func`` is "not" or "exists".
+        This function is applied to the condition tuple ``c``.
 
-        .. note::
-
-            For ``condition``, there is no "not" available.
-            Use the inverse comparison operator instead
+        An empty condition tuple results in no change to the query state.
+        If the top-level condition tuple is empty, all existing values are returned.
         """
-        check_level(login_context, cls.required_levels.search, cls.__name__ + '.search')
-
         def follow_path(path, q):
             def handle_many_to_many():
                 through = fv.through_model.alias()
@@ -552,11 +529,25 @@ class ActionNamespace:
                 mod = fv.rel_model
                 q = handle_many_to_many()
                 fv = getattr(mod, mod.pk_name)
+            elif isinstance(fv, peewee.BackrefAccessor):
+                mod = fv.rel_model.alias()
+                q = q.join(mod, on=(getattr(cur, cur.pk_name)
+                                    == getattr(mod, fv.field.name)))
+                fv = getattr(mod, mod.pk_name)
             return fv, q
 
         def handle_condition(cond, q):
-            if not cond:
-                return q
+            if len(cond) == 2:
+                func, c = cond
+                if func == 'not':
+                    c, q = handle_condition(c, q)
+                    return ~c, q
+                elif func == 'exists':
+                    sub_q = cls.model.alias().select(0)
+                    c, sub_q = handle_condition(c, sub_q)
+                    return peewee.fn.EXISTS(sub_q.where(c)), q
+                else:
+                    raise ValueError('`func` must be "not" or "exists"')
             a, op, b = cond
             if op in ('and', 'or'):
                 if not a:
@@ -564,58 +555,62 @@ class ActionNamespace:
                 elif not b:
                     return handle_condition(a, q)
                 else:
-                    return getattr(operator, op + '_')(handle_condition(a, q),
-                                                       handle_condition(b, q))
+                    a, q = handle_condition(a, q)
+                    b, q = handle_condition(b, q)
+                    return getattr(operator, op + '_')(a, b), q
             else:
                 a, q = follow_path(a, q)
                 if op in ('eq', 'ne', 'gt', 'lt', 'ge', 'le'):
-                    return q.where(getattr(operator, op)(a, b))
+                    return getattr(operator, op)(a, b), q
                 elif op == 'in':
-                    return q.where(a << b)
+                    return a << b, q
                 elif op == 'contains':
-                    return q.where(a.contains(b))
+                    return a.contains(b), q
                 else:
                     raise ValueError('`op` must be "and", "or", "eq", "ne", "gt", "lt" '
                                      '"ge", "le" or "contains"')
 
-        query = cls.model.select_str_fields()
-        result = handle_condition(condition, query)
-        return (DataNamespace(cls, value, login_context) for value in result)
+        query = cls.model.select_str_fields(cls._format_fields).distinct()
+        if condition:
+            condition, query = handle_condition(condition, query)
+            query = query.where(condition)
+        logging.info(f'{login_context} searched {cls.__name__}')
+        return (DataNamespace(cls, value, login_context, True) for value in query)
 
 
-class Book(ActionNamespace):
+class Book(ActionNamespace,
+           extra_actions={'get_all_genres': 'view', 'get_all_groups': 'view'},
+           ):
     """Namespace for Book-related functions"""
-    model = models.Book
-
     @staticmethod
     def new(*, isbn: int, author: str, title: str, language: str, publisher: str,  # noqa
             year: int, medium: str, shelf: str, series: T.Optional[str] = None,
             series_number: T.Optional[int] = None,
             concerned_people: T.Optional[str] = None,
-            genres: T.Optional[str] = None, groups: T.Iterable[str] = (),
+            genres: T.Iterable[str] = (), groups: T.Iterable[str] = (),
             library: str = 'main', login_context: LoginContext) -> int:
         """Attempt to create a new Book with the given arguments and return the ID
 
-        automatically create groups as needed
-
         :raise BuchSchlossBaseError: on failure
 
-        See models.Book.__doc__ for details on arguments"""
+        See models.Book.__doc__ for details on arguments
+        """
         with models.db:
             try:
                 b = models.Book.create(
                     isbn=isbn, author=author, title=title, language=language,
                     publisher=publisher, year=year, medium=medium,
                     shelf=shelf, series=series, series_number=series_number,
-                    concerned_people=concerned_people, genres=genres,
+                    concerned_people=concerned_people,
                     library=models.Library.get_by_id(library),
                 )
-                for g in groups:
-                    b.groups.add(models.Group.get_or_create(name=g)[0])
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', library)
-            else:
-                logging.info('{} created {}'.format(login_context, b))
+            for g in groups:
+                models.Group.create(book=b, name=g)
+            for g in genres:
+                models.Genre.create(book=b, name=g)
+            logging.info(f'{login_context} created {b}')
         return b.id
 
     @classmethod
@@ -627,74 +622,55 @@ class Book(ActionNamespace):
 
         :raise BuchSchlossBaseError: if the Book isn't found
             or the new library does not exist
-
-        Return a set of error messages for errors during group changes.
         """
-        if ((not set(kwargs.keys()) <= cls._model_fields)
-                or 'id' in kwargs):
+        if not set(kwargs.keys()) <= cls._model_fields - {'id'}:
             raise TypeError('unexpected kwarg')
-        groups = set(kwargs.pop('groups', ()))
-        errors = _update_library_group(models.Group, book.groups, groups)
         lib = kwargs.pop('library', None)
         if lib is not None:
             try:
                 book.library = models.Library.get_by_id(lib)
             except models.Library.DoesNotExist:
                 raise BuchSchlossNotFoundError('Library', lib)
+        for k in {'genres', 'groups'} & kwargs.keys():
+            model: peewee.Model = getattr(models, k[:-1].capitalize())
+            values = kwargs.pop(k, ())
+            model.delete().where(model.book == book, model.name.not_in(values)).execute()
+            for v in values:
+                try:
+                    model.create(book=book, name=v)
+                except peewee.IntegrityError as e:
+                    if not str(e).startswith('UNIQUE'):
+                        raise
         for k, v in kwargs.items():
-            if (isinstance(v, str)
-                    and not isinstance(getattr(models.Book, k), peewee.CharField)):
-                logging.warning('auto-type-conversion used')
-                v = type(getattr(book, k))(v)
             setattr(book, k, v)
         book.save()
-        logging.info('{} edited {}'.format(login_context, book))
-        return errors
+        logging.info(f'{login_context} edited {book}')
 
     @staticmethod
-    @from_db(models.Book)
-    def view_str(book: T.Union[int, models.Book], *, login_context):
-        """Return data about a Book.
+    def get_all_genres(login_context):
+        """return all known genres in the database"""
+        logging.info(f'{login_context} viewed all genres')
+        return sorted(g.name for g in models.Genre.select(models.Genre.name).distinct())
 
-        Return a dictionary consisting of the following items as strings:
+    @staticmethod
+    def get_all_groups(login_context):
+        """return all known groups in the database"""
+        logging.info(f'{login_context} viewed all groups')
+        return sorted(g.name for g in models.Group.select(models.Group.name).distinct())
 
-            - author, isbn, title, series, series_number, language, publisher,
-              concerned_people, year, medium, genres, shelf, id
-            - the name of the Library the Book is in
-            - groups as a string consisting of group names separated by ';'
-            - the book's status (available, borrowed or inactive)
-            - ``return_date``: either ``'-----'`` or the date the book will be returned
-            - ``borrowed_by``: ``'-----'`` or a representation of the borrowing Person
-            - ``__str__``: the string representation of the Book
-
-        and ``'borrowed_by_id'``, the ID of the Person that borrowed the Book (int)
-        or None if not borrowed
-        """
-        r = {k: str(getattr(book, k) or '') for k in
-             ('author', 'isbn', 'title', 'series', 'series_number', 'language',
-              'publisher', 'concerned_people', 'year', 'medium', 'genres', 'shelf', 'id',
-              )}
-        r['library'] = book.library.name
-        r['groups'] = ';'.join(g.name for g in book.groups)
-        borrow = book.borrow or Dummy(id=None, _bool=False)
-        r['status'] = utils.get_name('Book::' +  # noqa
-                                     ('borrowed' if borrow else
-                                      ('available' if book.is_active
-                                       else 'inactive')))
-        r['return_date'] = str(borrow.return_date.strftime(config.core.date_format))
-        r['borrowed_by'] = str(borrow.person)
-        r['borrowed_by_id'] = borrow.person.id
-        r['__str__'] = str(book)
-        logging.info('{} viewed {}'.format(login_context, book))
-        return r
+    @staticmethod
+    def get_all_series(login_context):
+        """return all known series names in the database"""
+        logging.info(f'{login_context} viewed all series names')
+        return sorted(b.series for b in
+                      models.Book.select(models.Book.series).distinct()
+                      .where(models.Book.series != None))  # noqa
 
 
 class Person(ActionNamespace):
     """Namespace for Person-related functions"""
-    model = models.Person
-
     @staticmethod
-    def new(*, id_: int, first_name: str, last_name: str, class_: str,  # noqa
+    def new(*, id: int, first_name: str, last_name: str, class_: str,  # noqa
             max_borrow: int = 3, libraries: T.Iterable[str] = ('main',),
             pay: bool = None, borrow_permission: date = None,
             login_context):
@@ -711,9 +687,7 @@ class Person(ActionNamespace):
         """
         if borrow_permission is None and pay:
             borrow_permission = date.today() + timedelta(weeks=52)
-        if max_borrow > 3 and not login_context.level >= 4:
-            raise BuchSchlossPermError(4)
-        p = models.Person(id=id_, first_name=first_name, last_name=last_name,
+        p = models.Person(id=id, first_name=first_name, last_name=last_name,
                           class_=class_, max_borrow=max_borrow,
                           borrow_permission=borrow_permission)
         p.libraries = libraries
@@ -721,75 +695,53 @@ class Person(ActionNamespace):
             p.save(force_insert=True)
         except peewee.IntegrityError as e:
             if str(e).startswith('UNIQUE'):
-                raise BuchSchlossExistsError('Person', id_)
+                raise BuchSchlossExistsError('Person', id)
             else:
                 raise
         else:
-            logging.info('{} created {} with borrow_permission={}'
-                         .format(login_context, p, borrow_permission))
+            logging.info(f'{login_context} created {p} '
+                         f'with borrow_permission={borrow_permission}')
 
     @classmethod
     @from_db(person=models.Person)
     def edit(cls, person: T.Union[int, models.Person], *, login_context, **kwargs):
         """Edit a Person based on the arguments given.
 
-        :raise BuchSchlossBaseError: if the Person isn't found.
-        :return: a set of errors found during updating the person's libraries
+        :raise BuchSchlossBaseError: if the Person isn't found or a library doesn't exist.
 
         See Person.__doc__ for more information on the arguments.
 
         If ``pay`` is True, ``borrow_permission`` will be incremented
         by 52 weeks. (assuming a value of today if None)
         """
-        if not set(kwargs.keys()) <= cls._model_fields | {'pay'} or 'id' in kwargs:
+        if not set(kwargs.keys()) - {'pay'} <= cls._model_fields - {'id'}:
             raise TypeError('unexpected kwarg')
-        if kwargs.get('max_borrow', 0) > 3 and not login_context.level >= 4:
-            raise BuchSchlossPermError(4)
         if kwargs.pop('pay', False):
+            if 'borrow_permission' in kwargs:
+                raise TypeError(
+                    '``pay`` and ``borrow_permission`` may not be given together')
             kwargs['borrow_permission'] = ((person.borrow_permission or date.today())
                                            + timedelta(weeks=52))
         errors = set()
-        lib = set(kwargs.pop('libraries', ()))
-        errors.update(_update_library_group(models.Library, person.libraries, lib))
+        if 'libraries' in kwargs:
+            lib_names = kwargs.pop('libraries')
+            libs = models.Library.select().where(models.Library.name << lib_names)
+            if libs.count() != len(lib_names):
+                not_found = set(lib_names) - {lib.name for lib in libs}
+                raise BuchSchlossNotFoundError('Library', next(iter(not_found)))
+            person.libraries.add(lib_names, clear_existing=True)
         for k, v in kwargs.items():
             setattr(person, k, v)
         person.save()
-        logging.info('{} edited {}'.format(login_context, person)
-                     + (' setting borrow_permission to {}'
-                        .format(kwargs['borrow_permission'])
-                        if 'borrow_permission' in kwargs else ''))
+        msg = f'{login_context} edited {person}'
+        if 'borrow_permission' in kwargs:
+            msg += f' setting borrow_permission to {kwargs["borrow_permission"]}'
+        logging.info(msg)
         return errors
-
-    @staticmethod
-    @from_db(models.Person)
-    def view_str(person: T.Union[models.Person, int], *, login_context):
-        """Return data about a Person.
-
-        Return a dict consisting of the following items as strings:
-
-            - id, first_name, last_name, `class_` max_borrow, borrow_permission attributes
-            - libraries as a string, individual libraries separated by ';'
-            - borrows as a tuple of strings representing the borrows
-            - ``__str__``: the string representation
-
-        and ``'borrow_book_ids'``, a sequence of the IDs of the borrowed books
-        in the same order their representations appear in 'borrows'
-        """
-        r = {k: str(getattr(person, k) or '') for k in
-             'id first_name last_name class_ max_borrow borrow_permission'.split()}
-        borrows = person.borrows
-        r['borrows'] = tuple(map(str, borrows))
-        r['borrow_book_ids'] = [b.book.id for b in borrows]
-        r['libraries'] = ';'.join(L.name for L in person.libraries)
-        r['__str__'] = str(person)
-        logging.info('{} viewed {}'.format(login_context, person))
-        return r
 
 
 class Library(ActionNamespace):
     """Namespace for Library-related functions"""
-    model = models.Library
-
     @staticmethod
     def new(name: str, *,  # noqa
             books: T.Sequence[int] = (),
@@ -821,196 +773,40 @@ class Library(ActionNamespace):
                                    ).where(models.Book.id << books).execute()
 
     @staticmethod
-    def edit(action: LibraryGroupAction, name: str, *,
-             people: T.Sequence[int] = (),
-             books: T.Sequence[int] = (),
+    @from_db(models.Library)
+    def edit(lib: T.Union[models.Library, str], *,
              pay_required: bool = None,
-             login_context):
-        """Perform the given action on the Library with the given name
+             login_context,
+             ):
+        """Set restriction status of a library
 
-            :param action: may be one of the following LibraryGroupAction constants:
-
-                - ``DELETE`` will remove the reference to the library from all people
-                  and books (setting their library to 'main'),
-                  but not actually delete the Library itself
-                  ``people`` and ``books`` are ignored in this case
-                - ``ADD`` will add the Library to all given people and set the library
-                  of all the given books to the specified one
-                - ``REMOVE`` will remove the reference to the given Library in the given
-                  people and set the library of the given books to 'main'
-                - ``NONE`` will ignore ``people`` and ``books`` and
-                  take no action other than setting ``pay_required``
-
-            :param name: is the name of the Library to modify
-            :param people: is an iterable of the IDs of the people to modify
-            :param books: is an iterable of IDs of the books to modify
+            :param lib: is the name of the Library to modify
             :param pay_required: will set the Library's payment
               requirement to itself if not None
 
             :raise BuchSchlossBaseError: if the Library doesn't exist
         """
-        try:
-            lib: models.Library = models.Library.get_by_id(name)
-        except models.Library.DoesNotExist:
-            raise BuchSchlossNotFoundError('Library', name)
-        with models.db:
-            if action is LibraryGroupAction.DELETE:
-                lib.people = ()
-                models.Book.update({models.Book.library: models.Library.get_by_id('main')}
-                                   ).where(models.Book.library == lib).execute()
-            elif action is LibraryGroupAction.ADD:
-                models.Book.update({models.Book.library: lib}
-                                   ).where(models.Book.id << books).execute()
-                for p in people:
-                    lib.people.add(p)
-            elif action is LibraryGroupAction.REMOVE:
-                models.Book.update({models.Book.library: models.Library.get_by_id('main')}
-                                   ).where((models.Book.library == lib)
-                                           & (models.Book.id << books)).execute()
-                for p in people:
-                    lib.people.remove(p)
-            if pay_required is not None:
-                lib.pay_required = pay_required
-                lib.save()
-
-    @staticmethod
-    @from_db(models.Library)
-    def view_str(lib, *, login_context):
-        """Return information on the Library
-
-        Return a dict with the following items as strings:
-
-        - ``__str__``: a string representation of the Library
-        - ``name``: the name of the Library
-        - ``people``: the IDs of the people in the Library, separated by ';'
-        - ``books``: the IDs of the books in the Library, separated by ';'
-        """
-        return {
-            '__str__': str(lib),
-            'name': lib.name,
-            'people': ';'.join(map(str, (p.id for p in lib.people))),
-            'books': ';'.join(map(str, (b.id for b in lib.books))),
-        }
-
-
-class Group(ActionNamespace):
-    """Namespace for Group-related functions"""
-    model = models.Group
-
-    @staticmethod
-    def new(name: str, books: T.Sequence[int] = (), *, login_context):  # noqa
-        """Create a new Group with the given name and books
-
-        :raise BuchSchlossBaseError: if the Group exists
-
-        Ignore nonexistent Books.
-        """
-        with models.db:
-            try:
-                group = models.Group.create(name=name)
-            except peewee.IntegrityError as e:
-                if str(e).startswith('UNIQUE'):
-                    raise BuchSchlossExistsError('Group', name)
-                else:
-                    raise
-            else:
-                group.books = books
-
-    @staticmethod
-    def edit(action: LibraryGroupAction,
-             name: str,
-             books: T.Iterable[int],
-             *, login_context):
-        """Perform the given action on the Group with the given name
-
-        :param action: may be one of the following LibraryGroupAction constants:
-
-            - ``DELETE`` will remove all references to the Group,
-              but not delete the Group itself. ``books`` is ignored in this case
-
-            - ``ADD`` will add the given Group to the given books
-              ignore IDs of non-existing books
-
-            - ``REMOVE`` will remove the reference to the Group in all of the given books
-              ignore books not in the Group and IDs of nonexistent books
-
-            - ``NONE`` does nothing
-
-        :param books: specifies the books to add/remove.delete
-        :param name: specifies the name of the Group
-        :raise BuchSchlossBaseError: if the Group doesn't exist
-        """
-        with models.db:
-            try:
-                group = models.Group.get_by_id(name)
-            except models.Group.DoesNotExist:
-                raise BuchSchlossNotFoundError('Group', name)
-            else:
-                if action is LibraryGroupAction.DELETE:
-                    group.books = ()
-                elif action is LibraryGroupAction.NONE:
-                    pass
-                else:
-                    for book in books:
-                        getattr(group.books, action.value)(book)
-
-    @staticmethod
-    @from_db(models.Group)
-    def activate(group, src: T.Sequence[str] = (), dest: str = 'main', *, login_context):
-        """Activate a Group
-
-        :param src: is an iterable of the names of origin libraries.
-            If it is falsey (empty), books are taken from all libraries
-
-        :param dest: is the name of the target Library
-
-        :raise BuchSchlossBaseError: if the Group, the target Library
-            or a source Library does not exist
-        """
-        if src and (models.Library.select(None)
-                    .where(models.Library.name << src).count()
-                    != len(src)):
-            present_libraries = set(lib.name for lib in
-                                    models.Library.select(models.Library.name)
-                                    .where(models.Library.name << src))
-            not_found = ', '.join(set(src) - present_libraries)
-            raise BuchSchlossNotFoundError('Libraries', not_found)
-        try:
-            dest = models.Library.get_by_id(dest)
-        except models.Library.DoesNotExist:
-            raise BuchSchlossNotFoundError('Library', dest)
-        books_to_update = (models.Book.select(models.Book.id)
-                           .join(models.Book.groups.through_model)
-                           .join(models.Group)
-                           .where(models.Group.name == group.name)
-                           .switch(models.Book))
-        if src:
-            books_to_update = books_to_update.where(models.Book.library << src)
-        (models.Book.update(library=dest)
-         .where(models.Book.id << [b.id for b in books_to_update])
-         .execute())
-
-    @staticmethod
-    @from_db(models.Group)
-    def view_str(group, *, login_context):
-        """Return data on a Group
-
-        Return a dict with the following items as strings:
-
-        - ``__str__``: a string representation of the Group
-        - ``name``: the name of the Group
-        - ``books``: the IDs of the books in the Group separated by ';'
-        """
-        return {
-            '__str__': str(group),
-            'name': group.name,
-            'books': ';'.join(str(b.id) for b in group.books),
-        }
+        if pay_required is not None:
+            lib.pay_required = pay_required
+            lib.save()
+        logging.info(f'{login_context} edited {lib}')
 
 
 class Borrow(ActionNamespace):
     """Namespace for Borrow-related functions"""
-    model = models.Borrow
+    _format_fields_back = utils.get_format_fields('Borrow::repr-back')
+    _format_fields_not_back = utils.get_format_fields('Borrow::repr-not-back')
+    _format_fields = _format_fields_not_back | _format_fields_back | {'is_back'}
+
+    @classmethod
+    def format_object(cls, obj: models.Borrow):
+        """differentiate between returned and not returned borrows"""
+        if obj.is_back:
+            attrs = {k: getattr(obj, k) for k in cls._format_fields_back}
+            return utils.get_name('Borrow::repr-back', **attrs)
+        else:
+            attrs = {k: getattr(obj, k) for k in cls._format_fields_not_back}
+            return utils.get_name('Borrow::repr-not-back', **attrs)
 
     @classmethod
     @from_db(book=models.Book, person=models.Person)
@@ -1028,41 +824,34 @@ class Borrow(ActionNamespace):
             b) the Person has reached their limit set in max_borrow
             c) the Person is not allowed to access the library the book is in
             d) the Book is not available
-            e) the Person 's
-               borrow_permission has expired
-            f) ``weeks`` exceeds the one allowed to the executing member
-            g) ``weeks`` is <= 0
+            e) the Person's borrow_permission has expired
 
         The maximum amount of time a book may be borrowed for is defined
         in the configuration settings.
         """
-        req_level = next(i for i, allowed_weeks in
-                         enumerate([*config.core.borrow_time_limit, float('inf')])
-                         if weeks <= allowed_weeks)
-        check_level(login_context, req_level, 'Borrow.new')
-        if weeks <= 0:
-            raise BuchSchlossError('Borrow', 'Borrow::borrow_length_not_positive')
-        if not book.is_active or book.borrow:
-            raise BuchSchlossError('Borrow', 'Borrow::Book_{}_not_available', book.id)
+        if not book.is_active or book.borrow.where(models.Borrow.is_back == False).count():  # noqa
+            raise BuchSchlossError('Borrow', 'Borrow::{}_not_available', book)
         if override:
             check_level(login_context, cls.required_levels.override, 'Borrow.new.override')
         else:
             if book.library not in person.libraries:
                 raise BuchSchlossError(
-                    'Borrow', 'Borrow::{person}_not_in_Library_{library}',
-                    person=person, library=book.library.name)
+                    'Borrow', 'Borrow::{person}_not_in_{library}',
+                    person=person, library=book.library)
             if (book.library.pay_required
                     and (person.borrow_permission or date.min) < date.today()):
                 raise BuchSchlossError(
                     'Borrow', 'Borrow::Library_{}_needs_payment', book.library)
-            if len(person.borrows) >= person.max_borrow:
+            n_borrowed = person.borrows.where(models.Borrow.is_back == False).count()  # noqa
+            if n_borrowed >= person.max_borrow:
                 raise BuchSchlossError('Borrow', 'Borrow::{}_reached_max_borrow', person)
         rdate = date.today() + timedelta(weeks=weeks)
         models.Borrow.create(person=person, book=book, return_date=rdate)
-        logging.info('{} borrowed {} to {} until {}{}'.format(
-            login_context, book, person, rdate, override * ' with override=True'))
+        logging.info(f'{login_context} borrowed {book} to {person} until {rdate}'
+                     + override * ' with override=True')
 
     @staticmethod
+    @from_db(models.Borrow)
     def edit(borrow, *,
              login_context,
              is_back: bool = None,
@@ -1071,37 +860,15 @@ class Borrow(ActionNamespace):
              ):
         """Edit a Borrow
 
-        :param borrow: is either a Borrow DataNS, a Borrow ID or a Book DataNS
+        :param borrow: is either a Borrow DataNS or a Borrow ID
         :param is_back: whether the book was returned
         :param return_date: the date on which the book has to be returned
-        :param weeks: the number of weeks to extend borrowing time
+        :param weeks: the number of weeks to extend borrowing time (from today on)
 
         :raise BuchSchlossBaseError: if ``borrow`` is a Book DataNS whose .borrow is None
 
         ``weeks`` and ``return_date`` may not be given together
         """
-        err = TypeError('``borrow`` must be a borrow ID or a Book or Borrow DataNS')
-        if isinstance(borrow, int):
-            try:
-                borrow = models.Borrow.get_by_id(borrow)
-            except models.Borrow.DoesNotExist:
-                raise BuchSchlossNotFoundError('Borrow', borrow)
-        else:  # is DataNamespace
-            try:
-                borrow = borrow._data  # noqa
-            except AttributeError:
-                raise err
-            if isinstance(borrow, models.Book):  # noqa
-                # here, ``borrow`` is, in fact, a Book DataNS
-                if borrow.borrow is None:
-                    raise BuchSchlossError(
-                        'Borrow::not_borrowed', 'Borrow::{}_not_borrowed', borrow.id)
-                borrow = borrow.borrow
-            elif isinstance(borrow, models.Borrow):
-                borrow = borrow
-            else:
-                raise err
-
         if return_date is not None and weeks is not None:
             raise TypeError('``return_date`` and ``weeks`` may not both be given')
         if weeks is not None:
@@ -1110,39 +877,19 @@ class Borrow(ActionNamespace):
             borrow.return_date = return_date
         if is_back is not None:
             borrow.is_back = is_back
-        logging.info('{} edited {}'.format(login_context, borrow))
+        logging.info(f'{login_context} edited {borrow}')
         borrow.save()
 
-    @staticmethod
-    @from_db(models.Borrow)
-    def view_str(borrow, *, login_context):
-        """Return information about a Borrow
 
-        Return a dictionary containing the following items:
-
-        - ``__str__``: a string representation of the Borrow
-        - ``person``: a string representation of the borrowing Person
-        - ``person_id``: the ID of the borrowing Person
-        - ``book``: a string representation of the borrowed Book
-        - ``book_id``: the ID of the borrowed Book
-        - ``return_date``: a string representation of the date
-          by which the book has to be returned
-        - ``is_back``: a string indicating whether the Book has been returned
-        """
-        return {
-            '__str__': str(borrow),
-            'person': str(borrow.person),
-            'person_id': borrow.person.id,
-            'book': str(borrow.book),
-            'book_id': borrow.book.id,
-            'return_date': str(borrow.return_date),
-            'is_back': utils.get_name(str(borrow.is_back)),
-        }
-
-
-class Member(ActionNamespace):
+class Member(ActionNamespace, extra_actions={'change_password': None}):  # special-cased
     """namespace for Member-related functions"""
-    model = models.Member
+    @classmethod
+    def format_object(cls, obj: models.Member):
+        """Wrap utils.get_name to format the ::repr with matching arguments"""
+        attrs = {k: getattr(obj, k) for k in cls._format_fields}
+        if 'level' in attrs:
+            attrs['level'] = utils.level_names[obj.level]
+        return utils.get_name('Member::repr', **attrs)
 
     @staticmethod
     @auth_required
@@ -1163,7 +910,7 @@ class Member(ActionNamespace):
                     raise BuchSchlossExistsError('Member', name)
                 else:
                     raise
-        logging.info('{} created {}'.format(login_context, m))
+        logging.info(f'{login_context} created {m}')
 
     @staticmethod
     @auth_required
@@ -1183,12 +930,12 @@ class Member(ActionNamespace):
             Use ``Member.change_password`` instead
         """
         old_str = str(member)
-        if (not set(kwargs.keys()) <= {'level'}) or 'name' in kwargs:
+        if not set(kwargs.keys()) <= {'level'}:
             raise TypeError('unexpected kwarg')
         for k, v in kwargs.items():
             setattr(member, k, v)
         member.save()
-        logging.info('{} edited {} to {}'.format(login_context, old_str, member))
+        logging.info(f'{login_context} edited {old_str} to {member}')
 
     @classmethod
     @auth_required
@@ -1209,31 +956,22 @@ class Member(ActionNamespace):
         member.salt = urandom(config.core.salt_length)
         member.password = pbkdf(new_password.encode(), member.salt)
         member.save()
-        logging.info("{} changed {}'s password".format(login_context, member))
-
-    @staticmethod
-    @from_db(models.Member)
-    def view_str(member, *, login_context):
-        """Return information about a Member
-
-        Return a dictionary with the following string items:
-
-        - ``__str__``: a representation of the Member
-        - ``name``: the Member's name
-        - ``level``: the Member's level
-        """
-        return {
-            '__str__': str(member),
-            'name': member.name,
-            'level': utils.level_names[member.level],
-        }
+        logging.info(f"{login_context} changed {member}'s password")
 
 
-class Script(ActionNamespace):
+class Script(ActionNamespace, extra_actions={'execute': None}):
     """namespace for Script-related functions"""
-    model = models.Script
     allowed_chars = set(string.ascii_letters + string.digits + ' _-')
     callbacks = None
+
+    @staticmethod
+    def _transform_permissions(perms):
+        """create a ScriptPermissions form an iterable of names"""
+        return functools.reduce(
+            operator.or_,
+            (ScriptPermissions[p] for p in perms),
+            ScriptPermissions(0),
+        )
 
     @classmethod
     @auth_required
@@ -1241,13 +979,14 @@ class Script(ActionNamespace):
             name: str,
             code: str,
             setlevel: T.Optional[int],
-            permissions: ScriptPermissions,
+            permissions: T.Iterable[str],
             login_context: LoginContext):
         """create a new script with the given arguments
 
         raise a BuchSchlossError if a script with the names name already exists
         see models.Script for details on arguments
         """
+        permissions = cls._transform_permissions(permissions)
         if not name:
             raise ValueError('Name is empty')
         if not set(name) <= cls.allowed_chars:
@@ -1265,7 +1004,7 @@ class Script(ActionNamespace):
             else:
                 raise
         else:
-            logging.info('{} created {}'.format(login_context, new))
+            logging.info(f'{login_context} created {new}')
 
     @classmethod
     @auth_required
@@ -1274,30 +1013,12 @@ class Script(ActionNamespace):
         """edit a script"""
         if not set(kwargs) <= cls._model_fields or 'name' in kwargs:
             raise TypeError('unexpected kwarg')
+        if 'permissions' in kwargs:
+            kwargs['permissions'] = cls._transform_permissions(kwargs['permissions'])
         for k, v in kwargs.items():
             setattr(script, k, v)
         script.save()
-        logging.info('{} edited {}'.format(login_context, script))
-
-    @staticmethod
-    @from_db(models.Script)
-    def view_str(script: T.Union[models.Script, str], *, login_context) -> dict:
-        """return a dict with the following items:
-
-        - ``__str__``: a string representation of the script
-        - ``name``: the script name
-        - ``setlevel``: the script's setlevel status (``'-----'`` if not set)
-        - ``permissions``: the scripts permissions, separated by ``';'``
-        """
-        return {
-            '__str__': str(script),
-            'name': script.name,
-            'setlevel': ('-----' if script.setlevel is None
-                         else utils.level_names[script.setlevel]),
-            'permissions': ';'.join(utils.get_name('Script::permissions::' + p.name)
-                                    for p in ScriptPermissions
-                                    if p in script.permissions)
-        }
+        logging.info(f'{login_context} edited {script}')
 
     @classmethod
     @from_db(script=models.Script)
@@ -1322,12 +1043,12 @@ class Script(ActionNamespace):
         script_lc = LoginContext(
             LoginType.SCRIPT, script_lc_level, name=script.name, invoker=login_context)
         ui_callbacks = callbacks or cls.callbacks
-        get_name_prefix = 'script-data::{}::'.format(script.name)
+        get_name_prefix = f'script-data::{script.name}::'
         script_config = config.scripts.lua.get(script.name).mapping
         if ScriptPermissions.STORE in script.permissions:
             edit_func = partial(Script.edit, script.name, login_context=internal_priv_lc)
             add_storage = (
-                lambda: Script.view_ns(script.name, login_context=internal_priv_lc).storage,
+                lambda: Script.view_ns(script.name, login_context=internal_priv_lc)['storage'],
                 lambda data: edit_func(storage=data),
             )
         else:
@@ -1343,89 +1064,105 @@ class Script(ActionNamespace):
             ns = runtime.execute(script.code)
             if function is not None:
                 ns[function]()
+        except BuchSchlossBaseError:
+            raise
         except Exception as e:
             if config.debug:
                 raise
             logging.error('error executing script function: ' + str(e))
-            display = ':'.join((script.name, function))
+            display = script.name
+            if function is not None:
+                display += ':' + function
             raise BuchSchlossError('Script::execute', 'script_{}_exec_problem', display)
 
 
-class DataNamespace:
+class DataNamespace(T.Mapping[str, T.Any]):
     """class for data namespaces returned by view_ns"""
     def __init__(self,
                  ans: T.Type[ActionNamespace],
                  raw_data: T.Any,
                  login_context: LoginContext,
+                 verified=False,
                  ):
         """initialize this namespace with data from the database"""
-        self._data = raw_data
-        self._handlers = self.data_handling[ans]
-        self._login_context = login_context
+        self.verified = verified
+        self.data = raw_data
+        self.ans = ans
+        self.handlers = self.data_handling[ans]
+        self.attributes = frozenset.union(*map(frozenset, self.handlers.values()))
+        self.login_context = login_context
+        self.string = ans.format_object(raw_data)
 
     def __eq__(self, other):
         if isinstance(other, DataNamespace):
-            return self._data == other._data
-        elif isinstance(other, type(self.id)):
-            return self.id == other
+            return self.data == other.data
+        elif isinstance(other, type(self['id'])):
+            return self['id'] == other
         else:
             return NotImplemented
 
-    def __dir__(self) -> T.Iterable[str]:
-        return set(itertools.chain(
-            super().__dir__(),
-            ['id'],  # some already have it -> set
-            *self._handlers.values(),
-        ))
+    def __len__(self):
+        return len(tuple(self))
+
+    def __iter__(self):
+        return iter({'id', *itertools.chain.from_iterable(self.handlers.values())})
 
     def __hash__(self):
-        return hash(self.id)
+        return hash(self['id'])
 
     def __str__(self):
-        return str(self._data)
+        return str(self.data)
 
-    def __getattr__(self, item):
-        if item in self._handlers['allow']:
-            return getattr(self._data, item)
-        elif item in self._handlers.get('wrap_iter', {}):
+    def __getitem__(self, item):
+        if not self.verified:
+            self.ans.check_view_permissions(self.login_context, self)
+            self.verified = True
+        if item == 'id':
+            # Not making the same mistake twice
+            return getattr(self.data, type(self.data).pk_name)
+        elif item in self.attributes:
+            obj = getattr(self.data, item)
+        else:
+            raise KeyError(f"DataNamespace of {self.ans!r} has no key '{item}'")
+        if item in self.handlers.get('transform', {}):
+            obj = self.handlers['transform'][item](obj)
+        if item in self.handlers.get('wrap_iter', {}):
             new_dns = partial(type(self),
-                              self._handlers['wrap_iter'][item],
-                              login_context=self._login_context)
-            return tuple(map(new_dns, getattr(self._data, item)))
-        elif item in self._handlers.get('wrap_dns', {}):
-            obj = getattr(self._data, item)
+                              self.handlers['wrap_iter'][item],
+                              login_context=self.login_context)
+            return tuple(map(new_dns, obj))
+        elif item in self.handlers.get('wrap_dns', {}):
             if obj is None:
                 return None
             else:
                 return type(self)(
-                    self._handlers['wrap_dns'][item],
+                    self.handlers['wrap_dns'][item],
                     obj,
-                    login_context=self._login_context,
+                    login_context=self.login_context,
                 )
-        elif item == 'id':
-            # Not making the same mistake twice
-            return getattr(self._data, type(self._data).pk_name)
-        else:
-            raise AttributeError("DataNamespace object has no attribute '%s'" % item)
+        else:  # allow + transform without wrapping
+            return obj
 
     data_handling: T.Mapping[T.Type[ActionNamespace], T.Mapping] = {
         Book: {
-            'allow': ('id isbn author title series series_number language publisher '
-                      'concerned_people year medium genres shelf is_active').split(),
-            'wrap_iter': {'groups': Group},
+            'allow': ('isbn author title series series_number language publisher '
+                      'concerned_people year medium shelf is_active').split(),
+            'transform': {
+                'genres': lambda gs: [g.name for g in gs],
+                'groups': lambda gs: [g.name for g in gs],
+                'borrow': lambda bs:
+                    next(iter(bs.where(models.Borrow.is_back == False).limit(1)), None),  # noqa
+            },
             'wrap_dns': {'library': Library, 'borrow': Borrow},
         },
         Person: {
-            'allow': 'id first_name last_name class_ max_borrow pay_date'.split(),
+            'allow': 'first_name last_name class_ max_borrow borrow_permission'.split(),
+            'transform': {'borrows': lambda bs: bs.where(models.Borrow.is_back == False)},  # noqa
             'wrap_iter': {'libraries': Library, 'borrows': Borrow},
         },
         Library: {
             'allow': ('name', 'pay_required'),
             'wrap_iter': {'books': Book, 'people': Person},
-        },
-        Group: {
-            'allow': ('name',),
-            'wrap_iter': {'books': Book},
         },
         Borrow: {
             'allow': ('id', 'return_date', 'is_back'),
@@ -1435,7 +1172,10 @@ class DataNamespace:
             'allow': ('name', 'level'),
         },
         Script: {
-            'allow': ('name', 'code', 'setlevel', 'permissions', 'storage'),
+            'allow': ('name', 'code', 'setlevel', 'storage'),
+            'transform': {
+                'permissions': lambda ps: [p.name for p in ScriptPermissions if p in ps],
+            },
         },
     }
 

@@ -141,7 +141,7 @@ def test_load_names(tmpdir):
         '{"123": "a lot", "0": "none"}',
     )
     for default_case in expected_defaults:
-        file.write('{"level names": %s}' % default_case)
+        file.write('{"level_names": %s}' % default_case)
         assert main.load_names(file, 'json') == {'level names': default_level_names}
-    file.write('{"level names": {"4": "four", "6": "six"}}')
+    file.write('{"level_names": {"4": "four", "6": "six"}}')
     assert main.load_names(file, 'json') == {'level names': {4: 'four', 6: 'six'}}

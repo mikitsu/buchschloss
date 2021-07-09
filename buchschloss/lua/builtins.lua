@@ -3,6 +3,7 @@ BuchSchloss Lua builtins
 ]]--
 
 local ActionNS_meta = {}
+local Book_meta = {}
 local ActionNS = {}
 local new_data_ns
 
@@ -11,21 +12,33 @@ function ActionNS_meta.__index(tbl, key)
     if val ~= nil then
         return val
     end
-    return new_data_ns(tbl.backend, (rawget(tbl, 'delegate') or {}), key)
+    return new_data_ns(tbl.backend, key)
+end
+
+function Book_meta.__index(tbl, key)
+    if key == 'genres' then
+        return buchschloss.Book.get_all_genres()
+    elseif key == 'groups' then
+        return buchschloss.Book.get_all_groups()
+    else
+        return ActionNS_meta.__index(tbl, key)
+    end
 end
 
 function ActionNS_meta.__call(tbl, query)
     return tbl.backend.search(query)
 end
 
+Book_meta.__call = ActionNS_meta.__call
+
 function ActionNS:new(options)
     return self.backend.new(options)
 end
 
-function new_data_ns(backend, delegate, id)
+function new_data_ns(backend, id)
     local data_ns
     local function index(tbl, key)
-        if key == 'edit' or delegate[key] then
+        if key == 'edit' then
             return function(self, options)
                 table.insert(options, 1, id)
                 return backend[key](options)
@@ -49,10 +62,9 @@ function check_level(required, do_alert)
 end
 
 return {
-    Book=setmetatable({backend=buchschloss.Book}, ActionNS_meta),
+    Book=setmetatable({backend=buchschloss.Book}, Book_meta),
     Borrow=setmetatable({backend=buchschloss.Borrow}, ActionNS_meta),
     Person=setmetatable({backend=buchschloss.Person}, ActionNS_meta),
     Library=setmetatable({backend=buchschloss.Library}, ActionNS_meta),
-    Group=setmetatable({backend=buchschloss.Group, delegate={activate=true}}, ActionNS_meta),
     check_level=check_level,
 }

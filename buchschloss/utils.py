@@ -3,42 +3,27 @@
 contents (for use):
     - get_runner() -- get a task running function
     - send_email() -- send an email
+    - check_isbn() -- check an ISBN and convert it to ISBN-13
     - get_name() -- get a pretty name
+    - get_format_fields() -- get the names of format fields for models
+    - format_date() -- format a date
     - level_names -- get a pretty level representation
     - get_book_data() -- attempt to get data about a book based on the ISBN
 """
-
+import ast
 import collections
 import functools
+import itertools
 import operator
 import email
 import smtplib
 import ssl
-from datetime import datetime, date
+import datetime
 import time
 import logging
 import sched
 
 from buchschloss import core, config, py_scripts
-
-
-class FormattedDate(date):
-    """print a datetime.date as specified in config.core.date_format"""
-
-    def __str__(self):
-        return self.strftime(config.core.date_format)
-
-    @classmethod
-    def fromdate(cls, date_: date):
-        """Create a FormattedDate from a datetime.date"""
-        if date_ is None:
-            return None
-        else:
-            return cls(date_.year, date_.month, date_.day)
-
-    def todate(self):
-        """transform self to a datetime.date"""
-        return date(self.year, self.month, self.day)
 
 
 class LevelNameDict(dict):
@@ -66,7 +51,83 @@ def send_email(subject, text):
         logging.error('error while sending email: {}: {}'.format(type(e).__name__, e))
 
 
-def get_name(internal: str):
+def check_isbn(isbn: str) -> int:
+    """Check whether the given ISBN is valid and convert it into ISBN-13 format"""
+    # To list of digits
+    if {'x', 'X'} & set(isbn[:-1]):
+        raise ValueError('"X" in not-last position')
+    digits = []
+    for digit in isbn:
+        if digit.isdigit():
+            digits.append(int(digit))
+        elif digit in 'xX':
+            digits.append(10)
+    if len(digits) == 9:
+        digits.insert(0, 0)
+    del isbn
+    # check the checksum
+    get_weighted_digits = functools.partial(zip, itertools.cycle((1, 3)))
+    if len(digits) == 10:
+        if (sum((10 - i) * x for i, x in enumerate(digits)) % 11
+                or sum(i * x for i, x in enumerate(digits, 1)) % 11):
+            raise ValueError('checksum mismatch')
+        else:
+            digits = [9, 7, 8] + digits[:-1]
+            digits.append(-sum(w * d for w, d in get_weighted_digits(digits)) % 10)
+    elif len(digits) == 13:
+        if sum(w * d for w, d in get_weighted_digits(digits)) % 10:
+            raise ValueError('checksum mismatch')
+    else:
+        raise ValueError(f'ISBN has {len(digits)} digits, not 10 or 13')
+    return int(''.join(map(str, digits)))
+
+
+def lookup_name_spec(spec: str):
+    """Look up a name spec in config.utils.names. See get_name for strategy"""
+    *path, name = spec.lower().split('::')
+    look_in = []
+    for components in range(2**len(path)-1, -1, -1):
+        try:
+            look_in.append(functools.reduce(
+                operator.getitem,
+                (ns for i, ns in enumerate(path, 1) if components & (1 << (len(path) - i))),
+                config.utils.names))
+        except (KeyError, TypeError):
+            pass
+    for ns in look_in:
+        if isinstance(ns, str):
+            continue
+        try:  # for some reason (configobj), this can't be written as if ... in ...
+            val = ns[name]
+        except KeyError:
+            continue
+        if isinstance(val, dict):
+            if '*this*' in val:
+                val = val['*this*']
+            else:
+                continue
+        elif not isinstance(val, str):
+            raise TypeError(f'{val!r} is neither dict nor str')
+        return val
+    return None
+
+
+def get_format_fields(lookup_name: str) -> set:
+    """return the field required to format a Model instance"""
+    fmt_str = lookup_name_spec(lookup_name)
+    if fmt_str is None:
+        return set()
+    # The string is formatted with keyword arguments corresponding to attributes
+    expr_to_parse = 'f' + repr(fmt_str)
+    try:
+        values = ast.parse(expr_to_parse, mode='eval').body.values
+    except SyntaxError:
+        logging.error(f'Formatting error for "{lookup_name}" (resolved to "{fmt_str}")')
+        return set()
+    return {fv.value.id for fv in values if isinstance(fv, ast.FormattedValue)}
+
+
+def get_name(internal: str, *format_args, **format_kwargs):
     """Get an end-user suitable name.
 
     Try lookup in config.utils.names.
@@ -78,8 +139,9 @@ def get_name(internal: str):
         as namespace for the second (right).
     If a name isn't found, a warning is logged and the internal name returned,
         potentially modified
+
+    Returned names are formatted with ``format_args`` and ``format_kwargs``
     """
-    internal = internal.lower()
     if '__' in internal:
         r = []
         prefix = ''
@@ -88,35 +150,23 @@ def get_name(internal: str):
             r.append(get_name(prefix))
             prefix += '::'
         return ': '.join(r)
-    *path, name = internal.split('::')
-    components = 2**len(path)
-    look_in = []
-    while components:
-        components -= 1
-        try:
-            look_in.append(functools.reduce(
-                operator.getitem,
-                (ns for i, ns in enumerate(path, 1) if components & (1 << (len(path) - i))),
-                config.utils.names))
-        except (KeyError, TypeError):
-            pass
-    for ns in look_in:
-        if isinstance(ns, str):
-            continue
-        try:
-            val = ns[name]
-            if isinstance(val, str):
-                return val
-            elif isinstance(val, dict):
-                return val['*this*']
-            else:
-                raise TypeError('{!r} is neither dict nor str'.format(val))
-        except KeyError:
-            pass
-    name = '::'.join(path + [name])
-    if not config.debug:
-        logging.warning('Name "{}" was not found in the namefile'.format(name))
-    return name
+    val = lookup_name_spec(internal)
+    try:
+        return val.format(*format_args, **format_kwargs)
+    except (KeyError, IndexError, ValueError):
+        logging.error(f'Formatting error for "{internal}" (resolved to "{val}")')
+    except AttributeError:  # if val is None
+        if not config.debug:
+            logging.warning(f'Name "{internal}" was not found in the namefile')
+    return internal
+
+
+def format_date(date: datetime.date):
+    """format a date object as specified in config"""
+    if date is None:
+        return '-----'
+    else:
+        return date.strftime(config.utils.names.date)
 
 
 def get_book_data(isbn: int):
@@ -131,20 +181,21 @@ def get_book_data(isbn: int):
             login_context=core.internal_unpriv_lc,
         )()
 
-    data = {}
-    for spec in config.utils.book_data_scripts:
-        get_data_from_script(spec)
     try:
         book = next(iter(core.Book.search(
             ('isbn', 'eq', isbn), login_context=core.internal_priv_lc)))
     except StopIteration:
-        pass
+        data = {}
+        for spec in config.utils.book_data_scripts:
+            try:
+                get_data_from_script(spec)
+            except core.BuchSchlossBaseError as e:
+                logging.warning(
+                    f'Error "{e.title}" fetching data for {isbn}: {e.message}')
     else:
-        new_data = core.Book.view_str(book.id, login_context=core.internal_priv_lc)
-        for k in 'id status return_date borrowed_by_id __str__ borrowed_by'.split():
-            del new_data[k]
-        data.update(new_data)
-
+        data = dict(core.Book.view_ns(book['id'], login_context=core.internal_priv_lc))
+    for k in ('id', 'borrow', 'is_active'):
+        data.pop(k, None)
     return data
 
 
@@ -195,17 +246,17 @@ def get_runner():
         scheduler.enter(0, 0, target)
 
     last_invocations = collections.defaultdict(
-        lambda: datetime.fromtimestamp(0), core.misc_data.last_script_invocations)
+        lambda: datetime.datetime.fromtimestamp(0), core.misc_data.last_script_invocations)
     for spec in config.scripts.repeating:
         target = get_script_target(spec, login_context=core.internal_unpriv_lc)
         script_id = '{0[name]}!{0[type]}'.format(spec)
         delay = spec['invocation'].total_seconds()
-        invoke_time: datetime = last_invocations[script_id] + spec['invocation']
+        invoke_time: datetime.datetime = last_invocations[script_id] + spec['invocation']
 
         def target_wrapper(_f, _t=target, _id=script_id, _delay=delay):
             _t()
             last_invs = core.misc_data.last_script_invocations
-            last_invs[_id] = datetime.now()
+            last_invs[_id] = datetime.datetime.now()
             core.misc_data.last_script_invocations = last_invs
             scheduler.enter(_delay, 0, functools.partial(_f, _f))
 

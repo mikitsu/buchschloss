@@ -9,7 +9,7 @@ local interval = 86400 * (config.warn_days or 0)
 local function reformat_borrows(borrows)
     local r = {}
     for k, v in pairs(borrows) do
-        r[k] = {v.person, v.book, v.return_date}
+        r[k] = {v.person.__str__, v.book.__str__, ui.format_date(v.return_date)}
     end
     return r
 end
