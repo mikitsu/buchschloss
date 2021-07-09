@@ -150,7 +150,7 @@ def load_names(name_file: ActuallyPathLike,
     # TODO: this is not very nice.
     #   is there a way to make sure the keys are valid without going berserk
     #   if something unexpected happens?
-    level_names = processed_data.get('level_names')
+    level_names = processed_data.pop('level_names', None)
     if not isinstance(level_names, dict):
         level_names = {}
     for k, v in level_names.copy().items():
