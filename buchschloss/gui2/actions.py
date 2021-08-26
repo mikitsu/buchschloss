@@ -105,7 +105,7 @@ class SearchForm(BaseForm):
         for ws in cls.all_widgets.values():
             if ws[None] is not None:
                 w, *a, kw = ws[None]
-                if issubclass(w, (Checkbox, OptionsFromSearch)):
+                if issubclass(w, (Checkbox, DropdownChoices)):
                     kw = {**kw, 'allow_none': True}
                     ws.setdefault(FormTag.SEARCH, (w, *a, kw))
 
@@ -570,7 +570,7 @@ class BookForm(SearchForm, EditForm, ViewForm):
             {'attr': 'person'},
         )},
         'genres': (MultiChoicePopup, lambda: Book.get_all_genres(), {'new': True}),
-        'library': (OptionsFromSearch, Library, {}),
+        'library': (OptionsFromSearch, Library, {'search': False}),
         'groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {'new': True}),
         'shelf': NonEmptyREntry,
     }
@@ -591,7 +591,7 @@ class PersonForm(SearchForm, EditForm, ViewForm):
             partial(view_data, 'book'),
             {'attr': 'book', 'multiple': True},
         )},
-        'libraries': (SearchMultiChoice, Library, {}),
+        'libraries': (SearchMultiChoice, Library, {'search': False}),
         'pay': {
             FormTag.SEARCH: None,
             FormTag.VIEW: None,

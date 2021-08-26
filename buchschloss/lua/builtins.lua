@@ -56,7 +56,7 @@ end
 function check_level(required, do_alert)
     local r = buchschloss.login_context.invoker.level < required
     if r and (do_alert or do_alert == nil) then
-        ui.alert('must_be_{}', ui.get_level(required))
+        ui.alert('error::must_be_{}', ui.get_level(required))
     end
     return r
 end

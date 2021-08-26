@@ -21,7 +21,7 @@ WRAPLENGTH = config.gui2.widget_size.main.width // 2
 class OptionsFromSearch(formlib.DropdownChoices):
     """A formlib.DropdownChoices tuple that gets choices from a search"""
     def __init__(self, form, master, name,
-                 action_ns, allow_none=False, setter=False, condition=(), default=None):
+                 action_ns, allow_none=False, setter=False, condition=(), **kwargs):
         """Create a new instance.
 
         :param action_ns: is the ActionNamespace to search in
@@ -35,14 +35,15 @@ class OptionsFromSearch(formlib.DropdownChoices):
         The parameters ``allow_none`` and ``setter`` are mutually exclusive.
         """
         self.action_ns = action_ns
-        values = [(o['id'], o.string) for o in action_ns.search(condition)]
+        values = sorted((o['id'], o.string) for o in action_ns.search(condition))
         if allow_none:
             if setter:
                 raise ValueError('``setter`` and ``allow_none`` are mutually exclusive')
             values.insert(0, (None, ''))
         if setter:
             self._update_values = self._update_values_with_set
-        super().__init__(form, master, name, values, default=default)
+        kwargs.setdefault('default', None)
+        super().__init__(form, master, name, values, **kwargs)
         if setter:
             self.widget.bind('<<ComboboxSelected>>', self._do_set)
 
@@ -265,7 +266,7 @@ class SearchMultiChoice(MultiChoicePopup):
         # This isn't a function returning a tuple that uses
         # the function providable for options to allow ViewForm
         # to treat this differently than other MultiChoicePopups
-        values = [(o['id'], o.string) for o in action_ns.search(condition)]
+        values = sorted((o['id'], o.string) for o in action_ns.search(condition))
         super().__init__(form, master, name, values)
 
 

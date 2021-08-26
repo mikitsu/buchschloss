@@ -194,8 +194,7 @@ class LuaUIInteraction(LuaObject):
     @lupa.unpacks_lua_table_method
     def get_name(self, internal, *format_args, **format_kwargs):
         """provide access to utils.get_name from Lua code"""
-        return (utils.get_name(self.script_prefix + internal)
-                .format(*format_args, **format_kwargs))
+        return utils.get_name(self.script_prefix + internal, *format_args, **format_kwargs)
 
     get_level = staticmethod(utils.level_names.__getitem__)
     format_date = staticmethod(utils.format_date)
