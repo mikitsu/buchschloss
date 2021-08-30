@@ -3,6 +3,7 @@
   "error_in_buchschloss": "Error in BuchSchloss",
   "errors_{}": "the following errors occurred:\n\n{}",
   "back_to_results": "back to search results",
+  "no_results": "no search results",
   "{}_results": "{} results",
   "info_regarding": "information regarding",
   "logged_in_as_{}": "logged in as {}",

@@ -8,7 +8,7 @@ from tkinter import ttk
 import tkinter.messagebox as tk_msg
 import tkinter.font as tk_font
 from functools import partial
-from typing import Type, Callable, Optional, Sequence, Mapping, Any
+from typing import Type, Callable, Optional, Sequence, Mapping, Any, ClassVar
 
 from . import main
 from . import common
@@ -148,6 +148,8 @@ class EditForm(BaseForm):
     Use OptionsFromSearch with setter=True for the first not-inherited widget.
     Modify ``.get_data`` to include the value of the first widget under ``'*args'``.
     """
+    id_name: ClassVar[str]
+
     def __init_subclass__(cls, **kwargs):
         cls.id_name = next(iter(cls.all_widgets))
         super().__init_subclass__(**kwargs)
@@ -309,6 +311,12 @@ def show_results(master: tk.Widget,
     :param results: is a sequence of DataNS objects
     :param view_func: is a function that displays data
     """
+    if not results:
+        tk_msg.showinfo(utils.get_name('action::search'), utils.get_name('no_results'))
+        return
+    elif len(results) == 1:
+        view_func(master, results[0])
+        return
 
     def search_show():
         common.destroy_all_children(result_frame)
@@ -550,7 +558,10 @@ def get_script_action(script_spec):
 
 class BookForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
-        'id': {FormTag.VIEW: DisplayWidget},
+        'id': {
+            FormTag.VIEW: DisplayWidget,
+            FormTag.SEARCH: IntEntry,
+        },
         'isbn': {
             FormTag.NEW: (ISBNEntry, True, {}),
             None: (ISBNEntry, False, {}),
@@ -578,10 +589,7 @@ class BookForm(SearchForm, EditForm, ViewForm):
 
 class PersonForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
-        'id': {
-            FormTag.SEARCH: None,
-            FormTag.NEW: IntEntry,
-        },
+        'id': IntEntry,
         'first_name': NonEmptyREntry,
         'last_name': NonEmptyREntry,
         'class_': ClassEntry,
@@ -591,7 +599,7 @@ class PersonForm(SearchForm, EditForm, ViewForm):
             partial(view_data, 'book'),
             {'attr': 'book', 'multiple': True},
         )},
-        'libraries': (SearchMultiChoice, Library, {'search': False}),
+        'libraries': (SearchMultiChoice, Library, {}),
         'pay': {
             FormTag.SEARCH: None,
             FormTag.VIEW: None,
