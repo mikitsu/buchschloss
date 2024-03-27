@@ -7,7 +7,9 @@ import re
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tk_msg
-from typing import Any, Optional
+from typing import ClassVar
+
+from .. import aforms
 
 __all__ = [
     'Form', 'ScrolledForm',
@@ -16,83 +18,29 @@ __all__ = [
 ]
 
 
-class Form:
+class Form(aforms.Form):
     """Display a form.
 
-    Forms are specified by subclassing and setting the ``all_widgets`` attribute.
-    It is merged with the superclasses' attributes.
-    To remove a specification by a superclass, explicitly set it to ``None``.
-    The ``all_widgets`` attribute is a dict of the form::
-
-        {
-            field: {
-                tag: widget_spec,
-                tag_2: widget_spec_2,
-                ...,
-                None: default_widget_spec,
-            },
-            field_2: tag_dict_2,  # may also be a widget spec
-            ...
-            field_n: tag_dict_n,  # may also be a widget spec
-        }
-
-    Where ``field`` is a field name (passed to widgets and used as default result key),
-    ``tag`` is a form tag (see below) with ``None`` indicating the default
-    and a ``widget_spec`` specifies a ``FormWidget`` either as a class, in which
-    case the instance will be created without arguments or as a ``(class, *args, kwargs)``
-    tuple, in which case the instance will be created with ``*args`` and  ``**kwargs``.
-    It may also be ``None``, in which case no widget is created.
-
-    .. note::
-        In all cases, relevant tk widget information (i.e.: master widget) is passed.
-        The optional arguments are for further specification.
-
-        Information for widget keyword arguments is not merged when subclassing.
-
-    When instantiating a form, a tag value is given.
-    It should be a string or an enum value, although every hashable object should work.
-    This tag is available as ``.tag`` (for use in e.g. validation functions)
-    and is used to choose the appropriate widget for a field.
+    This class adds tk-specific methods to the abstrace :class:`aforms.Form` class.
+    It implements :meth:`aforms.Form.make_widget` by looking up the enum value in
+    the ``widget_ns`` attribute, which must be set by a subclass.
     """
-    all_widgets: 'dict[str, dict[Any, Optional[tuple]]]' = {}
+    widget_ns: ClassVar
     error_text_config = {'fg': 'red'}
-
-    def __init_subclass__(cls):
-        """Merge the new and old ``all_widgets`` handling convenience shorthands"""
-        # first, handle convenience shorthands
-        for field, tag_spec in cls.all_widgets.items():
-            if not isinstance(tag_spec, dict):
-                tag_spec = {None: tag_spec}
-            cls.all_widgets[field] = {
-                tag: ws if isinstance(ws, (tuple, type(None))) else (ws, {})
-                for tag, ws in tag_spec.items()
-            }
-            cls.all_widgets[field].setdefault(None, None)
-        # second, merge
-        all_widgets = {}
-        for superclass in reversed(cls.__mro__):  # is there a way to get direct parents?
-            if not issubclass(superclass, Form):
-                continue
-            for field, tag_spec in superclass.all_widgets.items():
-                all_widgets.setdefault(field, {}).update(tag_spec)
-        cls.all_widgets = all_widgets
 
     def __init__(self, frame, tag, submit_callback):
         self.frame = self.master = frame
-        self.tag = tag
+        super().__init__(tag)
         self.submit_callback = submit_callback
-        self.widget_dict = {
-            name: widget[0](self, self.master, name, *widget[1:-1], **widget[-1])
-            for name, tag_alternatives in self.all_widgets.items()
-            for widget in [tag_alternatives.get(tag, tag_alternatives[None])]
-            if widget is not None
-        }
         i = -1
         for i, widget in enumerate(self.widget_dict.values()):
             self._grid_if_not_none(self.get_widget_label(widget), row=i, column=0)
             self._grid_if_not_none(widget.widget, row=i, column=1)
         self._grid_if_not_none(self.get_submit_widget(), row=i+1, column=0, columnspan=3)
         self._error_display_widgets = ()
+
+    def make_widget(self, name, w_elem, w_args, w_kwargs):
+        return getattr(self.widget_ns, w_elem.value)(self, self.master, name, *w_args, **w_kwargs)
 
     def handle_submit(self):
         """Check and possibly display errors or call callback"""

@@ -15,18 +15,10 @@ from . import common
 from .. import core
 from .. import config
 from .. import utils
-from .formlib import Form as LibForm, ScrolledForm, Entry, DropdownChoices, RadioChoices
-from .widgets import (
-    # not form-related
-    WRAPLENGTH,
-    # generic form widgets and form widget tuples
-    NonEmptyEntry, NonEmptyREntry, PasswordEntry, IntEntry, NullREntry, Text,
-    ConfirmedPasswordInput, Checkbox, MultiChoicePopup,
-    # specific form widgets and form widget tuples
-    SeriesInput, ISBNEntry, ClassEntry, ScriptNameEntry,
-    # complex form widgets
-    LinkWidget, DisplayWidget, OptionsFromSearch, FallbackOFS, SearchMultiChoice,
-)
+from ..aforms import Widget as W
+from .formlib import Form as LibForm, ScrolledForm
+from . import widgets
+from .widgets import WRAPLENGTH
 
 Book = common.NSWithLogin(core.Book)
 Person = common.NSWithLogin(core.Person)
@@ -40,9 +32,21 @@ class FormTag(enum.Enum):
     VIEW = '"view" action'
 
 
+NonEmptyEntry = (W.ENTRY, 'error', {'max_history': 0})
+NonEmptyREntry = (W.ENTRY, 'error', {})
+ClassEntry = (W.ENTRY, 'error', {'regex': config.gui2.class_regex})
+IntEntry = (W.ENTRY, 'error', {'transform': int})
+NullIntEntry = (W.ENTRY, 'none', {'transform': int})
+NullEntry = (W.ENTRY, 'none', {'max_history': 0})
+NullREntry = (W.ENTRY, 'none', {})
+ScriptNameEntry = (W.ENTRY, 'error', {'regex': r'^[a-zA-Z0-9 _-]*$'})
+PasswordEntry = (W.ENTRY, 'keep', {'extra_kwargs': {'show': '*'}})
+
+
 class NameForm(LibForm):
-    """Use utils.get_name"""
+    """Use utils.get_name and set ``widget_ns``"""
     form_name: str
+    widget_ns = widgets
 
     def __init_subclass__(cls, **kwargs):
         """Set cls.form_name"""
@@ -76,7 +80,7 @@ class BaseForm(NameForm, ScrolledForm):
             warn = True
             if k in cls.all_widgets:
                 for w, *_, w_kwargs in cls.all_widgets[k].values():
-                    if issubclass(w, Entry):
+                    if w is W.ENTRY:  # TODO: do we want this for differently-named entries?
                         warn = False
                         w_kwargs.setdefault('autocomplete', v)
             if warn:
@@ -96,8 +100,8 @@ class SearchForm(BaseForm):
     # PyCharm seems not to inherit the hint...
     all_widgets: 'dict[str, dict[Any, Optional[tuple]]]' = {
         'search_mode': {FormTag.SEARCH: (
-            RadioChoices, [(c, utils.get_name(c)) for c in ('and', 'or')], {})},
-        'exact_match': {FormTag.SEARCH: Checkbox},
+            W.RADIO_CHOICES, [(c, utils.get_name(c)) for c in ('and', 'or')], {})},
+        'exact_match': {FormTag.SEARCH: W.CHECKBOX},
     }
 
     def __init_subclass__(cls, **kwargs):
@@ -105,10 +109,10 @@ class SearchForm(BaseForm):
         for ws in cls.all_widgets.values():
             if ws[None] is not None:
                 w, *a, kw = ws[None]
-                if issubclass(w, (Checkbox, OptionsFromSearch)):
+                if w in (W.CHECKBOX, W.OPTIONS_FROM_SEARCH):
                     kw = {**kw, 'allow_none': True}
                     ws.setdefault(FormTag.SEARCH, (w, *a, kw))
-                elif issubclass(w, DropdownChoices):
+                elif w is W.DROPDOWN_CHOICES:
                     if a:
                         a = (((None, ''), *a[0]), *a[1:])
                     else:
@@ -163,7 +167,7 @@ class EditForm(BaseForm):
         if FormTag.EDIT in widget_spec:
             raise TypeError("can't use EditForm if FormTag.EDIT is specified")
         widget_spec[FormTag.EDIT] = (
-            OptionsFromSearch,
+            W.OPTIONS_FROM_SEARCH,
             common.NSWithLogin(getattr(core, cls.form_name)),
             {'setter': True},
         )
@@ -197,18 +201,18 @@ class ViewForm(BaseForm):
             if ws[None] is None:
                 continue
             w, *a, kw = ws[None]
-            if issubclass(w, (SearchMultiChoice, OptionsFromSearch)):
+            if w in (W.SEARCH_MULTI_CHOICE, W.OPTIONS_FROM_SEARCH):
                 ans = a[0] if a else kw.pop('action_ns')
                 new = (
-                    LinkWidget,
+                    W.LINK,
                     partial(view_data, ans.__name__),
-                    {'multiple': issubclass(w, SearchMultiChoice)},
+                    {'multiple': w is W.SEARCH_MULTI_CHOICE},
                 )
-            elif issubclass(w, Checkbox):
-                new = (Checkbox, {'active': False})
+            elif w is W.CHECKBOX:
+                new = (W.CHECKBOX, {'active': False})
             else:
-                display = 'list' if issubclass(w, MultiChoicePopup) else 'str'
-                new = (DisplayWidget, display, {})
+                display = 'list' if w is W.MULTI_CHOICE_POPUP else 'str'
+                new = (W.DISPLAY, display, {})
             ws.setdefault(FormTag.VIEW, new)
 
     def get_submit_widget(self):
@@ -335,7 +339,7 @@ def show_results(master: tk.Widget,
         btn.config(text=utils.get_name('back_to_results'), command=search_show)
         return view_func(result_frame, dns)
 
-    all_widgets = {str(i): (LinkWidget, view_wrap, {'wraplength': WRAPLENGTH * 2})
+    all_widgets = {str(i): (W.LINK, view_wrap, {'wraplength': WRAPLENGTH * 2})
                    for i in range(len(results))}
     form_cls = type('ConcreteSRForm', (SearchResultForm,), {'all_widgets': all_widgets})
     common.destroy_all_children(master)
@@ -418,7 +422,7 @@ def view_action(master: tk.Widget, ans: common.NSWithLogin):
     temp_form = type(
         ans.ans.__name__ + 'Form',
         (NameForm,),
-        {'all_widgets': {'id': (OptionsFromSearch, ans, {})}},
+        {'all_widgets': {'id': (W.OPTIONS_FROM_SEARCH, ans, {})}},
     )
     result = form_dialog(master.winfo_toplevel(), temp_form)  # noqa
     if result is None:
@@ -496,7 +500,7 @@ def handle_lua_get_data(data_spec):
     """provide a callback for lua's get_data"""
     type_widget_map = {
         'int': IntEntry,
-        'bool': Checkbox,
+        'bool': W.CHECKBOX,
         'str': NonEmptyEntry,
     }
 
@@ -512,9 +516,9 @@ def handle_lua_get_data(data_spec):
     for k, name, t, *x in data_spec:
         choices = [c if isinstance(c, str) else (c['id'], c.string) for cs in x for c in cs]
         if t == 'choice':
-            w = (DropdownChoices, choices, {'default': None})
+            w = (W.DROPDOWN_CHOICES, choices, {'default': None})
         elif t == 'multichoices':
-            w = (MultiChoicePopup, choices, {})
+            w = (W.MULTI_CHOICE_POPUP, choices, {})
         else:
             w = type_widget_map[t]
         cls_body['all_widgets'][k] = w
@@ -565,30 +569,30 @@ def get_script_action(script_spec):
 class BookForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
         'id': {
-            FormTag.VIEW: DisplayWidget,
-            FormTag.SEARCH: IntEntry,
+            FormTag.VIEW: W.DISPLAY,
+            FormTag.SEARCH: None,
         },
         'isbn': {
-            FormTag.NEW: (ISBNEntry, True, {}),
-            None: (ISBNEntry, False, {}),
+            FormTag.NEW: (W.ISBN_ENTRY, True, {}),
+            None: (W.ISBN_ENTRY, False, {}),
         },
         'author': NonEmptyREntry,
         'title': NonEmptyEntry,
-        'series': SeriesInput,
-        'series_number': SeriesInput.NumberDummy,
+        'series': W.SERIES_INPUT,
+        'series_number': W.SERIES_INPUT_NUMBER,
         'language': NonEmptyREntry,
         'publisher': NonEmptyREntry,
         'concerned_people': NullREntry,
         'year': IntEntry,
         'medium': NonEmptyREntry,
         'borrow': {FormTag.VIEW: (
-            LinkWidget,
+            W.LINK,
             partial(view_data, 'person'),
             {'attr': 'person'},
         )},
-        'genres': (MultiChoicePopup, lambda: Book.get_all_genres(), {'new': True}),
-        'library': (OptionsFromSearch, Library, {'search': False}),
-        'groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {'new': True}),
+        'genres': (W.MULTI_CHOICE_POPUP, lambda: Book.get_all_genres(), {'new': True}),
+        'library': (W.OPTIONS_FROM_SEARCH, Library, {'search': False}),
+        'groups': (W.MULTI_CHOICE_POPUP, lambda: Book.get_all_groups(), {'new': True}),
         'shelf': NonEmptyREntry,
     }
 
@@ -601,37 +605,37 @@ class PersonForm(SearchForm, EditForm, ViewForm):
         'class_': ClassEntry,
         'max_borrow': IntEntry,
         'borrows': {FormTag.VIEW: (
-            LinkWidget,
+            W.LINK,
             partial(view_data, 'book'),
             {'attr': 'book', 'multiple': True},
         )},
-        'libraries': (SearchMultiChoice, Library, {}),
+        'libraries': (W.SEARCH_MULTI_CHOICE, Library, {}),
         'pay': {
             FormTag.SEARCH: None,
             FormTag.VIEW: None,
-            None: Checkbox,
+            None: W.CHECKBOX,
         },
-        'borrow_permission': {FormTag.VIEW: DisplayWidget},
+        'borrow_permission': {FormTag.VIEW: W.DISPLAY},
     }
 
 
 class MemberForm(AuthedForm, SearchForm, EditForm, ViewForm):
     all_widgets = {
         'name': NonEmptyREntry,
-        'level': (DropdownChoices, tuple(utils.level_names.items()), 1, {'search': False}),
-        'password': {FormTag.NEW: ConfirmedPasswordInput},
+        'level': (W.DROPDOWN_CHOICES, tuple(utils.level_names.items()), 1, {'search': False}),
+        'password': {FormTag.NEW: W.CONFIRMED_PASSWORD_INPUT},
     }
 
 
 class MemberChangePasswordForm(AuthedForm):
     all_widgets = {
         'member': (
-            FallbackOFS,
+            W.FALLBACK_OFS,
             common.NSWithLogin(core.Member),
             {'fb_default': lambda: getattr(main.app.current_login, 'name', None)},
         ),
         'current_password': PasswordEntry,
-        'new_password': ConfirmedPasswordInput,
+        'new_password': W.CONFIRMED_PASSWORD_INPUT,
     }
 
 
@@ -645,7 +649,7 @@ class LoginForm(NameForm):
 class LibraryForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
         'name': NonEmptyREntry,
-        'pay_required': Checkbox,
+        'pay_required': W.CHECKBOX,
     }
 
 
@@ -653,25 +657,25 @@ class BorrowForm(ViewForm):
     # NOTE: this form is actually only used for NEW and VIEW
     # EDIT is split into restitute + extend, SEARCH is separate
     all_widgets = {
-        'person': (OptionsFromSearch, Person, {}),
-        'book': (OptionsFromSearch, Book, {
+        'person': (W.OPTIONS_FROM_SEARCH, Person, {}),
+        'book': (W.OPTIONS_FROM_SEARCH, Book, {
             'condition': ('not', ('exists', ('borrow.is_back', 'eq', False)))}),
         'weeks': {FormTag.NEW: IntEntry},
-        'override': {FormTag.NEW: Checkbox},
-        'return_date': {FormTag.VIEW: DisplayWidget},
+        'override': {FormTag.NEW: W.CHECKBOX},
+        'return_date': {FormTag.VIEW: W.DISPLAY},
     }
 
 
 class BorrowRestituteForm(BaseForm):
     all_widgets = {
-        'book': (OptionsFromSearch, Book,
+        'book': (W.OPTIONS_FROM_SEARCH, Book,
                  {'condition': ('borrow.is_back', 'eq', False)}),
     }
 
 
 class BorrowExtendForm(BaseForm):
     all_widgets = {
-        'book': (OptionsFromSearch, Book,
+        'book': (W.OPTIONS_FROM_SEARCH, Book,
                  {'condition': ('borrow.is_back', 'eq', False)}),
         'weeks': IntEntry,
     }
@@ -681,13 +685,13 @@ class BorrowSearchForm(SearchForm):
     all_widgets = {
         'book__title': NullREntry,
         'book__author': NullREntry,
-        'book__library': (OptionsFromSearch, Library, {}),
-        'book__groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {}),
+        'book__library': (W.OPTIONS_FROM_SEARCH, Library, {}),
+        'book__groups': (W.MULTI_CHOICE_POPUP, lambda: Book.get_all_groups(), {}),
         # this has on_empty='error', but empty values are removed when searching
         # the Null*Entries above are not really needed
         'person__class_': ClassEntry,
-        'person__libraries': (SearchMultiChoice, Library, {}),
-        'is_back': (Checkbox, {'allow_none': True}),
+        'person__libraries': (W.SEARCH_MULTI_CHOICE, Library, {}),
+        'is_back': (W.CHECKBOX, {'allow_none': True}),
     }
 
 
@@ -695,15 +699,15 @@ class ScriptForm(AuthedForm, SearchForm, EditForm, ViewForm):
     all_widgets = {
         'name': ScriptNameEntry,
         'permissions': {
-            None: (MultiChoicePopup, [
+            None: (W.MULTI_CHOICE_POPUP, [
                 (p.name, utils.get_name('script::permissions::' + p.name))
                 for p in core.ScriptPermissions], {}),
-            FormTag.VIEW: (DisplayWidget, 'list', {'get_name': 'script::permissions::'}),
+            FormTag.VIEW: (W.DISPLAY, 'list', {'get_name': 'script::permissions::'}),
         },
-        'setlevel': (DropdownChoices,
+        'setlevel': (W.DROPDOWN_CHOICES,
                      ((None, '-----'), *utils.level_names.items()), {}),
         'code': {
-            None: Text,
+            None: W.TEXT,
             FormTag.SEARCH: None,
             FormTag.VIEW: None,
         }

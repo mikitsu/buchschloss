@@ -1,12 +1,9 @@
-"""Test gui2.formlib"""
+"""Test aforms"""
 import types
 import runpy
 import os
 
-# giant dance to prevent importing buchschloss.gui2 (uses tk)
-# TODO: rewrite gui2 so that it doesn't start on import
-formlib = types.SimpleNamespace(**runpy.run_path(
-    os.path.join(os.path.dirname(__file__), '..', 'buchschloss', 'gui2', 'formlib.py')))
+from buchschloss import aforms
 
 
 def test_merge():
@@ -19,7 +16,7 @@ def test_merge():
     class NotDerivedForm(NotAForm):
         pass
 
-    class AForm(formlib.Form):
+    class AForm(aforms.Form):
         all_widgets = {
             'field-1': 'widget class (AForm)',
             'field-2': ('widget class (AForm)', {'kwargs': 'AForm'}),
@@ -30,7 +27,7 @@ def test_merge():
             }
         }
 
-    class BForm(NotDerivedForm, formlib.Form, NotBForm):
+    class BForm(NotDerivedForm, aforms.Form, NotBForm):
         all_widgets = {
             'field-1': ('widget class (BForm)', {'kwargs': 'BForm'}),
             'field-4': 'widget class (BForm)',

@@ -13,6 +13,24 @@ from .. import utils
 from .. import config
 from . import formlib
 from . import common
+from .formlib import Entry, RadioChoices, DropdownChoices
+
+__all__ = [
+    'Entry',
+    'RadioChoices',
+    'DropdownChoices',
+    'MultiChoicePopup',
+    'OptionsFromSearch',
+    'FallbackOFS',
+    'SeriesInput',
+    'ConfirmedPasswordInput',
+    'ISBNEntry',
+    'Text',
+    'Checkbox',
+    'SearchMultiChoice',
+    'DisplayWidget',
+    'LinkWidget',
+]
 
 
 WRAPLENGTH = config.gui2.widget_size.main.width // 2
@@ -112,21 +130,22 @@ class SeriesInput(formlib.FormWidget):
         if self.get() is None and self.series_number.get() is not None:
             return self.form.get_name('error::series_number_without_series')
 
-    class NumberDummy(formlib.FormWidget):
-        """Dummy form widget for series numbers. Must be used with series"""
-        widget = None
 
-        def __init__(self, form, master, name, series_key='series'):
-            super().__init__(form, master, name)
-            self.series_key = series_key
+class SeriesInputNumber(formlib.FormWidget):
+    """Dummy form widget for series numbers. Must be used with series"""
+    widget = None
 
-        def get(self):
-            """return the series number from the main widget"""
-            return self.form.widget_dict[self.series_key].series_number.get()
+    def __init__(self, form, master, name, series_key='series'):
+        super().__init__(form, master, name)
+        self.series_key = series_key
 
-        def set(self, data):
-            """set the series number in the main widget"""
-            self.form.widget_dict[self.series_key].series_number.set(data)
+    def get(self):
+        """return the series number from the main widget"""
+        return self.form.widget_dict[self.series_key].series_number.get()
+
+    def set(self, data):
+        """set the series number in the main widget"""
+        self.form.widget_dict[self.series_key].series_number.set(data)
 
 
 class ConfirmedPasswordInput(formlib.FormWidget):
@@ -188,17 +207,6 @@ class ISBNEntry(formlib.Entry):
             tk_msg.showerror(e.title, e.message)
         else:
             self.form.set_data(data)
-
-
-NonEmptyEntry = (formlib.Entry, 'error', {'max_history': 0})
-NonEmptyREntry = (formlib.Entry, 'error', {})
-ClassEntry = (formlib.Entry, 'error', {'regex': config.gui2.class_regex})
-IntEntry = (formlib.Entry, 'error', {'transform': int})
-NullIntEntry = (formlib.Entry, 'none', {'transform': int})
-NullEntry = (formlib.Entry, 'none', {'max_history': 0})
-NullREntry = (formlib.Entry, 'none', {})
-ScriptNameEntry = (formlib.Entry, 'error', {'regex': r'^[a-zA-Z0-9 _-]*$'})
-PasswordEntry = (formlib.Entry, 'keep', {'extra_kwargs': {'show': '*'}})
 
 
 class Text(formlib.FormWidget):
