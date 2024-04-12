@@ -105,8 +105,14 @@ class SearchForm(BaseForm):
         for ws in cls.all_widgets.values():
             if ws[None] is not None:
                 w, *a, kw = ws[None]
-                if issubclass(w, (Checkbox, DropdownChoices)):
+                if issubclass(w, (Checkbox, OptionsFromSearch)):
                     kw = {**kw, 'allow_none': True}
+                    ws.setdefault(FormTag.SEARCH, (w, *a, kw))
+                elif issubclass(w, DropdownChoices):
+                    if a:
+                        a = (((None, ''), *a[0]), *a[1:])
+                    else:
+                        kw['choices'] = ((None, ''), *kw['choices'])
                     ws.setdefault(FormTag.SEARCH, (w, *a, kw))
 
     def get_data(self):
@@ -612,7 +618,7 @@ class PersonForm(SearchForm, EditForm, ViewForm):
 class MemberForm(AuthedForm, SearchForm, EditForm, ViewForm):
     all_widgets = {
         'name': NonEmptyREntry,
-        'level': (DropdownChoices, tuple(utils.level_names.items()), 1, {}),
+        'level': (DropdownChoices, tuple(utils.level_names.items()), 1, {'search': False}),
         'password': {FormTag.NEW: ConfirmedPasswordInput},
     }
 

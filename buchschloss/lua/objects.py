@@ -245,6 +245,7 @@ class LuaRequestsInterface(LuaObject):
         try:
             r = requests.get(url, headers={'User-Agent': 'buchschloss-lua'})
         except requests.RequestException as e:
+            raise
             raise core.BuchSchlossError('no_connection', 'no_connection_{}', str(e))
         if result == 'auto':
             result = r.headers.get('Content-Type', '').split('/')[-1]

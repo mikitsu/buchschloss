@@ -187,11 +187,7 @@ def get_book_data(isbn: int):
     except StopIteration:
         data = {}
         for spec in config.utils.book_data_scripts:
-            try:
-                get_data_from_script(spec)
-            except core.BuchSchlossBaseError as e:
-                logging.warning(
-                    f'Error "{e.title}" fetching data for {isbn}: {e.message}')
+            get_data_from_script(spec)
     else:
         data = dict(core.Book.view_ns(book['id'], login_context=core.internal_priv_lc))
     for k in ('id', 'borrow', 'is_active'):
