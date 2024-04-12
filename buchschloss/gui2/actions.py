@@ -15,7 +15,7 @@ from . import common
 from .. import core
 from .. import config
 from .. import utils
-from ..aforms import Widget as W
+from ..aforms import Widget as W, FormTag
 from .formlib import Form as LibForm, ScrolledForm
 from . import widgets
 from .widgets import WRAPLENGTH
@@ -23,13 +23,6 @@ from .widgets import WRAPLENGTH
 Book = common.NSWithLogin(core.Book)
 Person = common.NSWithLogin(core.Person)
 Library = common.NSWithLogin(core.Library)
-
-
-class FormTag(enum.Enum):
-    SEARCH = '"search" action'
-    NEW = '"new" action'
-    EDIT = '"edit" action'
-    VIEW = '"view" action'
 
 
 NonEmptyEntry = (W.ENTRY, 'error', {'max_history': 0})
@@ -43,26 +36,11 @@ ScriptNameEntry = (W.ENTRY, 'error', {'regex': r'^[a-zA-Z0-9 _-]*$'})
 PasswordEntry = (W.ENTRY, 'keep', {'extra_kwargs': {'show': '*'}})
 
 
-class NameForm(LibForm):
-    """Use utils.get_name and set ``widget_ns``"""
-    form_name: str
+class NSForm(LibForm):
     widget_ns = widgets
 
-    def __init_subclass__(cls, **kwargs):
-        """Set cls.form_name"""
-        cls.form_name = cls.__name__.replace('Form', '')
-        super().__init_subclass__(**kwargs)  # noqa -- it might accept kwargs later
 
-    def get_name(self, name):
-        """redirect to utils.get_name inserting a form-specific prefix"""
-        if isinstance(self.tag, FormTag):
-            items = ('form', self.form_name, self.tag.name, name)
-        else:
-            items = ('form', self.form_name, name)
-        return utils.get_name('::'.join(items))
-
-
-class BaseForm(NameForm, ScrolledForm):
+class BaseForm(NSForm, ScrolledForm):
     """Base class for forms, handling default content and autocompletes"""
     height = config.gui2.widget_size.main.height
 
@@ -234,7 +212,7 @@ class SearchResultForm(BaseForm):
         return None
 
 
-def form_dialog(root: tk.Widget, form_cls: Type[NameForm]) -> Optional[dict]:
+def form_dialog(root: tk.Widget, form_cls: Type[NSForm]) -> Optional[dict]:
     """Show a pop-up dialog based on a form"""
     def callback(kwargs):
         nonlocal data
@@ -421,7 +399,7 @@ def view_action(master: tk.Widget, ans: common.NSWithLogin):
     """Ask for an ID and call :func:`.view_data`. Useful with ``functools.partial``"""
     temp_form = type(
         ans.ans.__name__ + 'Form',
-        (NameForm,),
+        (NSForm,),
         {'all_widgets': {'id': (W.OPTIONS_FROM_SEARCH, ans, {})}},
     )
     result = form_dialog(master.winfo_toplevel(), temp_form)  # noqa
@@ -639,7 +617,7 @@ class MemberChangePasswordForm(AuthedForm):
     }
 
 
-class LoginForm(NameForm):
+class LoginForm(NSForm):
     all_widgets = {
         'name': NonEmptyREntry,
         'password': PasswordEntry,
