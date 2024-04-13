@@ -20,10 +20,6 @@ from .formlib import Form as LibForm, ScrolledForm
 from . import widgets
 from .widgets import WRAPLENGTH
 
-Book = common.NSWithLogin(core.Book)
-Person = common.NSWithLogin(core.Person)
-Library = common.NSWithLogin(core.Library)
-
 
 NonEmptyEntry = (W.ENTRY, 'error', {'max_history': 0})
 NonEmptyREntry = (W.ENTRY, 'error', {})
@@ -146,7 +142,7 @@ class EditForm(BaseForm):
             raise TypeError("can't use EditForm if FormTag.EDIT is specified")
         widget_spec[FormTag.EDIT] = (
             W.OPTIONS_FROM_SEARCH,
-            common.NSWithLogin(getattr(core, cls.form_name)),
+            getattr(core, cls.form_name),
             {'setter': True},
         )
 
@@ -400,7 +396,7 @@ def view_action(master: tk.Widget, ans: common.NSWithLogin):
     temp_form = type(
         ans.ans.__name__ + 'Form',
         (NSForm,),
-        {'all_widgets': {'id': (W.OPTIONS_FROM_SEARCH, ans, {})}},
+        {'all_widgets': {'id': (W.OPTIONS_FROM_SEARCH, ans.ans, {})}},
     )
     result = form_dialog(master.winfo_toplevel(), temp_form)  # noqa
     if result is None:
@@ -568,9 +564,9 @@ class BookForm(SearchForm, EditForm, ViewForm):
             partial(view_data, 'person'),
             {'attr': 'person'},
         )},
-        'genres': (W.MULTI_CHOICE_POPUP, lambda: Book.get_all_genres(), {'new': True}),
-        'library': (W.OPTIONS_FROM_SEARCH, Library, {'search': False}),
-        'groups': (W.MULTI_CHOICE_POPUP, lambda: Book.get_all_groups(), {'new': True}),
+        'genres': (W.MULTI_CHOICE_POPUP, core.Book.get_all_genres, {'new': True}),
+        'library': (W.OPTIONS_FROM_SEARCH, core.Library, {'search': False}),
+        'groups': (W.MULTI_CHOICE_POPUP, core.Book.get_all_groups, {'new': True}),
         'shelf': NonEmptyREntry,
     }
 
@@ -587,7 +583,7 @@ class PersonForm(SearchForm, EditForm, ViewForm):
             partial(view_data, 'book'),
             {'attr': 'book', 'multiple': True},
         )},
-        'libraries': (W.SEARCH_MULTI_CHOICE, Library, {}),
+        'libraries': (W.SEARCH_MULTI_CHOICE, core.Library, {}),
         'pay': {
             FormTag.SEARCH: None,
             FormTag.VIEW: None,
@@ -609,7 +605,7 @@ class MemberChangePasswordForm(AuthedForm):
     all_widgets = {
         'member': (
             W.FALLBACK_OFS,
-            common.NSWithLogin(core.Member),
+            core.Member,
             {'fb_default': lambda: getattr(main.app.current_login, 'name', None)},
         ),
         'current_password': PasswordEntry,
@@ -635,8 +631,8 @@ class BorrowForm(ViewForm):
     # NOTE: this form is actually only used for NEW and VIEW
     # EDIT is split into restitute + extend, SEARCH is separate
     all_widgets = {
-        'person': (W.OPTIONS_FROM_SEARCH, Person, {}),
-        'book': (W.OPTIONS_FROM_SEARCH, Book, {
+        'person': (W.OPTIONS_FROM_SEARCH, core.Person, {}),
+        'book': (W.OPTIONS_FROM_SEARCH, core.Book, {
             'condition': ('not', ('exists', ('borrow.is_back', 'eq', False)))}),
         'weeks': {FormTag.NEW: IntEntry},
         'override': {FormTag.NEW: W.CHECKBOX},
@@ -646,14 +642,14 @@ class BorrowForm(ViewForm):
 
 class BorrowRestituteForm(BaseForm):
     all_widgets = {
-        'book': (W.OPTIONS_FROM_SEARCH, Book,
+        'book': (W.OPTIONS_FROM_SEARCH, core.Book,
                  {'condition': ('borrow.is_back', 'eq', False)}),
     }
 
 
 class BorrowExtendForm(BaseForm):
     all_widgets = {
-        'book': (W.OPTIONS_FROM_SEARCH, Book,
+        'book': (W.OPTIONS_FROM_SEARCH, core.Book,
                  {'condition': ('borrow.is_back', 'eq', False)}),
         'weeks': IntEntry,
     }
@@ -663,12 +659,12 @@ class BorrowSearchForm(SearchForm):
     all_widgets = {
         'book__title': NullREntry,
         'book__author': NullREntry,
-        'book__library': (W.OPTIONS_FROM_SEARCH, Library, {}),
-        'book__groups': (W.MULTI_CHOICE_POPUP, lambda: Book.get_all_groups(), {}),
+        'book__library': (W.OPTIONS_FROM_SEARCH, core.Library, {}),
+        'book__groups': (W.MULTI_CHOICE_POPUP, core.Book.get_all_groups, {}),
         # this has on_empty='error', but empty values are removed when searching
         # the Null*Entries above are not really needed
         'person__class_': ClassEntry,
-        'person__libraries': (W.SEARCH_MULTI_CHOICE, Library, {}),
+        'person__libraries': (W.SEARCH_MULTI_CHOICE, core.Library, {}),
         'is_back': (W.CHECKBOX, {'allow_none': True}),
     }
 

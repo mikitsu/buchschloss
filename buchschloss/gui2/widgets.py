@@ -13,6 +13,7 @@ from .. import utils
 from .. import config
 from . import formlib
 from . import common
+from . import main
 from .formlib import Entry, RadioChoices, DropdownChoices
 
 __all__ = [
@@ -52,7 +53,7 @@ class OptionsFromSearch(formlib.DropdownChoices):
 
         The parameters ``allow_none`` and ``setter`` are mutually exclusive.
         """
-        self.action_ns = action_ns
+        action_ns = self.action_ns = common.NSWithLogin(action_ns)
         values = sorted((o['id'], o.string) for o in action_ns.search(condition))
         if allow_none:
             if setter:
@@ -254,13 +255,15 @@ class Checkbox(formlib.FormWidget):
 
 
 class MultiChoicePopup(formlib.MultiChoicePopup):
-    """provide the ``wraplength`` argument and set ``max_height`` and ``sep``"""
+    """provide the ``wraplength`` argument, set ``max_height`` and ``sep``, pass login_context to choices()"""
     max_height = config.gui2.popup_height
     sep = config.gui2.option_sep
 
-    def __init__(self, *args, button_options=None, **kwargs):
+    def __init__(self, form, master, name, choices, *args, button_options=None, **kwargs):
+        if callable(choices):
+            choices = lambda _choices=choices: _choices(login_context=main.app.current_login)
         kwargs['button_options'] = {**(button_options or {}), 'wraplength': WRAPLENGTH}
-        super().__init__(*args, **kwargs)
+        super().__init__(form, master, name, choices, *args, **kwargs)
 
 
 class SearchMultiChoice(MultiChoicePopup):
@@ -274,7 +277,7 @@ class SearchMultiChoice(MultiChoicePopup):
         # This isn't a function returning a tuple that uses
         # the function providable for options to allow ViewForm
         # to treat this differently than other MultiChoicePopups
-        values = sorted((o['id'], o.string) for o in action_ns.search(condition))
+        values = sorted((o['id'], o.string) for o in common.NSWithLogin(action_ns).search(condition))
         super().__init__(form, master, name, values)
 
 
