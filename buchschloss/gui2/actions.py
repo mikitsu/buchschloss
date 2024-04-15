@@ -1,35 +1,25 @@
 """translate GUI actions to core-provided functions"""
 
 import collections.abc
-import enum
 import logging
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tk_msg
 import tkinter.font as tk_font
 from functools import partial
-from typing import Type, Callable, Optional, Sequence, Mapping, Any, ClassVar
+from typing import Type, Callable, Optional, Sequence, Mapping
 
 from . import main
 from . import common
 from .. import core
 from .. import config
 from .. import utils
-from ..aforms import Widget as W, FormTag, Form as AForm
+from .. import aforms
+from ..aforms import Widget as W, FormTag
+from ..aforms.defs import AuthedForm, PasswordEntry, NonEmptyREntry, IntEntry, NonEmptyEntry
 from .formlib import Form as LibForm, ScrolledForm
 from . import widgets
 from .widgets import WRAPLENGTH
-
-
-NonEmptyEntry = (W.ENTRY, 'error', {'max_history': 0})
-NonEmptyREntry = (W.ENTRY, 'error', {})
-ClassEntry = (W.ENTRY, 'error', {'regex': config.gui2.class_regex})
-IntEntry = (W.ENTRY, 'error', {'transform': int})
-NullIntEntry = (W.ENTRY, 'none', {'transform': int})
-NullEntry = (W.ENTRY, 'none', {'max_history': 0})
-NullREntry = (W.ENTRY, 'none', {})
-ScriptNameEntry = (W.ENTRY, 'error', {'regex': r'^[a-zA-Z0-9 _-]*$'})
-PasswordEntry = (W.ENTRY, 'keep', {'extra_kwargs': {'show': '*'}})
 
 
 class NSForm(LibForm):
@@ -104,97 +94,23 @@ class BaseForm(NSForm, ScrolledForm):
             return super().get_submit_widget()
 
 
-class SearchForm(AForm):
-    """Add search options (and/or) + exact matching and adapt widgets"""
-    # PyCharm seems not to inherit the hint...
-    all_widgets: 'dict[str, dict[Any, Optional[tuple]]]' = {
-        'search_mode': {FormTag.SEARCH: (
-            W.RADIO_CHOICES, [(c, utils.get_name(c)) for c in ('and', 'or')], {})},
-        'exact_match': {FormTag.SEARCH: W.CHECKBOX},
-    }
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        for ws in cls.all_widgets.values():
-            if ws[None] is not None:
-                w, *a, kw = ws[None]
-                if w in (W.CHECKBOX, W.OPTIONS_FROM_SEARCH):
-                    kw = {**kw, 'allow_none': True}
-                    ws.setdefault(FormTag.SEARCH, (w, *a, kw))
-                elif w is W.DROPDOWN_CHOICES:
-                    if a:
-                        a = (((None, ''), *a[0]), *a[1:])
-                    else:
-                        kw['choices'] = ((None, ''), *kw['choices'])
-                    ws.setdefault(FormTag.SEARCH, (w, *a, kw))
-
-
-class AuthedForm(AForm):
-    """add a 'current_password' field for NEW and EDIT"""
+class MemberChangePasswordForm(AuthedForm):
     all_widgets = {
-        'current_password': {
-            FormTag.NEW: PasswordEntry,
-            FormTag.EDIT: PasswordEntry,
-        }
+        'member': (
+            W.FALLBACK_OFS,
+            core.Member,
+            {'fb_default': lambda: getattr(main.app.current_login, 'name', None)},
+        ),
+        'current_password': PasswordEntry,
+        'new_password': W.CONFIRMED_PASSWORD_INPUT,
     }
 
 
-class EditForm(AForm):
-    """Adapt forms for the EDIT action.
-
-    On FormTag.EDIT:
-    Use OptionsFromSearch with setter=True for the first not-inherited widget.
-    Modify ``.get_data`` to include the value of the first widget under ``'*args'``.
-    """
-    id_name: ClassVar[str]
-
-    def __init_subclass__(cls, **kwargs):
-        cls.id_name = next(iter(cls.all_widgets))
-        super().__init_subclass__(**kwargs)
-        widget_spec = cls.all_widgets[cls.id_name]
-        if FormTag.EDIT in widget_spec:
-            raise TypeError("can't use EditForm if FormTag.EDIT is specified")
-        widget_spec[FormTag.EDIT] = (
-            W.OPTIONS_FROM_SEARCH,
-            getattr(core, cls.form_name),
-            {'setter': True},
-        )
-
-
-class ViewForm(AForm):
-    """Adapt a form to be suitable with FormTag.VIEW
-
-    Don't show a submit button when used with FormTag.VIEW.
-
-    Insert display widgets (DisplayWidget or LinkWidget) on subclassing
-    where a specific widget for FormTag.VIEW is not specified.
-    The widget and arguments are chosen based on the default widget:
-
-    - ``SearchMultiChoice`` creates a ``LinkWidget`` with ``multiple=True``
-    - ``OptionsFromSearch`` creates a normal ``LinkWidget``
-    - ``Checkbox`` creates a ``Checkbox`` with ``active=False``
-    - ``MultiChoicePopup`` creates a ``DisplayWidget`` with ``display='list'``
-    - everything else creates a ``DisplayWidget`` with ``display='str'``
-    """
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        for ws in cls.all_widgets.values():
-            if ws[None] is None:
-                continue
-            w, *a, kw = ws[None]
-            if w in (W.SEARCH_MULTI_CHOICE, W.OPTIONS_FROM_SEARCH):
-                ans = a[0] if a else kw.pop('action_ns')
-                new = (
-                    W.LINK,
-                    ans.__name__,
-                    {'multiple': w is W.SEARCH_MULTI_CHOICE},
-                )
-            elif w is W.CHECKBOX:
-                new = (W.CHECKBOX, {'active': False})
-            else:
-                display = 'list' if w is W.MULTI_CHOICE_POPUP else 'str'
-                new = (W.DISPLAY, display, {})
-            ws.setdefault(FormTag.VIEW, new)
+class LoginForm(NSForm):
+    all_widgets = {
+        'name': NonEmptyREntry,
+        'password': PasswordEntry,
+    }
 
 
 class SearchResultForm(BaseForm):
@@ -269,9 +185,9 @@ def make_action(master: tk.Widget,
     if ans is None:
         ans = getattr(core, name.capitalize())
     ans = common.NSWithLogin(ans)
-    form_cls = globals().get(
+    form_cls = form_classes.get(
         f'{name.capitalize()}{func.title().replace("_", "")}Form',
-        globals()[name.capitalize() + 'Form']
+        form_classes[name.capitalize() + 'Form']
     )
     tag = FormTag.__members__.get(func.upper())
     if func == 'view':
@@ -299,7 +215,7 @@ def show_results(master: tk.Widget,
         tk_msg.showinfo(utils.get_name('action::search'), utils.get_name('no_results'))
         return
     elif len(results) == 1:
-        view_func(master, results[0])
+        view_data(view_key, master, ans.view_ns(results[0]['id']))
         return
 
     def search_show():
@@ -377,7 +293,7 @@ def view_data(name: str, master: tk.Widget, dns: core.DataNamespace):
     :param dns: is a DataNamespace of the object to display
     """
     common.destroy_all_children(master)
-    form_cls: Type[BaseForm] = globals()[name.capitalize() + 'Form']
+    form_cls: Type[BaseForm] = form_classes[name.capitalize() + 'Form']
     form = form_cls(master, FormTag.VIEW, lambda **kw: None)
     try:
         form.set_data(dns)
@@ -539,150 +455,4 @@ def get_script_action(script_spec):
 
 # Form definitions
 
-
-class BookForm(SearchForm, EditForm, ViewForm, BaseForm):
-    all_widgets = {
-        'id': {
-            FormTag.VIEW: W.DISPLAY,
-            FormTag.SEARCH: None,
-        },
-        'isbn': {
-            FormTag.NEW: (W.ISBN_ENTRY, True, {}),
-            None: (W.ISBN_ENTRY, False, {}),
-        },
-        'author': NonEmptyREntry,
-        'title': NonEmptyEntry,
-        'series': W.SERIES_INPUT,
-        'series_number': W.SERIES_INPUT_NUMBER,
-        'language': NonEmptyREntry,
-        'publisher': NonEmptyREntry,
-        'concerned_people': NullREntry,
-        'year': IntEntry,
-        'medium': NonEmptyREntry,
-        'borrow': {FormTag.VIEW: (
-            W.LINK,
-            'person',
-            {'attr': 'person'},
-        )},
-        'genres': (W.MULTI_CHOICE_POPUP, core.Book.get_all_genres, {'new': True}),
-        'library': (W.OPTIONS_FROM_SEARCH, core.Library, {'search': False}),
-        'groups': (W.MULTI_CHOICE_POPUP, core.Book.get_all_groups, {'new': True}),
-        'shelf': NonEmptyREntry,
-    }
-
-
-class PersonForm(SearchForm, EditForm, ViewForm, BaseForm):
-    all_widgets = {
-        'id': IntEntry,
-        'first_name': NonEmptyREntry,
-        'last_name': NonEmptyREntry,
-        'class_': ClassEntry,
-        'max_borrow': IntEntry,
-        'borrows': {FormTag.VIEW: (
-            W.LINK,
-            'book',
-            {'attr': 'book', 'multiple': True},
-        )},
-        'libraries': (W.SEARCH_MULTI_CHOICE, core.Library, {}),
-        'pay': {
-            FormTag.SEARCH: None,
-            FormTag.VIEW: None,
-            None: W.CHECKBOX,
-        },
-        'borrow_permission': {FormTag.VIEW: W.DISPLAY},
-    }
-
-
-class MemberForm(AuthedForm, SearchForm, EditForm, ViewForm, BaseForm):
-    all_widgets = {
-        'name': NonEmptyREntry,
-        'level': (W.DROPDOWN_CHOICES, tuple(utils.level_names.items()), 1, {'search': False}),
-        'password': {FormTag.NEW: W.CONFIRMED_PASSWORD_INPUT},
-    }
-
-
-class MemberChangePasswordForm(AuthedForm, BaseForm):
-    all_widgets = {
-        'member': (
-            W.FALLBACK_OFS,
-            core.Member,
-            {'fb_default': lambda: getattr(main.app.current_login, 'name', None)},
-        ),
-        'current_password': PasswordEntry,
-        'new_password': W.CONFIRMED_PASSWORD_INPUT,
-    }
-
-
-class LoginForm(NSForm):
-    all_widgets = {
-        'name': NonEmptyREntry,
-        'password': PasswordEntry,
-    }
-
-
-class LibraryForm(SearchForm, EditForm, ViewForm, BaseForm):
-    all_widgets = {
-        'name': NonEmptyREntry,
-        'pay_required': W.CHECKBOX,
-    }
-
-
-class BorrowForm(ViewForm, BaseForm):
-    # NOTE: this form is actually only used for NEW and VIEW
-    # EDIT is split into restitute + extend, SEARCH is separate
-    all_widgets = {
-        'person': (W.OPTIONS_FROM_SEARCH, core.Person, {}),
-        'book': (W.OPTIONS_FROM_SEARCH, core.Book, {
-            'condition': ('not', ('exists', ('borrow.is_back', 'eq', False)))}),
-        'weeks': {FormTag.NEW: IntEntry},
-        'override': {FormTag.NEW: W.CHECKBOX},
-        'return_date': {FormTag.VIEW: W.DISPLAY},
-    }
-
-
-class BorrowRestituteForm(BaseForm):
-    all_widgets = {
-        'book': (W.OPTIONS_FROM_SEARCH, core.Book,
-                 {'condition': ('borrow.is_back', 'eq', False)}),
-    }
-
-
-class BorrowExtendForm(BaseForm):
-    all_widgets = {
-        'book': (W.OPTIONS_FROM_SEARCH, core.Book,
-                 {'condition': ('borrow.is_back', 'eq', False)}),
-        'weeks': IntEntry,
-    }
-
-
-class BorrowSearchForm(SearchForm, BaseForm):
-    all_widgets = {
-        'book__title': NullREntry,
-        'book__author': NullREntry,
-        'book__library': (W.OPTIONS_FROM_SEARCH, core.Library, {}),
-        'book__groups': (W.MULTI_CHOICE_POPUP, core.Book.get_all_groups, {}),
-        # this has on_empty='error', but empty values are removed when searching
-        # the Null*Entries above are not really needed
-        'person__class_': ClassEntry,
-        'person__libraries': (W.SEARCH_MULTI_CHOICE, core.Library, {}),
-        'is_back': (W.CHECKBOX, {'allow_none': True}),
-    }
-
-
-class ScriptForm(AuthedForm, SearchForm, EditForm, ViewForm, BaseForm):
-    all_widgets = {
-        'name': ScriptNameEntry,
-        'permissions': {
-            None: (W.MULTI_CHOICE_POPUP, [
-                (p.name, utils.get_name('script::permissions::' + p.name))
-                for p in core.ScriptPermissions], {}),
-            FormTag.VIEW: (W.DISPLAY, 'list', {'get_name': 'script::permissions::'}),
-        },
-        'setlevel': (W.DROPDOWN_CHOICES,
-                     ((None, '-----'), *utils.level_names.items()), {}),
-        'code': {
-            None: W.TEXT,
-            FormTag.SEARCH: None,
-            FormTag.VIEW: None,
-        }
-    }
+form_classes = aforms.instantiate(BaseForm)
