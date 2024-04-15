@@ -15,7 +15,7 @@ from . import common
 from .. import core
 from .. import config
 from .. import utils
-from ..aforms import Widget as W, FormTag
+from ..aforms import Widget as W, FormTag, Form as AForm
 from .formlib import Form as LibForm, ScrolledForm
 from . import widgets
 from .widgets import WRAPLENGTH
@@ -68,8 +68,43 @@ class BaseForm(NSForm, ScrolledForm):
             label['wraplength'] = WRAPLENGTH
         return label
 
+    def get_data(self):
+        """handle SEARCH and EDIT
 
-class SearchForm(BaseForm):
+        for SEARCH tags, ignore empty data
+        for EDIT tags, move the ID widget value to `*args`
+        """
+        if self.tag is FormTag.SEARCH:
+            return {k: v
+                    for k, v in super().get_data().items()
+                    if v or isinstance(v, bool)}
+        else:
+            data = super().get_data()
+            if self.tag is FormTag.EDIT:
+                data['*args'] = (data.pop(self.id_name),)
+            return data
+
+    def validate(self):
+        """ignore errors from empty widgets"""
+        errors = super().validate()
+        # NOTE: the password entry will raise ValueError if the passwords don't
+        # match, but it shouldn't be used in searches anyway.
+        # All other widgets shouldn't raise exceptions in .get()
+        if self.tag is FormTag.SEARCH:
+            data = self.get_data()
+            for k in errors.keys() - data.keys():
+                del errors[k]
+        return errors
+
+    def get_submit_widget(self):
+        """Don't show a submit button when used with FormTag.VIEW"""
+        if self.tag is FormTag.VIEW:
+            return None
+        else:
+            return super().get_submit_widget()
+
+
+class SearchForm(AForm):
     """Add search options (and/or) + exact matching and adapt widgets"""
     # PyCharm seems not to inherit the hint...
     all_widgets: 'dict[str, dict[Any, Optional[tuple]]]' = {
@@ -93,29 +128,8 @@ class SearchForm(BaseForm):
                         kw['choices'] = ((None, ''), *kw['choices'])
                     ws.setdefault(FormTag.SEARCH, (w, *a, kw))
 
-    def get_data(self):
-        """ignore empty data"""
-        if self.tag is FormTag.SEARCH:
-            return {k: v
-                    for k, v in super().get_data().items()
-                    if v or isinstance(v, bool)}
-        else:
-            return super().get_data()
 
-    def validate(self):
-        """ignore errors from empty widgets"""
-        errors = super().validate()
-        # NOTE: the password entry will raise ValueError if the passwords don't
-        # match, but it shouldn't be used in searches anyway.
-        # All other widgets shouldn't raise exceptions in .get()
-        if self.tag is FormTag.SEARCH:
-            data = self.get_data()
-            for k in errors.keys() - data.keys():
-                del errors[k]
-        return errors
-
-
-class AuthedForm(BaseForm):
+class AuthedForm(AForm):
     """add a 'current_password' field for NEW and EDIT"""
     all_widgets = {
         'current_password': {
@@ -125,7 +139,7 @@ class AuthedForm(BaseForm):
     }
 
 
-class EditForm(BaseForm):
+class EditForm(AForm):
     """Adapt forms for the EDIT action.
 
     On FormTag.EDIT:
@@ -146,15 +160,8 @@ class EditForm(BaseForm):
             {'setter': True},
         )
 
-    def get_data(self):
-        """put the value of the ID widget under ``'*args'``"""
-        data = super().get_data()
-        if self.tag is FormTag.EDIT:
-            data['*args'] = (data.pop(self.id_name),)
-        return data
 
-
-class ViewForm(BaseForm):
+class ViewForm(AForm):
     """Adapt a form to be suitable with FormTag.VIEW
 
     Don't show a submit button when used with FormTag.VIEW.
@@ -188,13 +195,6 @@ class ViewForm(BaseForm):
                 display = 'list' if w is W.MULTI_CHOICE_POPUP else 'str'
                 new = (W.DISPLAY, display, {})
             ws.setdefault(FormTag.VIEW, new)
-
-    def get_submit_widget(self):
-        """Don't show a submit button when used with FormTag.VIEW"""
-        if self.tag is FormTag.VIEW:
-            return None
-        else:
-            return super().get_submit_widget()
 
 
 class SearchResultForm(BaseForm):
@@ -540,7 +540,7 @@ def get_script_action(script_spec):
 # Form definitions
 
 
-class BookForm(SearchForm, EditForm, ViewForm):
+class BookForm(SearchForm, EditForm, ViewForm, BaseForm):
     all_widgets = {
         'id': {
             FormTag.VIEW: W.DISPLAY,
@@ -571,7 +571,7 @@ class BookForm(SearchForm, EditForm, ViewForm):
     }
 
 
-class PersonForm(SearchForm, EditForm, ViewForm):
+class PersonForm(SearchForm, EditForm, ViewForm, BaseForm):
     all_widgets = {
         'id': IntEntry,
         'first_name': NonEmptyREntry,
@@ -593,7 +593,7 @@ class PersonForm(SearchForm, EditForm, ViewForm):
     }
 
 
-class MemberForm(AuthedForm, SearchForm, EditForm, ViewForm):
+class MemberForm(AuthedForm, SearchForm, EditForm, ViewForm, BaseForm):
     all_widgets = {
         'name': NonEmptyREntry,
         'level': (W.DROPDOWN_CHOICES, tuple(utils.level_names.items()), 1, {'search': False}),
@@ -601,7 +601,7 @@ class MemberForm(AuthedForm, SearchForm, EditForm, ViewForm):
     }
 
 
-class MemberChangePasswordForm(AuthedForm):
+class MemberChangePasswordForm(AuthedForm, BaseForm):
     all_widgets = {
         'member': (
             W.FALLBACK_OFS,
@@ -620,14 +620,14 @@ class LoginForm(NSForm):
     }
 
 
-class LibraryForm(SearchForm, EditForm, ViewForm):
+class LibraryForm(SearchForm, EditForm, ViewForm, BaseForm):
     all_widgets = {
         'name': NonEmptyREntry,
         'pay_required': W.CHECKBOX,
     }
 
 
-class BorrowForm(ViewForm):
+class BorrowForm(ViewForm, BaseForm):
     # NOTE: this form is actually only used for NEW and VIEW
     # EDIT is split into restitute + extend, SEARCH is separate
     all_widgets = {
@@ -655,7 +655,7 @@ class BorrowExtendForm(BaseForm):
     }
 
 
-class BorrowSearchForm(SearchForm):
+class BorrowSearchForm(SearchForm, BaseForm):
     all_widgets = {
         'book__title': NullREntry,
         'book__author': NullREntry,
@@ -669,7 +669,7 @@ class BorrowSearchForm(SearchForm):
     }
 
 
-class ScriptForm(AuthedForm, SearchForm, EditForm, ViewForm):
+class ScriptForm(AuthedForm, SearchForm, EditForm, ViewForm, BaseForm):
     all_widgets = {
         'name': ScriptNameEntry,
         'permissions': {
