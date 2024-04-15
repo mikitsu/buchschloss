@@ -4,7 +4,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox as tk_msg
 from functools import partial
-from typing import Callable, Any, Optional
+from typing import Callable, Any, Optional, ClassVar
 
 from ..misc import tkstuff as mtk
 
@@ -323,21 +323,25 @@ class DisplayWidget(formlib.FormWidget):
 
 class LinkWidget(formlib.FormWidget):
     """Display a button that opens an info display when clicked"""
+    # set in actions to avoid circular imports
+    view_func: ClassVar[Callable[[str, tk.Widget, Any], None]]
+
     def __init__(self, form, master, name,
-                 view_func: Callable[[tk.Widget, Any], None],
+                 view_key: str,
                  attr: Optional[str] = None,
                  display: Callable[[Any], str] = operator.attrgetter('string'),
                  multiple: bool = False,
                  wraplength=WRAPLENGTH,
+                 view_func=None,
                  ):
-        assert callable(view_func), (form, name, view_func)
         super().__init__(form, master, name)
         self.attr = attr
         self.display = display
         self.multiple = multiple
         self.wraplength = wraplength
+        self.view_key = view_key
         self.data = None
-        self.view_func = view_func
+        self.view_func = type(self).view_func if view_func is None else view_func
         self.widget = tk.Frame(self.master)
 
     def set(self, data):
@@ -360,7 +364,7 @@ class LinkWidget(formlib.FormWidget):
             tk.Button(
                 self.widget,
                 wraplength=self.wraplength,
-                command=partial(self.view_func, self.form.frame, arg),
+                command=lambda: self.view_func(self.view_key, self.form.frame, arg),
                 text=self.display(item),
             ).pack()
 

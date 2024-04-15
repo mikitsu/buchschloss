@@ -179,7 +179,7 @@ class ViewForm(BaseForm):
                 ans = a[0] if a else kw.pop('action_ns')
                 new = (
                     W.LINK,
-                    partial(view_data, ans.__name__),
+                    ans.__name__,
                     {'multiple': w is W.SEARCH_MULTI_CHOICE},
                 )
             elif w is W.CHECKBOX:
@@ -277,8 +277,7 @@ def make_action(master: tk.Widget,
     if func == 'view':
         return partial(view_action, master, ans)
     if func == 'search':
-        view_func = partial(view_data, name)
-        middle_callback = partial(search_callback, master, view_func, ans)
+        middle_callback = partial(search_callback, master, name, ans)
         callback = partial(callback_adapter, middle_callback, False)
     else:
         callback = partial(callback_adapter, getattr(ans, func), True)
@@ -287,7 +286,8 @@ def make_action(master: tk.Widget,
 
 def show_results(master: tk.Widget,
                  results: Sequence,
-                 view_func: Callable[[tk.Widget, core.DataNamespace], None],
+                 view_key: str,
+                 ans: common.NSWithLogin,
                  ):
     """show search results as buttons taking the user to the appropriate view
 
@@ -308,12 +308,13 @@ def show_results(master: tk.Widget,
         f = form_cls(result_frame, None, lambda d: None)
         f.set_data({str(i): dns for i, dns in enumerate(results)})
 
-    def view_wrap(_master, dns):
+    def view_wrap(_view_key, _master, dns):
+        assert _view_key == view_key and _master is result_frame, (view_key, _view_key, _master, result_frame)
         common.destroy_all_children(result_frame)
         btn.config(text=utils.get_name('back_to_results'), command=search_show)
-        return view_func(result_frame, dns)
+        return view_data(view_key, result_frame, ans.view_ns(dns['id']))
 
-    all_widgets = {str(i): (W.LINK, view_wrap, {'wraplength': WRAPLENGTH * 2})
+    all_widgets = {str(i): (W.LINK, view_key, {'wraplength': WRAPLENGTH * 2, 'view_func': view_wrap})
                    for i in range(len(results))}
     form_cls = type('ConcreteSRForm', (SearchResultForm,), {'all_widgets': all_widgets})
     common.destroy_all_children(master)
@@ -332,7 +333,7 @@ def show_results(master: tk.Widget,
 
 
 def search_callback(master: tk.Widget,
-                    view_func: Callable[[tk.Widget, core.DataNamespace], None],
+                    view_key: str,
                     ans: common.NSWithLogin,
                     search_mode: str,
                     exact_match: bool,
@@ -343,7 +344,7 @@ def search_callback(master: tk.Widget,
     This callback displays the search results with :func:`.show_results`.
     These arguments are meant to be given beforehand:
     :param master: is passed to :func:`.show_results`
-    :param view_func: is passed to :func:`.show_results`
+    :param view_key: is passed to :func:`.show_results`
     :param ans: is the (wrapped) ActionNamespace used for searching
       and getting result DataNamespaces
 
@@ -365,11 +366,7 @@ def search_callback(master: tk.Widget,
             else:
                 q = ((k, 'contains', v), search_mode, q)
 
-    def wrapped_view(view_master, dns):
-        """wrap to get a complete DataNS"""
-        return view_func(view_master, ans.view_ns(dns['id']))
-
-    show_results(master, tuple(ans.search(q)), wrapped_view)
+    show_results(master, tuple(ans.search(q)), view_key, ans)
 
 
 def view_data(name: str, master: tk.Widget, dns: core.DataNamespace):
@@ -389,6 +386,9 @@ def view_data(name: str, master: tk.Widget, dns: core.DataNamespace):
     except Exception:
         tk_msg.showerror(None, utils.get_name('unexpected_error'))
         raise
+
+
+widgets.LinkWidget.view_func = view_data
 
 
 def view_action(master: tk.Widget, ans: common.NSWithLogin):
@@ -561,7 +561,7 @@ class BookForm(SearchForm, EditForm, ViewForm):
         'medium': NonEmptyREntry,
         'borrow': {FormTag.VIEW: (
             W.LINK,
-            partial(view_data, 'person'),
+            'person',
             {'attr': 'person'},
         )},
         'genres': (W.MULTI_CHOICE_POPUP, core.Book.get_all_genres, {'new': True}),
@@ -580,7 +580,7 @@ class PersonForm(SearchForm, EditForm, ViewForm):
         'max_borrow': IntEntry,
         'borrows': {FormTag.VIEW: (
             W.LINK,
-            partial(view_data, 'book'),
+            'book',
             {'attr': 'book', 'multiple': True},
         )},
         'libraries': (W.SEARCH_MULTI_CHOICE, core.Library, {}),
