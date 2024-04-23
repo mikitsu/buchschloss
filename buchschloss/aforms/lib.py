@@ -93,6 +93,6 @@ class Form:
                 w_elem, *w_args, w_kwargs = widget
                 self.widget_dict[name] = self.make_widget(name, w_elem, w_args, w_kwargs)
 
-    def make_widget(self, w_elem, w_args, w_kwargs):
+    def make_widget(self, name, w_elem, w_args, w_kwargs):
         """Override this method to actually create widgets"""
         raise NotImplementedError
