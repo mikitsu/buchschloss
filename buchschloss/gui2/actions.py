@@ -113,7 +113,7 @@ class LoginForm(NSForm):
     }
 
 
-class SearchResultForm(BaseForm):
+class SearchResultForm(aforms.AForm, BaseForm):
     """Pseudo-form for displaying search results. Subclass setting ``all_widgets``"""
     def get_widget_label(self, widget):
         """No labels for search results"""
@@ -413,7 +413,7 @@ def handle_lua_get_data(data_spec):
             w = type_widget_map[t]
         cls_body['all_widgets'][k] = w
         name_data[k] = name
-    form_cls = type('LuaGetDataForm', (BaseForm,), cls_body)
+    form_cls = type('LuaGetDataForm', (aforms.Aform, BaseForm), cls_body)
     common.destroy_all_children(main.app.center)
     watcher = tk.Variable()
     data = None
