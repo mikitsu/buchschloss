@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block content %}
+<nav>{% for ans, func in actions %}
+	<a href="{{ url_for(func, what=ans) }}">{{ get_name('action::' + func + '_' + ans) }}</a>
+{% endfor %}</nav>
+{% endblock %}

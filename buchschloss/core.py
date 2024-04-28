@@ -1102,7 +1102,7 @@ class DataNamespace(T.Mapping[str, T.Any]):
             return NotImplemented
 
     def __len__(self):
-        return len(tuple(self))
+        return len(tuple(iter(self)))
 
     def __iter__(self):
         return iter({'id', *itertools.chain.from_iterable(self.handlers.values())})

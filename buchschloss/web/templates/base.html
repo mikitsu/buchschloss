@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Buchschloss</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script>
+function insert_multichoice(name, input_id, button_id, selected_id, value=null) {
+	if (value === null) {
+		let input = document.getElementById(input_id)
+		value = input.value
+		input.value = ''
+	}
+	let li = document.createElement('li')
+	let val_input = document.createElement('input')
+	let del_btn =document.createElement('button')
+	del_btn.setAttribute('type', 'button')
+	del_btn.addEventListener('click', () => li.remove())
+	del_btn.innerText = '❌'
+	del_btn.classList.add('del-btn')
+	val_input.setAttribute('type', 'hidden')
+	val_input.setAttribute('name', name)
+	val_input.value = value
+	li.innerText = value
+	li.appendChild(val_input)
+	li.appendChild(del_btn)
+	document.getElementById(selected_id).appendChild(li)
+}
+function register_multichoice(name, input_id, button_id, selected_id){
+	document.getElementById(button_id).addEventListener('click', () => insert_multichoice(name, input_id, button_id, selected_id))
+}
+function register_isbn_autofill() {
+	for (let elem of document.getElementsByName('isbn')) {
+		elem.addEventListener('keypress', e => {
+			if (e.key !== 'Enter') return;
+			e.preventDefault()
+			document.getElementById('loading-overlay').classList.add('active')
+			let req = new XMLHttpRequest();
+			req.open('GET', '/api/ad-hoc/get-book-data/' + encodeURI(elem.value), true)
+			req.onreadystatechange = () => {
+				if (req.readyState == 4) {
+					if (req.status == 200) {
+						for (let [k, v] of Object.entries(JSON.parse(req.responseText))) {
+							for (let e of document.getElementsByName(k)) {
+								e.value = v
+							}
+						}
+					}
+					console.log('removing overlay')
+					document.getElementById('loading-overlay').classList.remove('active')
+				}
+			}
+			req.send()
+		})
+	}
+}
+</script>
+</head>
+<body>
+<header>
+	<div class="status-bar">
+		<a href="/">{{ get_name('action::abort') }}</a>
+	{% if logged_in %}
+		<span>{{ get_name('logged_in_as_{}', current_login) }}</span>
+		<a href="{{ url_for('logout') }}">{{ get_name('logout') }}</a>
+	{% else %}
+		<span>{{ get_name('not_logged_in') }}</span>
+		<a href="{{ url_for('login') }}">{{ get_name('login') }}</a>
+	{% endif %}
+	</div>
+	{% for cat, msg in (messages or []) + get_flashed_messages(with_categories=true) %}
+	<p class="{{ cat }}">{{ msg }}</p>
+	{% endfor %}
+</header>
+<div id="loading-overlay">...</div>
+<main>
+	{% block content %}{{ form }}{% endblock %}
+</main>
+</body>
+</html>

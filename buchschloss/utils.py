@@ -189,7 +189,12 @@ def get_book_data(isbn: int):
         for spec in config.utils.book_data_scripts:
             get_data_from_script(spec)
     else:
-        data = dict(core.Book.view_ns(book['id'], login_context=core.internal_priv_lc))
+        book = core.Book.view_ns(book['id'], login_context=core.internal_priv_lc)
+        data = (
+            {k: book[k] for k in book.handlers['allow']}
+            | {k: book[k] for k in book.handlers['transform']}
+            | {k: book[k]['id'] for k in book.handlers['wrap_dns'] if book[k]}
+        )
     for k in ('id', 'borrow', 'is_active'):
         data.pop(k, None)
     return data

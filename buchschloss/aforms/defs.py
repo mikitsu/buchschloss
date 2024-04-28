@@ -141,6 +141,13 @@ class ViewForm(AForm):
             ws.setdefault(FormTag.VIEW, new)
 
 
+class LoginForm(AForm):
+    all_widgets = {
+        'name': NonEmptyREntry,
+        'password': PasswordEntry,
+    }
+
+
 class BookForm(SearchForm, EditForm, ViewForm):
     all_widgets = {
         'id': {
