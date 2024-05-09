@@ -3,3 +3,4 @@ beautifulsoup4~=4.4
 requests~=2.12
 configobj-dev==2019.9.1
 lupa~=2.1
+Flask~=3.0
