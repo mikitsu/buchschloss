@@ -65,7 +65,7 @@ def test_action_ns():
     def view_ns(a, *, login_context):
         assert login_context is FLAG
         if a == 1:
-            return Dummy(a=FLAG)
+            return {'a': FLAG}
         else:
             raise core.BuchSchlossBaseError('', '')
 
@@ -75,11 +75,12 @@ def test_action_ns():
 
     # noinspection PyArgumentList
     rt = lupa.LuaRuntime(attribute_handlers=(lua.lua_get, lua.lua_set))
-    dummy = Dummy(view_ns=view_ns, new=new, _call=lambda s, dns, runtime=None: dns)
+    dummy = Dummy(view_ns=view_ns, new=new, _call=lambda s, dns, runtime=None: dns,
+                  actions={'new', 'view_ns'})
     ns_book = objects.LuaActionNS(dummy, login_context=FLAG, runtime=rt)
     rt.globals()['book'] = ns_book
     with pytest.raises(AttributeError):
-        rt.eval('book.view_str')
+        rt.eval('book.model')
     assert rt.eval('book.view_ns') is not None
     assert rt.eval('book.new')
     assert rt.eval('book.view_ns(1).a') is FLAG
@@ -97,8 +98,8 @@ def test_action_ns():
 
 def test_data_ns(monkeypatch):
     """test LuaDataNS"""
-    monkeypatch.setattr(core, 'DataNamespace', Dummy)
-    data = Dummy(a=1, b=Dummy(x=1), c=[Dummy(x=2), Dummy(x=3)])
+    monkeypatch.setattr(core, 'DataNamespace', dict)
+    data = {'a': 1, 'b': {'x': 1}, 'c': [{'x': 2}, {'x': 3}]}
     rt = lupa.LuaRuntime(attribute_handlers=(lua.lua_get, lua.lua_set))  # noqa
     rt.globals()['ldn'] = objects.LuaDataNS(data, runtime=rt)
     assert rt.eval('type(ldn)') == 'userdata'
@@ -171,7 +172,7 @@ def test_ui_interaction(monkeypatch):
 
 def test_requests_bs4(monkeypatch):
     """test the requests and bs4 Lua interfaces"""
-    def get(url):
+    def get(url, **_):
         return {
             'https://test.invalid/plain.txt':
                 Dummy(headers={'Content-Type': 'text/plain'},

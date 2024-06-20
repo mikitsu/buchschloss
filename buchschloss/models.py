@@ -13,11 +13,10 @@ try:
     from . import config
 except ImportError:
     try:
-        from buchschloss import config
+        import config
     except ImportError:
         config = None
 if __name__ != '__main__':
-    from . import utils
     from . import core
 
 __all__ = [
@@ -53,26 +52,20 @@ class JSONField(peewee.TextField):
 class Model(peewee.Model):
     """Base class for all models."""
     DoesNotExist: peewee.DoesNotExist
-    str_fields: T.Iterable[peewee.Field]
+    str_fields: T.Set[peewee.Field]
     pk_name: str = 'id'
+    format_str: str = '<{0.__class__} object -- you should never see this text>'
 
     class Meta:
         database = db
 
     @classmethod
-    def select_str_fields(cls):
-        """return cls.select(*cls.str_fields)"""
-        return cls.select(*cls.str_fields)
+    def select_str_fields(cls, extra_fields: set):
+        """return cls.select(*<all string fields>)"""
+        return cls.select(*(getattr(cls, f) for f in cls.str_fields | extra_fields))
 
-
-class FormattedDateField(DateField):
-    def python_value(self, value):
-        return utils.FormattedDate.fromdate(super().python_value(value))
-
-    def db_value(self, value):
-        if isinstance(value, utils.FormattedDate):
-            return value.todate()
-        return value
+    def __str__(self):
+        return self.format_str.format(self)
 
 
 class ScriptPermissionField(IntegerField):
@@ -104,20 +97,12 @@ class Person(Model):
     last_name: T.Union[str, CharField] = CharField()
     class_: T.Union[str, CharField] = CharField()
     max_borrow: T.Union[int, IntegerField] = IntegerField()
-    borrow_permission: T.Union[datetime.date, DateField] = FormattedDateField(null=True)
+    borrow_permission: T.Union[datetime.date, DateField] = DateField(null=True)
+    borrows: peewee.BackrefAccessor
     libraries: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # libraries as backref
 
-    @property
-    def borrows(self):
-        return Borrow.select().where(Borrow.person == self,
-                                     Borrow.is_back == False)  # noqa
-
-    str_fields = (id, last_name, first_name)
-
-    def __str__(self):
-        return utils.get_name('Person[{}]"{}, {}"').format(
-            self.id, self.last_name, self.first_name
-        )
+    str_fields = {'id', 'last_name', 'first_name'}
+    format_str = 'Person[{0.id}]"{0.last_name}, {0.first_name}"'
 
 
 class Library(Model):
@@ -128,10 +113,8 @@ class Library(Model):
     name: T.Union[str, CharField] = CharField(primary_key=True)
     pay_required: T.Union[bool, BooleanField] = BooleanField(default=True)
 
-    def __str__(self):
-        return utils.get_name('Library[{}]').format(self.name)
-
-    str_fields = (name,)
+    format_str = 'Library[{0.name}]'
+    str_fields = {'name'}
     pk_name = 'name'
 
 
@@ -158,35 +141,41 @@ class Book(Model):
     concerned_people: T.Union[str, CharField] = CharField(null=True)
     year: T.Union[int, IntegerField] = IntegerField()
     medium: T.Union[str, CharField] = CharField()
-    genres: T.Union[str, CharField] = CharField(null=True)
 
-    groups: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]  # groups as backref
+    genres: peewee.BackrefAccessor
+    borrow: peewee.BackrefAccessor
+    groups: peewee.BackrefAccessor
     id: T.Union[int, IntegerField] = AutoField(primary_key=True)
     library: T.Union[Library, ForeignKeyField] = ForeignKeyField(Library, backref='books')
     shelf: T.Union[str, CharField] = CharField()
     is_active: T.Union[bool, BooleanField] = BooleanField(default=True)
 
-    @property
-    def borrow(self):
-        return Borrow.get_or_none(Borrow.book == self, is_back=False)
+    str_fields = {'id', 'title'}
+    format_str = 'Book[{0.id}]"{0.title}"'
 
-    str_fields = (id, title)
 
-    def __str__(self):
-        return utils.get_name('Book[{}]"{}"').format(self.id, self.title)
+class Genre(Model):
+    """A single genre-book pair"""
+    book = ForeignKeyField(Book, backref='genres')
+    name: T.Union[str, CharField] = CharField()
+
+    pk_name = 'name'  # for search
+
+    class Meta:
+        primary_key = peewee.CompositeKey('book', 'name')
 
 
 class Group(Model):
     """Represent a Group."""
-    books: T.Union[peewee.ManyToManyQuery, peewee.ManyToManyField]\
-        = ManyToManyField(Book, 'groups')
-    name: T.Union[str, CharField] = CharField(primary_key=True)
+    book = ForeignKeyField(Book, backref='groups')
+    name: T.Union[str, CharField] = CharField()
 
-    def __str__(self):
-        return utils.get_name('Group[{}]').format(self.name)
+    format_str = 'Group[{0.name}]'
+    str_fields = {'name'}
+    pk_name = 'name'  # for search
 
-    str_fields = (name,)
-    pk_name = 'name'
+    class Meta:
+        primary_key = peewee.CompositeKey('book', 'name')
 
 
 class Borrow(Model):
@@ -199,20 +188,13 @@ class Borrow(Model):
         - return_date: date by which the Book must de returned
     """
     id: T.Union[int, IntegerField] = AutoField(primary_key=True)
-    person: Person = ForeignKeyField(Person)
-    book: Book = ForeignKeyField(Book)
+    person: Person = ForeignKeyField(Person, backref='borrows')
+    book: Book = ForeignKeyField(Book, backref='borrow')
     is_back: T.Union[bool, BooleanField] = BooleanField(default=False)
-    return_date: T.Union[datetime.date, DateField] = FormattedDateField()
+    return_date: T.Union[datetime.date, DateField] = DateField()
 
-    # keep ID in, needed for further info
-    str_fields = (id, person, book, return_date, is_back)
-
-    def __str__(self):
-        if self.is_back:
-            is_back = utils.get_name('Borrow::is_back')
-        else:
-            is_back = utils.get_name('Borrow::until_{}').format(self.return_date)
-        return '{}: {} {}'.format(self.person, self.book, is_back)
+    str_fields = {'id', 'person', 'book'}
+    format_str = 'Borrow[{0.id}]({0.book}, {0.person})'
 
 
 class Member(Model):
@@ -222,12 +204,9 @@ class Member(Model):
     salt: T.Union[bytes, BlobField] = BlobField()
     level: T.Union[int, IntegerField] = IntegerField()
 
-    str_fields = (name, level)
+    format_str = 'Member[{0.name}]({0.level})'
+    str_fields = {'name', 'level'}
     pk_name = 'name'
-
-    def __str__(self):
-        return utils.get_name("Member[{}]({})").format(
-            self.name, utils.level_names[self.level])
 
 
 class Script(Model):
@@ -239,16 +218,9 @@ class Script(Model):
     permissions: 'T.Union[core.ScriptPermissions, ScriptPermissionField]' \
         = ScriptPermissionField()
 
-    str_fields = (name, setlevel)
+    format_str = 'Script[{0.name}]({0.setlevel})'
+    str_fields = {'name', 'setlevel'}
     pk_name = 'name'
-
-    def __str__(self):
-        if self.setlevel is None:
-            return '{}[{}]'.format(utils.get_name('Script'), self.name)
-        else:
-            return '{}[{}]({})'.format(
-                utils.get_name('Script'), self.name, utils.level_names[self.setlevel]
-            )
 
 
 class Misc(Model):
@@ -258,26 +230,26 @@ class Misc(Model):
     pk: T.Union[str, CharField] = CharField(primary_key=True)
     data: T.Any = PickleField()
 
-    str_fields = (pk,)
+    str_fields = {'pk'}
     pk_name = 'pk'
 
 
-models = Model.__subclasses__() + [Library.people.through_model, Group.books.through_model]
+models = Model.__subclasses__() + [Library.people.through_model]
 if __name__ == '__main__':
     print('Running this as a script will create tables in the DB '
           'and initialize them with basic data. Proceed? (y/n)')
     if not input().lower().startswith('y'):
         sys.exit()
+    import hashlib
+    if config is not None:
+        iterations = config.core.hash_iterations[0]
+    else:
+        iterations = int(input('iteration count -> '))
+    password = hashlib.pbkdf2_hmac('sha256', b'Pa$$w0rd', b'', iterations)
     db.create_tables(models)
     print('created tables...')
     Misc.create(pk='last_script_invocations', data={})
-    Member.create(name='SAdmin',
-                  password=b'\xd2Kf\xef#o\xba\xe2\x84i\x896\x13\x99\x80\x94P\xd4'
-                           b'\xab\x10n\xeaB\xda\x8c\xbf\xf9\x7f\xd4\xe7\x80\x87',
-                  salt=b'{\x7f\xa5\xe7\x07\x1e>\xdf$\xc6\x8cX\xe6\x15J\x8ds\x88'
-                       b'\x9d2}9\x98\x9b)x]\x8cc\x8a\xcb\xc8\x8aO\xb3y%g\x9d'
-                       b'\x94\xd8\x03m\xec$V\xfa\xcdW3',
-                  level=4)
+    Member.create(name='SAdmin', password=password, salt=b'', level=4)
     Library.create(name='main')
     print('Finished. Press return to exit')
     input()

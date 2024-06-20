@@ -68,14 +68,11 @@ class LuaObject(abc.ABC):
 
 class LuaActionNS(LuaObject):
     """wrap an ActionNamespace for use with Lua"""
-    get_allowed = ('new', 'view_ns', 'edit', 'search')
-
     def __init__(self, action_ns: 'T.Type[core.ActionNamespace]',
                  login_context: 'core.LoginContext',
-                 extra_get_allowed: T.Tuple[str, ...] = (),
                  **kwargs):
         super().__init__(**kwargs)
-        self.get_allowed += extra_get_allowed
+        self.get_allowed = action_ns.actions
         self.login_context = login_context
         self.action_ns = action_ns
 
@@ -113,22 +110,19 @@ class LuaActionNS(LuaObject):
 class LuaDataNS(LuaObject):
     """provide access to data as returned by view_ns"""
 
-    def __init__(self, data_ns, **kwargs):
+    def __init__(self, data_ns: 'core.DataNamespace', **kwargs):
         super().__init__(**kwargs)
         self.data_ns = data_ns
-        self._data = data_ns._data  # noqa: be core.DataNS for core.Borrow.edit
 
     def __repr__(self):
-        return str(self.data_ns)
+        return self.data_ns.string
 
     def lua_get(self, name):
         """return data values, re-wrapping if necessary"""
         if name == '__str__':
-            return str(self.data_ns)
-        elif name.startswith('_'):
-            raise LuaAccessForbidden(self, name)
+            return repr(self)
         else:
-            val = getattr(self.data_ns, name)
+            val = self.data_ns[name]
             if isinstance(val, core.DataNamespace):
                 return LuaDataNS(val, runtime=self.runtime)
             elif (isinstance(val, T.Sequence)
@@ -159,7 +153,10 @@ class LuaLoginContext(LuaObject):
 
 class LuaUIInteraction(LuaObject):
     """Provide Lua code a way to interact with the user interface"""
-    get_allowed = ('ask', 'alert', 'display', 'get_data', 'get_name', 'get_level')
+    get_allowed = (
+        'ask', 'alert', 'display', 'get_data',
+        'get_name', 'get_level', 'format_date',
+    )
 
     def __init__(self, callbacks, script_prefix, **kwargs):
         """provide the callbacks and script-specific prefix for get_name"""
@@ -190,9 +187,8 @@ class LuaUIInteraction(LuaObject):
         return self.callbacks['display'](lua.table_to_data(data))
 
     def get_data(self, data_spec):
-        """get input from the user. Includes acceptable types (int, str, bool)"""
-        data_spec = ((k, self.get_name(k), v) for k, v in
-                     lua.table_to_data(data_spec).items())
+        """get input from the user. Includes acceptable types (int, str, bool, choice)"""
+        data_spec = ((k, self.get_name(k), *v) for k, *v in lua.table_to_data(data_spec))
         return lua.data_to_table(self.runtime, self.callbacks['get_data'](data_spec))
 
     @lupa.unpacks_lua_table_method
@@ -202,6 +198,7 @@ class LuaUIInteraction(LuaObject):
                 .format(*format_args, **format_kwargs))
 
     get_level = staticmethod(utils.level_names.__getitem__)
+    format_date = staticmethod(utils.format_date)
 
 
 class LuaBS4Interface(LuaObject):
@@ -247,9 +244,9 @@ class LuaRequestsInterface(LuaObject):
             logging.warning('blocked request to unallowed URL: ' + url)
             return None
         try:
-            r = requests.get(url)
-        except requests.RequestException:
-            raise core.BuchSchlossError('no_connection', 'no_connection')
+            r = requests.get(url, headers={'User-Agent': 'buchschloss-lua'})
+        except requests.RequestException as e:
+            raise core.BuchSchlossError('no_connection', 'no_connection_{}', str(e))
         if result == 'auto':
             result = r.headers.get('Content-Type', '').split('/')[-1]
         if result in ('html', 'xml'):

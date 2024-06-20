@@ -9,6 +9,7 @@ from buchschloss import lua
 
 class DummyActionNS:
     """Save all calls and return fabricated results"""
+    actions = {'new', 'view_ns', 'search', 'restitute', 'activate'}
 
     def __init__(self, results):
         self.results = {k: iter(v) for k, v in results.items()}
@@ -37,12 +38,8 @@ def test_new(monkeypatch):
 def test_view(monkeypatch):
     """test <Model>[<pk>]"""
     person_dummy = DummyActionNS({'view_ns': [
-        types.SimpleNamespace(
-            first_name='first',
-            pay_date=datetime.datetime(1965, 1, 31),
-            _data=None,
-        ),
-        types.SimpleNamespace(first_name='first', pay_date=None, _data=None),
+        {'pay_date': datetime.datetime(1965, 1, 31)},
+        {'first_name': 'first'},
     ]})
     monkeypatch.setattr(core, 'Person', person_dummy)
     rt = lua.prepare_runtime(core.guest_lc)
@@ -54,13 +51,3 @@ def test_view(monkeypatch):
         ((123,), {'login_context': core.guest_lc}),
         ((124,), {'login_context': core.guest_lc}),
     )
-
-
-def test_specials(monkeypatch):
-    """test Borrow:restitute and Group[<id>]:activate"""
-    group_dummy = DummyActionNS({'activate': [None], 'view_ns': [object()]})
-    monkeypatch.setattr(core, 'Group', group_dummy)
-    rt = lua.prepare_runtime(core.guest_lc)
-    assert rt.eval('Group.g_name:activate{{"1", "2", "3"}, "dest"}') is None
-    assert (group_dummy.calls['activate'][0]
-            == (('g_name', ['1', '2', '3'], 'dest'), {'login_context': core.guest_lc}))

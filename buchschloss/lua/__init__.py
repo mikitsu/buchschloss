@@ -33,13 +33,15 @@ def data_to_table(runtime, data):
 
 
 def table_to_data(table):
-    """convert a Lua table to a dict or a list"""
+    """Convert a Lua table to a dict or a list. Handle LuaDataNS <-> DataNS"""
     if lupa.lua_type(table) == 'table':
         keys = set(table.keys())
         if keys == set(range(1, len(keys) + 1)):
             return [table_to_data(t) for t in table.values()]
         else:
             return {k: table_to_data(v) for k, v in table.items()}
+    elif isinstance(table, objects.LuaDataNS):
+        return table.data_ns
     else:
         return table
 
@@ -112,21 +114,14 @@ def prepare_runtime(login_context: 'core.LoginContext', *,
         ``add_config`` may be a combination of basic values, dicts
             and tuples/lists. It will be assigned to a global variable
     """
-    ans_extended_funcs = {
-        'Group': ('activate',),
-        'Member': ('change_password',),
-        'Script': ('execute',),
-    }
     # noinspection PyArgumentList
     runtime = lupa.LuaRuntime(attribute_handlers=(lua_get, lua_set))
     restrict_runtime(runtime, config.lua.whitelist.mapping)
     g = runtime.globals()
     g['buchschloss'] = runtime.table_from({
-        k: objects.LuaActionNS(getattr(core, k),
-                               login_context=login_context,
-                               extra_get_allowed=ans_extended_funcs.get(k, ()),
-                               runtime=runtime)
-        for k in 'Book Person Group Library Borrow Member Script'.split()
+        k: objects.LuaActionNS(
+            getattr(core, k), login_context=login_context, runtime=runtime)
+        for k in core.ActionNamespace.namespaces
     })
     wrapped_lc = objects.LuaLoginContext(login_context, runtime=runtime)
     g['buchschloss']['login_context'] = wrapped_lc
@@ -147,6 +142,7 @@ def prepare_runtime(login_context: 'core.LoginContext', *,
 
 def start():
     """provide a REPL"""
+    print(config.lua.intro.text)
     username = input(utils.get_name('interactive_question::username'))
     if username:
         password = getpass.getpass(utils.get_name('interactive_question::password'))
@@ -161,7 +157,8 @@ def start():
     rt.globals()['getpass'] = getpass.getpass  # for auth_required functions
     while True:
         try:
-            line = input(str(login_context) + '@buchschloss-lua ==> ')
+            line = input(config.lua.prompt.safe_substitute(
+                login_context=login_context, username=username))
         except EOFError:
             print()
             return

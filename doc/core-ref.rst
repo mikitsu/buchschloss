@@ -11,25 +11,22 @@
 -------------------
 
 .. autoclass:: buchschloss.core.ActionNamespace
-    :members: new, view_str, view_ns, search
+    :members: new, view_ns, search
 
 .. autoclass:: buchschloss.core.Book
-    :members: new, edit, view_str
+    :members: new, edit
 
 .. autoclass:: buchschloss.core.Person
-    :members: new, edit, view_str
-
-.. autoclass:: buchschloss.core.Group
-    :members: new, edit, activate, view_str
+    :members: new, edit
 
 .. autoclass:: buchschloss.core.Library
-    :members: new, edit, view_str
+    :members: new, edit
 
 .. autoclass:: buchschloss.core.Borrow
-    :members: new, restitute, view_str
+    :members: new, edit
 
 .. autoclass:: buchschloss.core.Member
-    :members: new, edit, change_password, view_str
+    :members: new, edit, change_password
 
 .. autoclass:: buchschloss.core.Script
-    :members: new, edit, execute, view_str
+    :members: new, edit, execute

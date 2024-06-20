@@ -9,3 +9,4 @@ flake8:
     - test
   ignore:
     - W503  # line break before binary operator
+    - E226  # missing whitespace around arithmetic operator

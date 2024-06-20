@@ -13,6 +13,7 @@ Welcome to BuchSchloss's documentation!
    api
    scripts
    core-ref
+   gui-api
 
 Indices and tables
 ==================

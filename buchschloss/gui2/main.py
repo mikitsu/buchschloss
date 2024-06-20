@@ -1,5 +1,6 @@
 """GUIv2 for buchschloss"""
 
+import collections.abc
 import collections
 import functools
 import operator
@@ -7,27 +8,19 @@ import logging
 import tkinter.messagebox as tk_msg
 import tkinter.font as tk_font
 import tkinter as tk
-import types
+from tkinter import ttk
 from functools import partial
 import sys
 import typing as T
-
-from ..misc import tkstuff as mtk
-
-try:
-    from collections.abc import Mapping
-except ImportError:
-    Mapping = dict
+from typing import MutableMapping
 
 from .. import core
 from .. import utils
 from .. import config
 from ..config.main import DummyErrorFile
-from . import forms
 from . import widgets
 from . import actions
 from . import common
-from .actions import generic_formbased_action, ShowInfo
 
 
 class ActionTree(dict):
@@ -38,7 +31,14 @@ class ActionTree(dict):
         orphan_n = len(self) % width or float('inf')
         orphan_nm1 = len(self) % (width - 1 or width) or float('inf')
         width -= (orphan_n < orphan_nm1)
-        widgets.ActionChoiceWidget(app.center, self.items(), horizontal=width).pack()
+        for i, (name, cmd) in enumerate(self.items()):
+            r, c = divmod(i, width)
+            tk.Button(
+                app.center,
+                padx=50,
+                text=utils.get_name('action::' + name),
+                command=cmd,
+            ).grid(row=r, column=c)
 
     @classmethod
     def from_nested(cls, mapping: T.Mapping):
@@ -78,6 +78,7 @@ class App:
         font_conf = {'family': config.gui2.font.family, 'size': config.gui2.font.size}
         for font_name in ('Default', 'Text', 'Menu'):
             tk_font.nametofont(font_name.join(('Tk', 'Font'))).config(**font_conf)
+        ttk.Style().configure('Treeview', rowheight=config.gui2.font.size*2)
         self.current_login = core.guest_lc
         self.on_next_reset = []
         self.greeter = tk.Label(self.root,
@@ -87,7 +88,7 @@ class App:
         self.center = tk.Frame(self.root)
         self.header = widgets.Header(
             self.root,
-            {'text': utils.get_name('action::login'), 'command': actions.login},
+            {'text': utils.get_name('action::login'), 'command': actions.login_logout},
             utils.get_name('not_logged_in'),
             {'text': utils.get_name('action::abort'), 'command': self.reset},
             {'text': utils.get_name('action::exit_app'), 'command': self.onexit}
@@ -122,11 +123,11 @@ class App:
 
     def clear_center(self):
         """clear the center frame"""
-        for w in self.center.children.copy().values():
-            w.destroy()
+        common.destroy_all_children(self.center)
 
     def onexit(self):
         """execute when the user exits the application"""
+        self.reset()
         if tk_msg.askokcancel(utils.get_name('action::exit_app'),
                               utils.get_name('interactive_question::really_exit_app')):
             if (isinstance(sys.stderr, DummyErrorFile)
@@ -143,115 +144,38 @@ class App:
             sys.exit()
 
 
-def new_book_autofill(form):
-    """automatically fill some information on a book"""
-
-    def filler(event=None):
-        with common.ignore_missing_messagebox():
-            if str(form) not in str(app.root.focus_get()):
-                # going somewhere else
-                return
-        valid, isbn = isbn_field.validate()
-        if not valid:
-            tk_msg.showerror(message=isbn)
-            isbn_field.focus()
-            return
-        if not tk_msg.askyesno(utils.get_name('book::isbn'),
-                               utils.get_name('interactive_question::isbn_autofill')):
-            return
-        try:
-            data = utils.get_book_data(isbn)
-        except core.BuchSchlossBaseError as e:
-            tk_msg.showerror(e.title, e.message)
-        else:
-            for k, v in data.items():
-                mtk.get_setter(form.widget_dict[k])(v)
-
-    isbn_field = form.widget_dict['isbn']
-    isbn_field.bind('<FocusOut>', filler)
-
-
-def get_actions(spec):
+def get_actions(master, spec):
     """return a dict of actions suitable for ActionTree.from_map"""
-    gfa = generic_formbased_action
-    wrapped_action_ns = {
-        k: common.NSWithLogin(getattr(core, k))
-        for k in ('Book', 'Person', 'Group', 'Library', 'Borrow', 'Member', 'Script')
-    }
-    default_action_adapters = {
-        'new': lambda name, ns: gfa('new', get_form(name), ns.new),
-        'edit': lambda name, ns: gfa(
-            'edit', get_form(name), ns.edit, fill_data=ns.view_ns),
-        'view': lambda name, __: ShowInfo.instances.get(name),
-        'search': lambda name, ns: actions.search(
-            get_form(name + 'Search', get_form(name)), ns.search, ShowInfo.instances[name]),
-    }
-    special_action_funcs = {
-        ('Group', 'edit'): gfa(
-            'edit', forms.GroupForm, wrapped_action_ns['Group'].edit),
-        ('Library', 'edit'): gfa(
-            'edit', forms.LibraryForm, wrapped_action_ns['Library'].edit),
-        ('Book', 'new'): gfa(  # not through override because of post_init
-            'new', forms.BookForm, actions.new_book, post_init=new_book_autofill),
-        ('Book', 'search'): actions.search(
-            forms.BookForm,
-            lambda c: wrapped_action_ns['Book'].search((c, 'and', ('is_active', 'eq', True))),
-            actions.ShowInfo.instances['Book'],
-        )
-    }
 
-    def get_form(name, *default):
-        return getattr(forms, name + 'Form', *default)
-
-    def get_gui2_action(namespace, func):
-        if (namespace, func) in special_action_funcs:
-            return special_action_funcs[(namespace, func)]
-        action_ns = wrapped_action_ns[namespace]
-        action_adapter = default_action_adapters.get(func)
-        if action_adapter is not None:
-            return action_adapter(namespace, action_ns)
-        special_func = getattr(action_ns, func, None)
-        if special_func is None:
-            logging.warning('unknown action "{}"'.format(':'.join((namespace, func))))
-            return None
-        else:
-            form_name = namespace.capitalize() + func.title().replace('_', '')
-            return gfa(None, get_form(form_name), special_func)
-
-    def set_gui2_action(namespace, func, insert_key):
-        action = get_gui2_action(namespace, func)
-        if action is not None:
-            cur_r[insert_key] = action
-
-    RType = T.DefaultDict[str, T.Union['RType', T.Callable[[T.Optional[tk.Event]], None]]]
-    r: RType = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
+    r = collections.defaultdict(lambda: collections.defaultdict(r.default_factory))
     for k, v in spec.items():
-        cur_r = functools.reduce(operator.getitem, k.split('::')[:-1], r)
-        if v['type'] == 'gui2':
-            if v['name'] not in wrapped_action_ns:
-                logging.warning('unknown action namespace "{}"'.format(v['name']))
-                continue
-            if v['function'] is None:
-                core_ans = wrapped_action_ns[v['name']]
-                cur_r = cur_r[k]
-                action_type = (types.FunctionType, types.MethodType)
-                for func_name in dir(core_ans):
-                    func_v = getattr(core_ans, func_name)
-                    if (func_name.startswith(('_', 'view'))
-                            or not isinstance(func_v, action_type)):
-                        continue
-                    set_gui2_action(v['name'], func_name, func_name)
-                set_gui2_action(v['name'], 'view', 'view')
-            else:
-                set_gui2_action(v['name'], v['function'], k)
-        else:
+        cur_r: MutableMapping = functools.reduce(operator.getitem, k.split('::')[:-1], r)  # noqa
+        if v['type'] != 'gui2':
             cur_r[k] = actions.get_script_action(v)
+            continue
+        name, function = v['name'], v['function']
+        if name not in core.ActionNamespace.namespaces:
+            logging.warning(f'unknown action namespace "{name}"')
+            continue
+        ans = common.NSWithLogin(getattr(core, name))
+        gui2_actions = [
+            a for a in ans.actions
+            if not a.startswith(('view',) + ('get_all',) * (name == 'Book'))
+        ] + ['view']
+        if function is None:
+            for a in gui2_actions:
+                cur_r[k][f'{k}::{a}'] = actions.make_action(master, name, a)
+        elif function in gui2_actions:
+            assert isinstance(cur_r, collections.defaultdict)
+            cur_r[k] = actions.make_action(master, name, function)
+        else:
+            logging.warning(f'unknown action: "{name}:{function}"')
     return r
 
 
 app = App()
 
-action_tree = ActionTree.from_nested(get_actions(config.gui2.actions.mapping))
+action_tree = ActionTree.from_nested(get_actions(app.center, config.gui2.actions.mapping))
 
 
 lua_callbacks = {

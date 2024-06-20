@@ -1,303 +1,436 @@
 """translate GUI actions to core-provided functions"""
 
-import collections
-import itertools
+import collections.abc
+import enum
+import logging
 import tkinter as tk
+from tkinter import ttk
 import tkinter.messagebox as tk_msg
+import tkinter.font as tk_font
 from functools import partial
-import typing as T
+from typing import Type, Callable, Optional, Sequence, Mapping, Any
 
-from ..misc import tkstuff as mtk
-from ..misc.tkstuff import dialogs as mtkd
-from ..misc.tkstuff import forms as mtkf
 from . import main
-from . import forms
-from . import widgets
 from . import common
 from .. import core
 from .. import config
 from .. import utils
+from .formlib import Form as LibForm, ScrolledForm, Entry, DropdownChoices, RadioChoices
+from .widgets import (
+    # not form-related
+    WRAPLENGTH,
+    # generic form widgets and form widget tuples
+    NonEmptyEntry, NonEmptyREntry, PasswordEntry, IntEntry, NullREntry, Text,
+    ConfirmedPasswordInput, Checkbox, MultiChoicePopup,
+    # specific form widgets and form widget tuples
+    SeriesInput, ISBNEntry, ClassEntry, ScriptNameEntry,
+    # complex form widgets
+    LinkWidget, DisplayWidget, OptionsFromSearch, FallbackOFS, SearchMultiChoice,
+)
+
+Book = common.NSWithLogin(core.Book)
+Person = common.NSWithLogin(core.Person)
+Library = common.NSWithLogin(core.Library)
 
 
-# noinspection PyDefaultArgument
-def generic_formbased_action(form_type, form_cls, callback,
-                             form_options={}, fill_data=None,
-                             post_init=lambda f: None,
-                             do_reset=True):
-    # TODO: make form_type an enum
-    """perform a generic action
-        Arguments:
-            form_type: 'new', 'edit' or 'search': used for the form group
-            form_cls: the form class (subclass of misc.tkstuff.forms.Form)
-            callback: the function to call on form submit with form data as keyword arguments
-            form_options: optional dict of additional options for the form
-            fill_data: optional callable taking the input of the first form field
-                and returning a dict of data to fill into the form
-            post_init: called after creation and placement of the form
-                with the form instance as argument
-            do_reset: boolean indicating whether to call app.reset after form submission"""
-    form_options_ = {
-        k: {'groups': v} for k, v in {
-            'new': [forms.ElementGroup.NEW],
-            'edit': [forms.ElementGroup.EDIT],
-            'search': [forms.ElementGroup.SEARCH],
-            None: [],
-        }.items()
+class FormTag(enum.Enum):
+    SEARCH = '"search" action'
+    NEW = '"new" action'
+    EDIT = '"edit" action'
+    VIEW = '"view" action'
+
+
+class NameForm(LibForm):
+    """Use utils.get_name"""
+    form_name: str
+
+    def __init_subclass__(cls, **kwargs):
+        """Set cls.form_name"""
+        cls.form_name = cls.__name__.replace('Form', '')
+        super().__init_subclass__(**kwargs)  # noqa -- it might accept kwargs later
+
+    def get_name(self, name):
+        """redirect to utils.get_name inserting a form-specific prefix"""
+        if isinstance(self.tag, FormTag):
+            items = ('form', self.form_name, self.tag.name, name)
+        else:
+            items = ('form', self.form_name, name)
+        return utils.get_name('::'.join(items))
+
+
+class BaseForm(NameForm, ScrolledForm):
+    """Base class for forms, handling default content and autocompletes"""
+    height = config.gui2.widget_size.main.height
+
+    def __init__(self, frame, tag, submit_callback):
+        super().__init__(frame, tag, submit_callback)
+        if tag is FormTag.NEW:
+            self.set_data(config.gui2.entry_defaults.get(self.form_name).mapping)
+
+    def __init_subclass__(cls, **kwargs):
+        """Handle autocompletes"""
+        # This will put every widget spec into the standard form, required below
+        super().__init_subclass__(**kwargs)
+
+        for k, v in config.gui2.get('autocomplete').get(cls.form_name).mapping.items():
+            warn = True
+            if k in cls.all_widgets:
+                for w, *_, w_kwargs in cls.all_widgets[k].values():
+                    if issubclass(w, Entry):
+                        warn = False
+                        w_kwargs.setdefault('autocomplete', v)
+            if warn:
+                logging.warning(
+                    f'autocomplete for {cls.form_name}.{k} specified, but no applied')
+
+    def get_widget_label(self, widget):
+        """add ``wraplength``"""
+        label = super().get_widget_label(widget)
+        if label is not None:
+            label['wraplength'] = WRAPLENGTH
+        return label
+
+
+class SearchForm(BaseForm):
+    """Add search options (and/or) + exact matching and adapt widgets"""
+    # PyCharm seems not to inherit the hint...
+    all_widgets: 'dict[str, dict[Any, Optional[tuple]]]' = {
+        'search_mode': {FormTag.SEARCH: (
+            RadioChoices, [(c, utils.get_name(c)) for c in ('and', 'or')], {})},
+        'exact_match': {FormTag.SEARCH: Checkbox},
     }
-    form_options_['edit']['default_content'] = {}
-    form_options_ = form_options_.get(form_type, {})
-    form_options_.update(form_options)
 
-    def action(event=None):
-        def onsubmit(data):
-            if fill_data is not None:
-                valid, id_ = id_field.validate()
-                if valid:
-                    mod = [id_]
-                    del data[id_name]
-                else:
-                    tk_msg.showerror()
-                    return
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for ws in cls.all_widgets.values():
+            if ws[None] is not None:
+                w, *a, kw = ws[None]
+                if issubclass(w, (Checkbox, OptionsFromSearch)):
+                    kw = {**kw, 'allow_none': True}
+                    ws.setdefault(FormTag.SEARCH, (w, *a, kw))
+
+    def get_data(self):
+        """ignore empty data"""
+        if self.tag is FormTag.SEARCH:
+            return {k: v
+                    for k, v in super().get_data().items()
+                    if v or isinstance(v, bool)}
+        else:
+            return super().get_data()
+
+    def validate(self):
+        """ignore errors from empty widgets"""
+        errors = super().validate()
+        # NOTE: the password entry will raise ValueError if the passwords don't
+        # match, but it shouldn't be used in searches anyway.
+        # All other widgets shouldn't raise exceptions in .get()
+        if self.tag is FormTag.SEARCH:
+            data = self.get_data()
+            for k in errors.keys() - data.keys():
+                del errors[k]
+        return errors
+
+
+class AuthedForm(BaseForm):
+    """add a 'current_password' field for NEW and EDIT"""
+    all_widgets = {
+        'current_password': {
+            FormTag.NEW: PasswordEntry,
+            FormTag.EDIT: PasswordEntry,
+        }
+    }
+
+
+class EditForm(BaseForm):
+    """Adapt forms for the EDIT action.
+
+    On FormTag.EDIT:
+    Use OptionsFromSearch with setter=True for the first not-inherited widget.
+    Modify ``.get_data`` to include the value of the first widget under ``'*args'``.
+    """
+    def __init_subclass__(cls, **kwargs):
+        cls.id_name = next(iter(cls.all_widgets))
+        super().__init_subclass__(**kwargs)
+        widget_spec = cls.all_widgets[cls.id_name]
+        if FormTag.EDIT in widget_spec:
+            raise TypeError("can't use EditForm if FormTag.EDIT is specified")
+        widget_spec[FormTag.EDIT] = (
+            OptionsFromSearch,
+            common.NSWithLogin(getattr(core, cls.form_name)),
+            {'setter': True},
+        )
+
+    def get_data(self):
+        """put the value of the ID widget under ``'*args'``"""
+        data = super().get_data()
+        if self.tag is FormTag.EDIT:
+            data['*args'] = (data.pop(self.id_name),)
+        return data
+
+
+class ViewForm(BaseForm):
+    """Adapt a form to be suitable with FormTag.VIEW
+
+    Don't show a submit button when used with FormTag.VIEW.
+
+    Insert display widgets (DisplayWidget or LinkWidget) on subclassing
+    where a specific widget for FormTag.VIEW is not specified.
+    The widget and arguments are chosen based on the default widget:
+
+    - ``SearchMultiChoice`` creates a ``LinkWidget`` with ``multiple=True``
+    - ``OptionsFromSearch`` creates a normal ``LinkWidget``
+    - ``Checkbox`` creates a ``Checkbox`` with ``active=False``
+    - ``MultiChoicePopup`` creates a ``DisplayWidget`` with ``display='list'``
+    - everything else creates a ``DisplayWidget`` with ``display='str'``
+    """
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for ws in cls.all_widgets.values():
+            if ws[None] is None:
+                continue
+            w, *a, kw = ws[None]
+            if issubclass(w, (SearchMultiChoice, OptionsFromSearch)):
+                ans = a[0] if a else kw.pop('action_ns')
+                new = (
+                    LinkWidget,
+                    partial(view_data, ans.__name__),
+                    {'multiple': issubclass(w, SearchMultiChoice)},
+                )
+            elif issubclass(w, Checkbox):
+                new = (Checkbox, {'active': False})
             else:
-                mod = ()
-            try:
-                r = callback(*mod, **data)
-            except core.BuchSchlossBaseError as e:
-                tk_msg.showerror(e.title, e.message)
-            except Exception:
-                tk_msg.showerror(None, utils.get_name('unexpected_error'))
-                raise
-            else:
-                if r and isinstance(r, set):
-                    tk_msg.showerror(None, utils.get_name('errors_{}').format('\n'.join(r)))
-                else:
-                    form.destroy()
-                    if do_reset:
-                        main.app.reset()
+                display = 'list' if issubclass(w, MultiChoicePopup) else 'str'
+                new = (DisplayWidget, display, {})
+            ws.setdefault(FormTag.VIEW, new)
 
-        form = form_cls(main.app.center, onsubmit=onsubmit, **form_options_)
-        if fill_data is not None:
-            id_field = form.widgets[0]
-            id_name = {id(v): k for k, v in form.widget_dict.items()}[id(id_field)]
-
-            def fill_fields(event=None):
-                with common.ignore_missing_messagebox():
-                    if str(form) not in str(main.app.root.focus_get()):
-                        return  # going somewhere else
-                valid, id_ = id_field.validate()
-                if not valid:
-                    tk_msg.showerror(None, id_)
-                    id_field.focus()
-                    return
-                try:
-                    data = fill_data(id_)
-                except core.BuchSchlossBaseError as e:
-                    tk_msg.showerror(e.title, e.message)
-                    id_field.focus()
-                else:
-                    for k, w in form.widget_dict.items():
-                        v = getattr(data, k, None)
-                        if v is not None:
-                            mtk.get_setter(w)(v)
-            id_field.bind('<FocusOut>', fill_fields)
-        form.widgets[0].focus()
-        form.pack()
-        post_init(form)
-    return action
+    def get_submit_widget(self):
+        """Don't show a submit button when used with FormTag.VIEW"""
+        if self.tag is FormTag.VIEW:
+            return None
+        else:
+            return super().get_submit_widget()
 
 
-def show_results(results: T.Iterable, view_func: T.Callable[[T.Any], dict], master=None):
+class SearchResultForm(BaseForm):
+    """Pseudo-form for displaying search results. Subclass setting ``all_widgets``"""
+    def get_widget_label(self, widget):
+        """No labels for search results"""
+        return None
+
+    def get_submit_widget(self):
+        """no submit widget"""
+        return None
+
+
+def form_dialog(root: tk.Widget, form_cls: Type[NameForm]) -> Optional[dict]:
+    """Show a pop-up dialog based on a form"""
+    def callback(kwargs):
+        nonlocal data
+        data = kwargs
+        popup.destroy()
+
+    data = None
+    popup = tk.Toplevel(root)
+    try:
+        popup.transient(root)
+        popup.grab_set()
+        form_cls(popup, None, callback)
+        popup.wait_window()
+    except Exception:
+        popup.destroy()
+        raise
+    return data
+
+
+def callback_adapter(callback, do_reset, kwargs):
+    """Adapter for form callbacks <-> ActionNS actions. For use with functools.partial.
+
+    The adapter handles argument unpacking (including *args) and error displaying.
+    These first two arguments should be given beforehand:
+    :param callback: is the action to wrap
+    :param do_reset: specifies whether ``app.reset`` should be called after the callback
+    The final argument should then be provided by the form:
+    :param kwargs: form submission data to call the real callback with
+    """
+    args = kwargs.pop('*args', ())
+    try:
+        callback(*args, **kwargs)
+    except core.BuchSchlossBaseError as e:
+        tk_msg.showerror(e.title, e.message)
+    except Exception:
+        tk_msg.showerror(None, utils.get_name('unexpected_error'))
+        raise
+    else:
+        if do_reset:
+            main.app.reset()
+
+
+def make_action(master: tk.Widget,
+                name: str,
+                func: str,
+                ans: Type[core.ActionNamespace] = None,
+                ) -> Callable:
+    """Make actions from a form and function name
+
+    :param master: is the master widget (passed to the form)
+    :param name: is the form name without 'Form'-suffix, e.g. 'book'
+    :param func: is the name of the function.
+      'search' is handled by :func:`.search_callback`
+      'view' is redirected to :func:`.view_action`
+    :param ans: is the ActionNamespace to use. If None, ``name`` is used to
+      select one automatically (must exist)
+    """
+    if ans is None:
+        ans = getattr(core, name.capitalize())
+    ans = common.NSWithLogin(ans)
+    form_cls = globals().get(
+        f'{name.capitalize()}{func.title().replace("_", "")}Form',
+        globals()[name.capitalize() + 'Form']
+    )
+    tag = FormTag.__members__.get(func.upper())
+    if func == 'view':
+        return partial(view_action, master, ans)
+    if func == 'search':
+        view_func = partial(view_data, name)
+        middle_callback = partial(search_callback, master, view_func, ans)
+        callback = partial(callback_adapter, middle_callback, False)
+    else:
+        callback = partial(callback_adapter, getattr(ans, func), True)
+    return partial(form_cls, master, tag, callback)
+
+
+def show_results(master: tk.Widget,
+                 results: Sequence,
+                 view_func: Callable[[tk.Widget, core.DataNamespace], None],
+                 ):
     """show search results as buttons taking the user to the appropriate view
 
-        Arguments:
-            - results: an iterable of objects as those returned by core.*.search
-            - view_func: the function to display information to the user
-            - master: the master widget, app.center by default
+    :param master: is the master widget in which the results are displayed
+    :param results: is a sequence of DataNS objects
+    :param view_func: is a function that displays data
     """
-    if master is None:
-        master = main.app.center
 
-    def search_hide():
-        rw.pack_forget()
-        show_btn = widgets.Button(search_frame, text=utils.get_name('back_to_results'))
-        show_btn.config(command=partial(search_show, show_btn))
-        show_btn.pack()
+    def search_show():
+        common.destroy_all_children(result_frame)
+        btn.config(text='')
+        f = form_cls(result_frame, None, lambda d: None)
+        f.set_data({str(i): dns for i, dns in enumerate(results)})
 
-    def search_show(btn):
-        btn.destroy()
-        ShowInfo.to_destroy.container.destroy()
-        ShowInfo.to_destroy = None
-        rw.pack()
+    def view_wrap(_master, dns):
+        common.destroy_all_children(result_frame)
+        btn.config(text=utils.get_name('back_to_results'), command=search_show)
+        return view_func(result_frame, dns)
 
-    def view_wrap(*args, **kwargs):
-        search_hide()
-        return view_func(*args, **kwargs)
+    all_widgets = {str(i): (LinkWidget, view_wrap, {'wraplength': WRAPLENGTH * 2})
+                   for i in range(len(results))}
+    form_cls = type('ConcreteSRForm', (SearchResultForm,), {'all_widgets': all_widgets})
+    common.destroy_all_children(master)
+    header = tk.Frame(master)
+    header.pack()
+    tk.Label(
+        header,
+        text=utils.get_name('{}_results', len(results)),
+        wraplength=WRAPLENGTH,
+    ).pack(side=tk.LEFT)
+    btn = tk.Button(header, wraplength=WRAPLENGTH)
+    btn.pack(side=tk.LEFT)
+    result_frame = tk.Frame(master)
+    result_frame.pack()
+    search_show()
 
-    search_frame = tk.Frame(master)
-    search_frame.pack()
-    rw = widgets.SearchResultWidget(search_frame, tuple(results), view_wrap)
-    rw.pack()
 
+def search_callback(master: tk.Widget,
+                    view_func: Callable[[tk.Widget, core.DataNamespace], None],
+                    ans: common.NSWithLogin,
+                    search_mode: str,
+                    exact_match: bool,
+                    **kwargs,
+                    ):
+    """Provide a search-specific callback. Intended for use with ``functools.partial``.
 
-def search(form_cls: T.Type[forms.BaseForm],
-           search_func: T.Callable[[T.Any], T.Iterable],
-           view_func: T.Callable[[T.Any], dict]
-           ) -> T.Callable[[T.Optional[tk.Event]], None]:
-    """wrapper for generic_formbased_action for search actions
+    This callback displays the search results with :func:`.show_results`.
+    These arguments are meant to be given beforehand:
+    :param master: is passed to :func:`.show_results`
+    :param view_func: is passed to :func:`.show_results`
+    :param ans: is the (wrapped) ActionNamespace used for searching
+      and getting result DataNamespaces
 
-    Arguments:
-        - form_cls: the misc.tkstuff.forms.Form subclass
-        - search_func: the function for searching
-        - view_func: the function for viewing individual results
+    These arguments typically are provided by the form submission:
+    :param search_mode: is ``'and'`` or ``'or'`` and specifies how the different
+      values are combined into a search query
+    :param exact_match: specified whether to use ``'eq'`` or ``'contains'`` operators
+    :param kwargs: are the search queries
     """
-    def search_callback(*, search_mode, exact_match, **kwargs):
-        q = ()
-        for k, val_seq in kwargs.items():
-            k = k.replace('__', '.')
-            if (isinstance(val_seq, str)
-                    or not isinstance(val_seq, collections.abc.Sequence)):
-                val_seq = [val_seq]
-            for v in val_seq:
-                if exact_match or not isinstance(v, str):
-                    q = ((k, 'eq', v), search_mode, q)
-                else:
-                    q = ((k, 'contains', v), search_mode, q)
+    q = ()
+    for k, val_seq in kwargs.items():
+        k = k.replace('__', '.')
+        if (isinstance(val_seq, str)
+                or not isinstance(val_seq, collections.abc.Sequence)):
+            val_seq = [val_seq]
+        for v in val_seq:
+            if exact_match or not isinstance(v, str):
+                q = ((k, 'eq', v), search_mode, q)
+            else:
+                q = ((k, 'contains', v), search_mode, q)
 
-        results = search_func(q)
-        show_results(results, view_func)
+    def wrapped_view(view_master, dns):
+        """wrap to get a complete DataNS"""
+        return view_func(view_master, ans.view_ns(dns['id']))
 
-    return generic_formbased_action('search', form_cls, search_callback, do_reset=False)
-
-
-class ShowInfo:
-    """provide callables that display information"""
-    to_destroy: T.ClassVar[T.Optional[tk.Widget]] = None
-    instances: T.ClassVar[T.Dict[str, 'ShowInfo']]
-    SpecialKeyFunc = T.Callable[[dict], T.Optional[T.Sequence]]
-
-    def __init__(
-            self,
-            namespace: T.Type[core.ActionNamespace],
-            special_keys: T.Mapping[str, SpecialKeyFunc] = {},  # noqa
-            id_type: type = str,
-        ):  # noqa
-        """Initialize
-
-        :param namespace: the action namespace to use for getting information
-        :param special_keys: a mapping from keys in the returned data to a function
-            taking the value mapped by the key and returning anew key
-            (may be None to use the default) and a value to pass
-            to widgets.InfoWidget.
-        :param id_type: the type of the ID
-        """
-        self.action_ns = common.NSWithLogin(namespace)
-        self.special_keys = special_keys
-        self.id_type = id_type
-        self.get_name_prefix = namespace.__name__ + '::'
-
-    def __call__(self, id_=None):
-        """ask for ID if not given"""
-        if id_ is None:
-            id_get_text = utils.get_name(self.get_name_prefix + 'id')
-            try:
-                id_ = mtkd.WidgetDialog.ask(
-                    main.app.root,
-                    widgets.OptionsFromSearch,
-                    {'action_ns': self.action_ns.ans},
-                    title=id_get_text,
-                    text=id_get_text,
-                )
-            except mtkd.UserExitedDialog:
-                main.app.reset()
-                return
-        self.display_information(id_)
-
-    def display_information(self, id_):
-        """actually display information"""
-        if ShowInfo.to_destroy is not None:
-            ShowInfo.to_destroy.container.destroy()
-        try:
-            data = self.action_ns.view_str(id_)
-        except core.BuchSchlossBaseError as e:
-            tk_msg.showerror(e.title, e.message)
-            main.app.reset()
-            return
-        pass_widgets = {utils.get_name('info_regarding'): data['__str__']}
-        for k, v in data.items():
-            display = utils.get_name(self.get_name_prefix + k)
-            if k in self.special_keys:
-                v = self.special_keys[k](data)
-                pass_widgets[display] = v
-            elif '_id' not in k and k != '__str__':
-                pass_widgets[display] = str(v)
-        iw = widgets.InfoWidget(main.app.center, pass_widgets)
-        iw.pack()
-        ShowInfo.to_destroy = iw
+    show_results(master, tuple(ans.search(q)), wrapped_view)
 
 
-ShowInfo.instances = {
-    'Book': ShowInfo(
-        core.Book,
-        {'borrowed_by': lambda d:
-            (widgets.Button, {
-                'text': d['borrowed_by'],
-                'command': (partial(ShowInfo.instances['Person'], d['borrowed_by_id'])
-                            if d['borrowed_by_id'] is not None else None)
-            })
-         },
-        int,
-    ),
-    'Person': ShowInfo(
-        core.Person,
-        {'borrows': lambda d:
-            [(widgets.Button, {
-                'text': t,
-                'command': partial(ShowInfo.instances['Book'], i)})
-             for t, i in zip(d['borrows'], d['borrow_book_ids'])],
-         },
-        int,
-    ),
-    'Borrow': ShowInfo(
-        core.Borrow,
-        {'person': lambda d:
-            (widgets.Button, {
-                'text': d['person'],
-                'command': partial(ShowInfo.instances['Person'], d['person_id'])
-            }),
-         'book': lambda d:
-             (widgets.Button, {
-                 'text': d['book'],
-                 'command': partial(ShowInfo.instances['Book'], d['book_id'])
-             }),
-         },
-        int,
-    ),
-}
-ShowInfo.instances.update({k: ShowInfo(getattr(core, k))
-                           for k in ('Library', 'Group', 'Member', 'Script')})
+def view_data(name: str, master: tk.Widget, dns: core.DataNamespace):
+    """Display data. Useful with ``functools.partial``.
+
+    :param name: is a :func:`.make_action`-compatible name
+    :param master: is the master widget to display data in
+    :param dns: is a DataNamespace of the object to display
+    """
+    common.destroy_all_children(master)
+    form_cls: Type[BaseForm] = globals()[name.capitalize() + 'Form']
+    form = form_cls(master, FormTag.VIEW, lambda **kw: None)
+    try:
+        form.set_data(dns)
+    except core.BuchSchlossBaseError as e:
+        tk_msg.showerror(e.title, e.message)
+    except Exception:
+        tk_msg.showerror(None, utils.get_name('unexpected_error'))
+        raise
 
 
-def login():
-    """log in"""
+def view_action(master: tk.Widget, ans: common.NSWithLogin):
+    """Ask for an ID and call :func:`.view_data`. Useful with ``functools.partial``"""
+    temp_form = type(
+        ans.ans.__name__ + 'Form',
+        (NameForm,),
+        {'all_widgets': {'id': (OptionsFromSearch, ans, {})}},
+    )
+    result = form_dialog(master.winfo_toplevel(), temp_form)  # noqa
+    if result is None:
+        main.app.reset()
+        return
+    view_data(ans.ans.__name__, master, ans.view_ns(result['id']))
+
+
+def login_logout():
+    """log in or log out"""
     if main.app.current_login.type is core.LoginType.GUEST:
-        try:
-            data = mtkd.FormDialog.ask(main.app.root, forms.LoginForm)
-        except mtkd.UserExitedDialog:
+        data = form_dialog(main.app.root, LoginForm)
+        if data is None:
             return
         try:
             main.app.current_login = core.login(**data)
         except core.BuchSchlossBaseError as e:
             tk_msg.showerror(e.title, e.message)
             return
-        main.app.header.set_info_text(
-            utils.get_name('logged_in_as_{}').format(
-                utils.get_name('Member[{}]({})').format(
-                    main.app.current_login.name,
-                    utils.level_names[main.app.current_login.level])))
+        cur_login = core.Member.view_ns(
+            main.app.current_login.name, login_context=core.internal_priv_lc).string
+        main.app.header.set_info_text(utils.get_name('logged_in_as_{}', cur_login))
         main.app.header.set_login_text(utils.get_name('action::logout'))
     else:
         main.app.current_login = core.guest_lc
-        main.app.header.set_info_text(utils.get_name('logged_out'))
+        main.app.header.set_info_text(utils.get_name('not_logged_in'))
         main.app.header.set_login_text(utils.get_name('action::login'))
 
 
@@ -306,45 +439,91 @@ def display_lua_data(data):
     popup = tk.Toplevel(main.app.root)
     popup.transient(main.app.root)
     popup.grab_set()
-    widget_cls, kwargs = get_lua_data_widget(popup, data)
-    widget_cls = mtk.ScrollableWidget(**config.gui2.widget_size.popup.mapping)(widget_cls)
-    widget_cls(popup, *kwargs.pop('*args', ()), **kwargs).pack()
+    outer_frame = tk.Frame(popup)
+    outer_frame.pack()
+    size = config.gui2.widget_size.popup
+    frame = tk.Frame(outer_frame, **size.mapping)
+    frame.propagate(False)
+    frame.grid(row=0, column=0)
+    # This isn't quite right because the x-scrollbar (the button is outside the frame)
+    # should also be considered, but it's probably good enough
+    view_height = size.height // ttk.Style().configure('Treeview', 'rowheight')
+    view = ttk.Treeview(frame, height=view_height)
+    width, height = add_lua_data_entries(view, '', data)
+    view.column('#0', width=width)
+    if height > view['height']:
+        sb = tk.Scrollbar(outer_frame, command=view.yview, orient=tk.VERTICAL)
+        sb.grid(row=0, column=1, sticky=tk.NS)
+        view['yscrollcommand'] = sb.set
+    if width > config.gui2.widget_size.popup.width:
+        sb = tk.Scrollbar(outer_frame, command=view.xview, orient=tk.HORIZONTAL)
+        sb.grid(row=1, column=0, sticky=tk.EW)
+        view['xscrollcommand'] = sb.set
+    view.pack(expand=True, fill=tk.BOTH)
     tk.Button(popup, command=popup.destroy, text='OK').pack()
 
 
-def get_lua_data_widget(master, data):
-    """recursively create a widget for lua display callback"""
-    if isinstance(data, dict):
-        return (mtk.ContainingWidget,
-                {'*args': itertools.chain(*(((tk.Label, {'text': k}),
-                                            get_lua_data_widget(master, v))
-                                            for k, v in data.items())),
-                 'horizontal': 2})
-    elif isinstance(data, T.Sequence) and not isinstance(data, str):
-        return (mtk.ContainingWidget,
-                {'*args': [get_lua_data_widget(master, d) for d in data],
-                 'direction': (tk.BOTTOM, tk.RIGHT)})
+def add_lua_data_entries(view, parent, data, width=0, height=0, indent=1):
+    """add entries to the Treeview and return (max width, total height)"""
+    if isinstance(data, Sequence) and not isinstance(data, str):
+        data = ((d, ()) if isinstance(d, str) else (i, d) for i, d in enumerate(data, 1))
+    elif isinstance(data, Mapping):
+        data = data.items()
     else:
-        return (tk.Label, {'text': data})
+        data = ((data, ()),)
+    for name, sub in data:
+        width = max(width, tk_font.nametofont('TkDefaultFont').measure(name) + 25*indent)
+        child = view.insert(parent, tk.END, text=name)
+        width, height = add_lua_data_entries(view, child, sub, width, height+1, indent+1)
+    return width, height
 
 
 def handle_lua_get_data(data_spec):
     """provide a callback for lua's get_data"""
     type_widget_map = {
-        'int': widgets.IntEntry,
-        'bool': widgets.CheckbuttonWithVar,
-        'str': tk.Entry,
+        'int': IntEntry,
+        'bool': Checkbox,
+        'str': NonEmptyEntry,
     }
-    name_data = {}
-    cls_body = {'get_name': name_data.__getitem__}
-    for k, name, v in data_spec:
-        cls_body[k] = mtkf.Element(type_widget_map[v])
+
+    def get_name(internal):
+        try:
+            return name_data[internal]
+        except KeyError:
+            # only happens on errors
+            return utils.get_name('form::' + internal)
+
+    name_data = {'submit': utils.get_name('form::submit')}
+    cls_body = {'get_name': staticmethod(get_name), 'all_widgets': {}}
+    for k, name, t, *x in data_spec:
+        choices = [c if isinstance(c, str) else (c['id'], c.string) for cs in x for c in cs]
+        if t == 'choice':
+            w = (DropdownChoices, choices, {'default': None})
+        elif t == 'multichoices':
+            w = (MultiChoicePopup, choices, {})
+        else:
+            w = type_widget_map[t]
+        cls_body['all_widgets'][k] = w
         name_data[k] = name
-    form = type('Cli2DataForm', (mtkf.Form,), cls_body)
+    form_cls = type('LuaGetDataForm', (BaseForm,), cls_body)
+    common.destroy_all_children(main.app.center)
+    watcher = tk.Variable()
+    data = None
+
+    def cb(new):
+        nonlocal data
+        data = new
+        watcher.set('set')
+
+    main.app.on_next_reset.append(lambda: watcher.set('set'))
     try:
-        return mtkd.FormDialog.ask(main.app.root, form)
-    except mtkd.UserExitedDialog:
-        return None
+        form = form_cls(main.app.center, None, cb)
+    except core.BuchSchlossBaseError as e:
+        tk_msg.showerror(e.title, e.message)
+        main.app.reset()
+    else:
+        form.frame.wait_variable(watcher)
+    return data
 
 
 def get_script_action(script_spec):
@@ -360,36 +539,158 @@ def get_script_action(script_spec):
             )()
         except core.BuchSchlossBaseError as e:
             tk_msg.showerror(e.title, e.message)
-        main.app.reset()
+        finally:
+            main.app.reset()
 
     return action
 
-# NOTE: the following functions aren't used anywhere
-# the decorator registers them in common.NSWithLogin
+
+# Form definitions
 
 
-@common.NSWithLogin.override('Book', 'new')  # actually used because it's shorter
-def new_book(**kwargs):
-    tk_msg.showinfo(
-        utils.get_name('Book'),
-        utils.get_name('Book::new_id_{}').format(
-            core.Book.new(login_context=main.app.current_login, **kwargs))
-    )
+class BookForm(SearchForm, EditForm, ViewForm):
+    all_widgets = {
+        'id': {FormTag.VIEW: DisplayWidget},
+        'isbn': {
+            FormTag.NEW: (ISBNEntry, True, {}),
+            None: (ISBNEntry, False, {}),
+        },
+        'author': NonEmptyREntry,
+        'title': NonEmptyEntry,
+        'series': SeriesInput,
+        'series_number': SeriesInput.NumberDummy,
+        'language': NonEmptyREntry,
+        'publisher': NonEmptyREntry,
+        'concerned_people': NullREntry,
+        'year': IntEntry,
+        'medium': NonEmptyREntry,
+        'borrow': {FormTag.VIEW: (
+            LinkWidget,
+            partial(view_data, 'person'),
+            {'attr': 'person'},
+        )},
+        'genres': (MultiChoicePopup, lambda: Book.get_all_genres(), {'new': True}),
+        'library': (OptionsFromSearch, Library, {}),
+        'groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {'new': True}),
+        'shelf': NonEmptyREntry,
+    }
 
 
-@common.NSWithLogin.override('Borrow', 'restitute')
-def borrow_restitute(book):
-    core.Borrow.edit(
-        common.NSWithLogin(core.Book).view_ns(book),
-        is_back=True,
-        login_context=main.app.current_login,
-    )
+class PersonForm(SearchForm, EditForm, ViewForm):
+    all_widgets = {
+        'id': {
+            FormTag.SEARCH: None,
+            FormTag.NEW: IntEntry,
+        },
+        'first_name': NonEmptyREntry,
+        'last_name': NonEmptyREntry,
+        'class_': ClassEntry,
+        'max_borrow': IntEntry,
+        'borrows': {FormTag.VIEW: (
+            LinkWidget,
+            partial(view_data, 'book'),
+            {'attr': 'book', 'multiple': True},
+        )},
+        'libraries': (SearchMultiChoice, Library, {}),
+        'pay': {
+            FormTag.SEARCH: None,
+            FormTag.VIEW: None,
+            None: Checkbox,
+        },
+        'borrow_permission': {FormTag.VIEW: DisplayWidget},
+    }
 
 
-@common.NSWithLogin.override('Borrow', 'extend')
-def borrow_extend(book, weeks):
-    core.Borrow.edit(
-        common.NSWithLogin(core.Book).view_ns(book),
-        weeks=weeks,
-        login_context=main.app.current_login,
-    )
+class MemberForm(AuthedForm, SearchForm, EditForm, ViewForm):
+    all_widgets = {
+        'name': NonEmptyREntry,
+        'level': (DropdownChoices, tuple(utils.level_names.items()), 1, {}),
+        'password': {FormTag.NEW: ConfirmedPasswordInput},
+    }
+
+
+class MemberChangePasswordForm(AuthedForm):
+    all_widgets = {
+        'member': (
+            FallbackOFS,
+            common.NSWithLogin(core.Member),
+            {'fb_default': lambda: getattr(main.app.current_login, 'name', None)},
+        ),
+        'current_password': PasswordEntry,
+        'new_password': ConfirmedPasswordInput,
+    }
+
+
+class LoginForm(NameForm):
+    all_widgets = {
+        'name': NonEmptyREntry,
+        'password': PasswordEntry,
+    }
+
+
+class LibraryForm(SearchForm, EditForm, ViewForm):
+    all_widgets = {
+        'name': NonEmptyREntry,
+        'pay_required': Checkbox,
+    }
+
+
+class BorrowForm(ViewForm):
+    # NOTE: this form is actually only used for NEW and VIEW
+    # EDIT is split into restitute + extend, SEARCH is separate
+    all_widgets = {
+        'person': (OptionsFromSearch, Person, {}),
+        'book': (OptionsFromSearch, Book, {
+            'condition': ('not', ('exists', ('borrow.is_back', 'eq', False)))}),
+        'weeks': {FormTag.NEW: IntEntry},
+        'override': {FormTag.NEW: Checkbox},
+        'return_date': {FormTag.VIEW: DisplayWidget},
+    }
+
+
+class BorrowRestituteForm(BaseForm):
+    all_widgets = {
+        'book': (OptionsFromSearch, Book,
+                 {'condition': ('borrow.is_back', 'eq', False)}),
+    }
+
+
+class BorrowExtendForm(BaseForm):
+    all_widgets = {
+        'book': (OptionsFromSearch, Book,
+                 {'condition': ('borrow.is_back', 'eq', False)}),
+        'weeks': IntEntry,
+    }
+
+
+class BorrowSearchForm(SearchForm):
+    all_widgets = {
+        'book__title': NullREntry,
+        'book__author': NullREntry,
+        'book__library': (OptionsFromSearch, Library, {}),
+        'book__groups': (MultiChoicePopup, lambda: Book.get_all_groups(), {}),
+        # this has on_empty='error', but empty values are removed when searching
+        # the Null*Entries above are not really needed
+        'person__class_': ClassEntry,
+        'person__libraries': (SearchMultiChoice, Library, {}),
+        'is_back': (Checkbox, {'allow_none': True}),
+    }
+
+
+class ScriptForm(AuthedForm, SearchForm, EditForm, ViewForm):
+    all_widgets = {
+        'name': ScriptNameEntry,
+        'permissions': {
+            None: (MultiChoicePopup, [
+                (p.name, utils.get_name('script::permissions::' + p.name))
+                for p in core.ScriptPermissions], {}),
+            FormTag.VIEW: (DisplayWidget, 'list', {'get_name': 'script::permissions::'}),
+        },
+        'setlevel': (DropdownChoices,
+                     ((None, '-----'), *utils.level_names.items()), {}),
+        'code': {
+            None: Text,
+            FormTag.SEARCH: None,
+            FormTag.VIEW: None,
+        }
+    }

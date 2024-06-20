@@ -18,7 +18,7 @@ DEFAULT_INTRO_TEXT = """Buchschloss
 https://github.com/mik2k2/buchschloss"""
 MODULE_DIR = os.path.dirname(__file__)
 INCLUDE_NAME = 'include'  # I'd love to make this configurable...
-UI_SECTIONS = ('cli', 'gui2')
+UI_SECTIONS = ('lua', 'gui2')
 ExceptSpec = T.Union[T.Type[BaseException], T.Tuple[T.Type[BaseException], ...]]
 ActuallyPathLike = T.Union[bytes, str, os.PathLike]
 
@@ -130,7 +130,7 @@ def load_file(path: ActuallyPathLike,
 
 def load_names(name_file: ActuallyPathLike,
                name_format: str
-               ) -> T.Mapping:
+               ) -> dict:
     """Load the name file with inclusions ignoring errors"""
     def convert_name_data(data):
         if isinstance(data, str):
@@ -150,7 +150,7 @@ def load_names(name_file: ActuallyPathLike,
     # TODO: this is not very nice.
     #   is there a way to make sure the keys are valid without going berserk
     #   if something unexpected happens?
-    level_names = processed_data.get('level names')
+    level_names = processed_data.pop('level_names', None)
     if not isinstance(level_names, dict):
         level_names = {}
     for k, v in level_names.copy().items():
@@ -162,10 +162,13 @@ def load_names(name_file: ActuallyPathLike,
             if 0 <= new_k <= MAX_LEVEL and isinstance(v, str):
                 level_names[new_k] = v
         del level_names[k]
-    if not len(level_names) >= 2:
+    if len(level_names) < 2:
         # gui2 needs at least two
-        sys.stderr.write('ATTENTION: filling default values for level names\n')
-        level_names = {i: 'level_' + str(i) for i in range(MAX_LEVEL + 1)}
+        if level_names and 0 not in level_names:
+            level_names[0] = '-----'
+        else:
+            sys.stderr.write('ATTENTION: filling default values for level names\n')
+            level_names = {i: 'level_' + str(i) for i in range(MAX_LEVEL + 1)}
     processed_data['level names'] = level_names
     return processed_data
 
@@ -244,6 +247,7 @@ def insert_name_data(config):
     """load name data into [utils][names]"""
     name_data = load_names(
         config['utils']['names']['file'], config['utils']['names']['format'])
+    name_data['date'] = config['utils']['names']['date format']
     # without unrepr=True, this gets converted to a Section
     # which fails with numeric keys (level representations)
     config['utils'].__setitem__('names', name_data, unrepr=True)
@@ -276,7 +280,7 @@ def redirect_stderr(config):
 def apply_permission_level_defaults(config):
     """apply default values for permission levels"""
     conf = config['core']['required levels']
-    for k in ('Book', 'Person', 'Group', 'Library', 'Member', 'Script'):
+    for k in ('Book', 'Person', 'Library', 'Member', 'Script'):
         if conf[k]['search'] is None:
             conf[k]['search'] = conf[k]['view']
         if conf[k]['edit'] is None:
@@ -285,24 +289,12 @@ def apply_permission_level_defaults(config):
     special_replacements = (
         (('Borrow', 'search'), ('Borrow', 'view')),
         (('Borrow', 'override'), ('Person', 'edit')),
-        (('Group', 'activate'), ('Book', 'edit')),
         (('Member', 'change password'), ('Member', 'edit')),
     )
     for (dest_1, dest_2), (src_1, src_2) in special_replacements:
         if conf[dest_1][dest_2] is None:
             conf[dest_1][dest_2] = conf[src_1][src_2]
 
-    return config
-
-
-def create_borrow_time_list(config):
-    """create a list of borrow time limits"""
-    limit_list = []
-    current = 0
-    for i in range(MAX_LEVEL + 1):
-        current = max(current, config['core']['borrow time limit'].get(str(i), 0))
-        limit_list.append(current)
-    config['core']['borrow time limit'] = limit_list
     return config
 
 
@@ -314,7 +306,6 @@ post_validation = (
     insert_name_data,
     apply_ui_intro_text_default,
     apply_permission_level_defaults,
-    create_borrow_time_list,
     check_smtp_auth_data,
     redirect_stderr,
 )
